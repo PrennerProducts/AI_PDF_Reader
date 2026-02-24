@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Env
+.env
+infra/.env
+
+# Runtime data
+data/uploads/
+data/exports/
+data/logs/
+
+# Ollama / model artifacts
+ollama/
+models/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
