@@ -4,6 +4,8 @@ from decimal import Decimal, InvalidOperation
 import json
 import os
 from pathlib import Path
+import shutil
+from threading import Lock
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -18,6 +20,8 @@ from db import (
     get_document_result,
     insert_document,
     list_documents,
+    reset_document_results,
+    update_line_item_llm_image_ids,
     replace_document_images,
     replace_document_amount_lines,
     replace_line_items,
@@ -27,7 +31,7 @@ from db import (
 from extractor import extract_pdf_images, extract_pdf_text
 from exporter import build_export_content
 from image_matcher import rank_line_item_candidates_with_vlm
-from llm import enrich_document_fields_with_ollama
+from llm import enrich_document_fields_with_ollama, extract_document_full_with_ollama
 from parser import parse_document_text
 from structured_parser import extract_amount_lines, extract_line_items
 
@@ -57,6 +61,9 @@ COMPARE_FIELDS = (
     "totals.vat_total",
     "totals.gross_total",
 )
+
+PROCESS_PROGRESS: dict[int, dict[str, Any]] = {}
+PROCESS_PROGRESS_LOCK = Lock()
 
 
 class ParseTextRequest(BaseModel):
@@ -122,6 +129,54 @@ def _json_safe(value):
     if isinstance(value, list):
         return [_json_safe(item) for item in value]
     return value
+
+
+def _utc_now_iso() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def _set_process_progress(
+    document_id: int,
+    *,
+    stage: str,
+    message: str,
+    mode: str | None = None,
+    step: int | None = None,
+    total: int | None = None,
+    page_ref: int | None = None,
+    status: str = "processing",
+    error: str | None = None,
+) -> None:
+    payload = {
+        "document_id": document_id,
+        "status": status,
+        "mode": mode,
+        "stage": stage,
+        "message": message,
+        "step": step,
+        "total": total,
+        "page_ref": page_ref,
+        "error": error,
+        "updated_at": _utc_now_iso(),
+    }
+    with PROCESS_PROGRESS_LOCK:
+        previous = PROCESS_PROGRESS.get(document_id) or {}
+        if payload["mode"] is None:
+            payload["mode"] = previous.get("mode")
+        PROCESS_PROGRESS[document_id] = payload
+
+
+def _get_process_progress(document_id: int) -> dict[str, Any] | None:
+    with PROCESS_PROGRESS_LOCK:
+        payload = PROCESS_PROGRESS.get(document_id)
+        if not payload:
+            return None
+        return dict(payload)
+
+
+def _clear_process_progress(document_id: int) -> None:
+    with PROCESS_PROGRESS_LOCK:
+        PROCESS_PROGRESS.pop(document_id, None)
 
 
 def _clean_optional_str(value: Any) -> str | None:
@@ -278,6 +333,21 @@ def _read_json_file(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"JSON root is not an object: {path}")
     return payload
+
+
+def _remove_file(path: Path) -> bool:
+    if not path.exists() or not path.is_file():
+        return False
+    path.unlink(missing_ok=True)
+    return True
+
+
+def _remove_dir(path: Path) -> int:
+    if not path.exists() or not path.is_dir():
+        return 0
+    file_count = sum(1 for item in path.rglob("*") if item.is_file())
+    shutil.rmtree(path, ignore_errors=True)
+    return file_count
 
 
 def _build_llm_run_list_entry(document_id: int, payload: dict[str, Any], path: Path) -> dict[str, Any]:
@@ -626,6 +696,113 @@ def _build_line_item_rows(extracted_text: str, template: str) -> list[dict]:
     return rows
 
 
+def _build_amount_line_rows_from_llm(
+    llm_amount_lines: list[dict[str, Any]],
+    totals: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in llm_amount_lines:
+        if not isinstance(item, dict):
+            continue
+        amount = _parse_eu_decimal(item.get("amount_raw"))
+        if amount is None:
+            continue
+        sort_order = _to_int_safe(item.get("sort_order"))
+        rows.append(
+            {
+                "line_type": _clean_optional_str(item.get("line_type")) or "other",
+                "label_raw": _clean_optional_str(item.get("label_raw")) or "LLM amount line",
+                "percent": _parse_eu_decimal(item.get("percent_raw")),
+                "base_amount": _parse_eu_decimal(item.get("base_amount_raw")),
+                "amount": amount,
+                "sort_order": sort_order if sort_order is not None else len(rows),
+            }
+        )
+
+    def _upsert_total_line(line_type: str, amount_raw: Any, fallback_label: str, percent: Decimal | None = None) -> None:
+        raw_text = amount_raw if isinstance(amount_raw, str) else _clean_optional_str(amount_raw)
+        amount = _parse_eu_decimal(raw_text)
+        if amount is None:
+            return
+        for row in rows:
+            if row.get("line_type") == line_type:
+                row["amount"] = amount
+                if percent is not None:
+                    row["percent"] = percent
+                return
+        rows.append(
+            {
+                "line_type": line_type,
+                "label_raw": fallback_label,
+                "percent": percent,
+                "base_amount": None,
+                "amount": amount,
+                "sort_order": len(rows),
+            }
+        )
+
+    totals_obj = totals if isinstance(totals, dict) else {}
+    _upsert_total_line("net_total", totals_obj.get("net_total"), "Nettosumme")
+    _upsert_total_line("vat", totals_obj.get("vat_total"), "Mehrwertsteuer", Decimal("20.00"))
+    _upsert_total_line("total", totals_obj.get("gross_total"), "Angebotssumme")
+
+    rows = sorted(rows, key=lambda row: (row.get("sort_order", 0), row.get("line_type", "")))
+    for idx, row in enumerate(rows):
+        row["sort_order"] = idx
+    return rows
+
+
+def _build_line_item_rows_from_llm(llm_line_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in llm_line_items:
+        if not isinstance(item, dict):
+            continue
+        quantity = _parse_eu_decimal(item.get("quantity_raw"))
+        width_mm = _parse_eu_decimal(item.get("width_raw"))
+        height_mm = _parse_eu_decimal(item.get("height_raw"))
+        unit_price = _parse_eu_decimal(item.get("unit_price_raw"))
+        line_total = _parse_eu_decimal(item.get("line_total_raw"))
+        page_ref = _to_int_safe(item.get("page_ref"))
+        if page_ref is not None and page_ref <= 0:
+            page_ref = None
+
+        llm_confidence = _to_float_safe(item.get("confidence"))
+        if llm_confidence is None:
+            confidence = Decimal("0.72") if line_total is None else Decimal("0.82")
+        else:
+            llm_confidence = max(0.0, min(1.0, llm_confidence))
+            confidence = Decimal(f"{llm_confidence:.4f}")
+
+        metadata = {
+            "source": "llm",
+            "quantity_raw": item.get("quantity_raw"),
+            "width_raw": item.get("width_raw"),
+            "height_raw": item.get("height_raw"),
+            "unit_price_raw": item.get("unit_price_raw"),
+            "line_total_raw": item.get("line_total_raw"),
+            "llm_confidence_raw": item.get("confidence"),
+        }
+        rows.append(
+            {
+                "position_no": _clean_optional_str(item.get("position_no")),
+                "lv_pos": _clean_optional_str(item.get("lv_pos")),
+                "is_alternative": bool(item.get("is_alternative", False)),
+                "quantity": quantity,
+                "unit": _clean_optional_str(item.get("unit")),
+                "width_mm": width_mm,
+                "height_mm": height_mm,
+                "description_short": _clean_optional_str(item.get("description_short")),
+                "description_long": _clean_optional_str(item.get("description_long")),
+                "unit_price": unit_price,
+                "line_total": line_total,
+                "page_ref": page_ref,
+                "confidence": confidence,
+                "metadata_json": json.dumps(metadata, ensure_ascii=True),
+            }
+        )
+    return rows
+
+
 @app.on_event("startup")
 def startup() -> None:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -763,12 +940,77 @@ def documents(limit: int = Query(default=20, ge=1, le=200)):
     return {"items": items, "count": len(items), "limit": limit}
 
 
+@app.post("/reset/{document_id}")
+def reset_document(document_id: int, delete_logs: bool = Query(default=True)):
+    reset_info = reset_document_results(document_id)
+    if not reset_info:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    _clear_process_progress(document_id)
+
+    removed_files = 0
+    if delete_logs:
+        raw_text_path = reset_info.get("previous_raw_text_path")
+        if raw_text_path:
+            try:
+                removed_files += int(_remove_file(Path(raw_text_path)))
+            except Exception:
+                pass
+
+        removed_files += int(_remove_file(TEXT_DUMP_DIR / f"document_{document_id}.txt"))
+        removed_files += _remove_dir(IMAGE_DUMP_DIR / f"document_{document_id}")
+
+        for path in _list_llm_dump_files(document_id):
+            removed_files += int(_remove_file(path))
+        removed_files += int(_remove_file(_llm_latest_file_path(document_id)))
+
+    return {
+        "document_id": reset_info["id"],
+        "status": reset_info["status"],
+        "deleted_amount_lines": reset_info["deleted_amount_lines"],
+        "deleted_line_items": reset_info["deleted_line_items"],
+        "deleted_images": reset_info["deleted_images"],
+        "deleted_log_files": removed_files,
+        "delete_logs": delete_logs,
+        "updated_at": reset_info["updated_at"],
+    }
+
+
 @app.get("/result/{document_id}")
 def result(document_id: int):
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
     return _json_safe(result_data)
+
+
+@app.get("/progress/{document_id}")
+def process_progress(document_id: int):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    progress = _get_process_progress(document_id)
+    if not progress:
+        status_text = str(document.get("status") or "unknown")
+        default_message = {
+            "uploaded": "Bereit zum Start.",
+            "processing": "Verarbeitung laeuft.",
+            "processed": "Verarbeitung abgeschlossen.",
+            "failed": "Verarbeitung fehlgeschlagen.",
+        }.get(status_text, f"Status: {status_text}")
+        progress = {
+            "document_id": document_id,
+            "status": status_text,
+            "mode": None,
+            "stage": status_text,
+            "message": default_message,
+            "step": None,
+            "total": None,
+            "page_ref": None,
+            "error": document.get("error_message"),
+            "updated_at": _utc_now_iso(),
+        }
+    return _json_safe({"document_id": document_id, "progress": progress})
 
 
 @app.get("/llm-runs/{document_id}")
@@ -1073,6 +1315,52 @@ def match_images(
     )
 
 
+def _persist_llm_image_assignments(document_id: int) -> dict[str, Any]:
+    try:
+        payload = match_images(
+            document_id=document_id,
+            strategy="hybrid",
+            max_candidates=6,
+            max_items=250,
+            allow_multiple=True,
+            vlm_min_confidence=0.40,
+        )
+    except HTTPException as exc:
+        return {"status": "skipped", "reason": f"match_images_http_{exc.status_code}", "updated_line_items": 0}
+    except Exception as exc:
+        return {"status": "error", "reason": str(exc)[:180], "updated_line_items": 0}
+
+    raw_items = payload.get("items")
+    if not isinstance(raw_items, list):
+        return {"status": "skipped", "reason": "match_items_missing", "updated_line_items": 0}
+
+    assignments: dict[int, list[int]] = {}
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        line_item_id = _to_int_safe(item.get("line_item_id"))
+        selected_raw = item.get("selected_image_ids")
+        if line_item_id is None or not isinstance(selected_raw, list):
+            continue
+        selected_ids: list[int] = []
+        for value in selected_raw:
+            parsed = _to_int_safe(value)
+            if parsed is not None:
+                selected_ids.append(parsed)
+        selected_ids = _dedupe_int_list(selected_ids)
+        if selected_ids:
+            assignments[line_item_id] = selected_ids
+
+    updated_count = update_line_item_llm_image_ids(document_id, assignments)
+    return {
+        "status": "ok",
+        "updated_line_items": updated_count,
+        "assigned_line_items": len(assignments),
+        "matched_items": (payload.get("summary") or {}).get("matched_items"),
+        "vlm_selected_items": (payload.get("summary") or {}).get("vlm_selected_items"),
+    }
+
+
 @app.get("/preview/{document_id}")
 def preview_document(
     document_id: int,
@@ -1128,6 +1416,13 @@ def process_document(
     update_document_status(document_id, status="processing", error_message=None)
 
     requested_mode = _resolve_process_mode(process_mode=process_mode, use_llm=use_llm, llm_override=llm_override)
+    _set_process_progress(
+        document_id,
+        stage="start",
+        message=f"Verarbeitung gestartet (Mode: {requested_mode}).",
+        mode=requested_mode,
+        status="processing",
+    )
     llm_requested = requested_mode != "parser_only"
     llm_enabled_env = _is_truthy(os.getenv("LLM_ENABLED"), default=True)
     llm_enabled = llm_requested and llm_enabled_env
@@ -1143,73 +1438,181 @@ def process_document(
     position_count = 0
     line_item_rows: list[dict[str, Any]] = []
     amount_line_rows: list[dict[str, Any]] = []
+    llm_image_assignment_summary: dict[str, Any] | None = None
 
     try:
+        _set_process_progress(
+            document_id,
+            stage="extract_text",
+            message="PDF-Text wird extrahiert.",
+            mode=requested_mode,
+            status="processing",
+        )
         extracted_text = extract_pdf_text(source_path)
         text_dump_path = TEXT_DUMP_DIR / f"document_{document_id}.txt"
         text_dump_path.write_text(extracted_text, encoding="utf-8")
+        _set_process_progress(
+            document_id,
+            stage="extract_images",
+            message="PDF-Bilder werden extrahiert.",
+            mode=requested_mode,
+            status="processing",
+        )
         image_rows = extract_pdf_images(source_path, IMAGE_DUMP_DIR / f"document_{document_id}")
 
-        parsed_base = parse_document_text(extracted_text)
-        parsed = dict(parsed_base)
-        template = _clean_optional_str(parsed.get("template")) or "generic"
-
-        if llm_requested and not llm_enabled_env:
-            llm_result = {
-                "ok": False,
-                "status": "disabled_env",
-                "model": llm_model,
-                "error": "LLM disabled via LLM_ENABLED=false.",
-                "raw_text": None,
-                "fields": {},
-            }
-        elif llm_enabled:
-            timeout_raw = os.getenv("LLM_TIMEOUT_SECONDS", "120").strip()
-            try:
-                timeout_seconds = max(5.0, float(timeout_raw))
-            except ValueError:
-                timeout_seconds = 120.0
-            llm_result = enrich_document_fields_with_ollama(
-                extracted_text=extracted_text,
-                parser_snapshot={
-                    "template": parsed_base.get("template"),
-                    "document_number": parsed_base.get("document_number"),
-                    "document_date": parsed_base.get("document_date"),
-                    "project_ref": parsed_base.get("project_ref"),
-                    "currency": parsed_base.get("currency"),
-                    "totals": parsed_base.get("totals"),
-                },
-                timeout_seconds=timeout_seconds,
-            )
+        parsed_base: dict[str, Any]
+        parsed: dict[str, Any]
+        if requested_mode == "llm_only":
+            timeout_raw = os.getenv("LLM_ONLY_TIMEOUT_SECONDS", os.getenv("LLM_TIMEOUT_SECONDS", "300")).strip()
         else:
-            llm_result = {
-                "ok": False,
-                "status": "not_requested",
-                "model": llm_model,
-                "error": None,
-                "raw_text": None,
-                "fields": {},
-            }
+            timeout_raw = os.getenv("LLM_TIMEOUT_SECONDS", "120").strip()
+        try:
+            timeout_seconds = max(5.0, float(timeout_raw))
+        except ValueError:
+            timeout_seconds = 300.0 if requested_mode == "llm_only" else 120.0
 
-        llm_changes = []
-        if llm_enabled and llm_result and llm_result.get("ok"):
+        if requested_mode == "llm_only":
+            parsed_base = {
+                "template": "llm_only",
+                "document_number": None,
+                "document_date": None,
+                "project_ref": None,
+                "currency": None,
+                "supplier_name": None,
+                "totals": {"net_total": None, "vat_total": None, "gross_total": None},
+                "position_count": 0,
+            }
+            if not llm_enabled_env:
+                llm_result = {
+                    "ok": False,
+                    "status": "disabled_env",
+                    "model": llm_model,
+                    "error": "LLM disabled via LLM_ENABLED=false.",
+                    "raw_text": None,
+                    "fields": {},
+                    "amount_lines": [],
+                    "line_items": [],
+                }
+            else:
+                def _llm_progress(event: dict[str, Any]) -> None:
+                    stage = _clean_optional_str(event.get("stage")) or "llm_only"
+                    message = _clean_optional_str(event.get("message")) or "LLM-only Verarbeitung laeuft."
+                    _set_process_progress(
+                        document_id,
+                        stage=stage,
+                        message=message,
+                        mode=requested_mode,
+                        step=_to_int_safe(event.get("step")),
+                        total=_to_int_safe(event.get("total")),
+                        page_ref=_to_int_safe(event.get("page_ref")),
+                        status="processing",
+                    )
+
+                llm_result = extract_document_full_with_ollama(
+                    extracted_text=extracted_text,
+                    timeout_seconds=timeout_seconds,
+                    progress_callback=_llm_progress,
+                )
+
+            if not (llm_result and llm_result.get("ok")):
+                status = (llm_result or {}).get("status") or "error"
+                error_text = (llm_result or {}).get("error") or "unknown"
+                raise RuntimeError(f"LLM-only extraction failed ({status}): {error_text}")
+
             llm_fields = llm_result.get("fields")
             llm_fields = llm_fields if isinstance(llm_fields, dict) else {}
-            if requested_mode == "llm_only":
-                parsed, llm_changes = _build_llm_only_fields(parsed_base, llm_fields)
-            elif requested_mode == "llm_override":
-                parsed, llm_changes = _merge_parser_with_llm_fields(parsed_base, llm_fields, override=True)
-            else:
-                parsed, llm_changes = _merge_parser_with_llm_fields(parsed_base, llm_fields, override=False)
-
-        llm_applied = bool(llm_enabled and llm_result and llm_result.get("ok"))
-        if requested_mode == "parser_only":
-            process_mode_effective = "parser_only"
-        elif llm_applied:
-            process_mode_effective = requested_mode
+            parsed, llm_changes = _build_llm_only_fields(parsed_base, llm_fields)
+            parsed["template"] = "llm_only"
+            template = "llm_only"
+            amount_line_rows = _build_amount_line_rows_from_llm(
+                llm_result.get("amount_lines") if isinstance(llm_result.get("amount_lines"), list) else [],
+                parsed.get("totals") if isinstance(parsed.get("totals"), dict) else {},
+            )
+            line_item_rows = _build_line_item_rows_from_llm(
+                llm_result.get("line_items") if isinstance(llm_result.get("line_items"), list) else []
+            )
+            process_mode_effective = "llm_only"
         else:
-            process_mode_effective = "parser_only_fallback"
+            _set_process_progress(
+                document_id,
+                stage="parse_text",
+                message="Parser extrahiert Felder, Positionen und Betragszeilen.",
+                mode=requested_mode,
+                status="processing",
+            )
+            parsed_base = parse_document_text(extracted_text)
+            parsed = dict(parsed_base)
+            template = _clean_optional_str(parsed.get("template")) or "generic"
 
+            if llm_requested and not llm_enabled_env:
+                llm_result = {
+                    "ok": False,
+                    "status": "disabled_env",
+                    "model": llm_model,
+                    "error": "LLM disabled via LLM_ENABLED=false.",
+                    "raw_text": None,
+                    "fields": {},
+                }
+            elif llm_enabled:
+                _set_process_progress(
+                    document_id,
+                    stage="llm_enrich",
+                    message="LLM reichert Parser-Ergebnis an.",
+                    mode=requested_mode,
+                    status="processing",
+                )
+                llm_result = enrich_document_fields_with_ollama(
+                    extracted_text=extracted_text,
+                    parser_snapshot={
+                        "template": parsed_base.get("template"),
+                        "document_number": parsed_base.get("document_number"),
+                        "document_date": parsed_base.get("document_date"),
+                        "project_ref": parsed_base.get("project_ref"),
+                        "currency": parsed_base.get("currency"),
+                        "totals": parsed_base.get("totals"),
+                    },
+                    timeout_seconds=timeout_seconds,
+                )
+            else:
+                llm_result = {
+                    "ok": False,
+                    "status": "not_requested",
+                    "model": llm_model,
+                    "error": None,
+                    "raw_text": None,
+                    "fields": {},
+                }
+
+            llm_changes = []
+            if llm_enabled and llm_result and llm_result.get("ok"):
+                llm_fields = llm_result.get("fields")
+                llm_fields = llm_fields if isinstance(llm_fields, dict) else {}
+                if requested_mode == "llm_override":
+                    parsed, llm_changes = _merge_parser_with_llm_fields(parsed_base, llm_fields, override=True)
+                else:
+                    parsed, llm_changes = _merge_parser_with_llm_fields(parsed_base, llm_fields, override=False)
+
+            llm_applied = bool(llm_enabled and llm_result and llm_result.get("ok"))
+            if requested_mode == "parser_only":
+                process_mode_effective = "parser_only"
+            elif llm_applied:
+                process_mode_effective = requested_mode
+            else:
+                process_mode_effective = "parser_only_fallback"
+
+            amount_line_rows = _build_amount_line_rows(
+                extracted_text,
+                parsed.get("totals") if isinstance(parsed.get("totals"), dict) else {},
+            )
+            line_item_rows = _build_line_item_rows(extracted_text, template)
+
+        _set_process_progress(
+            document_id,
+            stage="persist_rows",
+            message="Extraktion wird in die Datenbank geschrieben.",
+            mode=requested_mode,
+            status="processing",
+        )
         llm_dump_payload = {
             "run_id": llm_run_id,
             "created_at_utc": llm_run_created_at,
@@ -1247,11 +1650,18 @@ def process_document(
             supplier_name = llm_supplier
         elif llm_supplier and (supplier_name is None or llm_override_effective):
             supplier_name = llm_supplier
-        amount_line_rows = _build_amount_line_rows(extracted_text, totals)
-        line_item_rows = _build_line_item_rows(extracted_text, template)
         replace_document_amount_lines(document_id, amount_line_rows)
         replace_line_items(document_id, line_item_rows)
         replace_document_images(document_id, image_rows)
+        if requested_mode == "llm_only":
+            _set_process_progress(
+                document_id,
+                stage="llm_image_match",
+                message="LLM Bild-Matching laeuft.",
+                mode=requested_mode,
+                status="processing",
+            )
+            llm_image_assignment_summary = _persist_llm_image_assignments(document_id)
 
         position_count = len(line_item_rows) if line_item_rows else int(parsed.get("position_count", 0) or 0)
         confidence = _compute_confidence(
@@ -1274,16 +1684,39 @@ def process_document(
             raw_text_path=str(text_dump_path),
             status="processed",
         )
+        _set_process_progress(
+            document_id,
+            stage="completed",
+            message="Verarbeitung abgeschlossen.",
+            mode=requested_mode,
+            status="processed",
+        )
     except HTTPException:
+        _set_process_progress(
+            document_id,
+            stage="failed",
+            message="Verarbeitung mit HTTP-Fehler beendet.",
+            mode=requested_mode,
+            status="failed",
+        )
         raise
     except Exception as exc:
         update_document_status(document_id, status="failed", error_message=str(exc)[:1000])
+        _set_process_progress(
+            document_id,
+            stage="failed",
+            message="Verarbeitung fehlgeschlagen.",
+            mode=requested_mode,
+            status="failed",
+            error=str(exc)[:1000],
+        )
         raise HTTPException(status_code=500, detail=f"Processing failed: {exc}") from exc
 
     return {
         "document_id": updated["id"],
         "status": updated["status"],
         "template": template,
+        "parser_used": requested_mode != "llm_only",
         "position_count": position_count,
         "line_item_count": len(line_item_rows),
         "amount_line_count": len(amount_line_rows),
@@ -1310,6 +1743,9 @@ def process_document(
         "llm_run_id": llm_run_id,
         "llm_change_count": len([item for item in llm_changes if item.get("applied")]),
         "llm_change_total": len(llm_changes),
+        "llm_line_item_count": len((llm_result or {}).get("line_items") or []) if requested_mode == "llm_only" else None,
+        "llm_amount_line_count": len((llm_result or {}).get("amount_lines") or []) if requested_mode == "llm_only" else None,
+        "llm_image_assignment": llm_image_assignment_summary,
         "llm_dump_path": llm_dump_path,
         "updated_at": updated["updated_at"],
     }

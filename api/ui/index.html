@@ -69,6 +69,7 @@
     }
 
     .controls select,
+    .controls input[type="file"],
     .controls button {
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.3);
@@ -94,6 +95,14 @@
     .controls select {
       background: rgba(255, 255, 255, 0.96);
       color: #0a1624;
+    }
+
+    .controls input[type="file"] {
+      flex: 1 1 320px;
+      min-width: 240px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #0a1624;
+      cursor: pointer;
     }
 
     .controls button {
@@ -128,6 +137,99 @@
       min-height: 36px;
       display: flex;
       align-items: center;
+    }
+
+    .debug-panel {
+      margin-top: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 10px;
+      background: rgba(5, 21, 38, 0.24);
+      padding: 8px;
+    }
+
+    .debug-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+      color: #e4effb;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .debug-state {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: #dcecff;
+      margin-left: 6px;
+    }
+
+    .debug-state.running {
+      color: #ffe7bb;
+      border-color: rgba(255, 214, 140, 0.45);
+      background: rgba(160, 96, 0, 0.22);
+    }
+
+    .debug-state.ok {
+      color: #dbffeb;
+      border-color: rgba(104, 218, 157, 0.5);
+      background: rgba(8, 105, 59, 0.28);
+    }
+
+    .debug-state.err {
+      color: #ffdce3;
+      border-color: rgba(245, 123, 145, 0.5);
+      background: rgba(143, 23, 49, 0.35);
+    }
+
+    #clearDebugBtn {
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-size: 12px;
+      border-radius: 8px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    #clearDebugBtn:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .debug-log {
+      max-height: 120px;
+      overflow: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(3, 12, 22, 0.35);
+      padding: 6px 8px;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #d7e6f8;
+    }
+
+    .debug-line {
+      margin: 0 0 3px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .debug-line.warn {
+      color: #ffd89a;
+    }
+
+    .debug-line.err {
+      color: #ffc3cf;
+    }
+
+    .debug-line.ok {
+      color: #bcf3d5;
     }
 
     .workspace {
@@ -287,6 +389,12 @@
       background: #fbfdff;
     }
 
+    .img-card.llm-assigned {
+      border-color: #66c89a;
+      box-shadow: inset 0 0 0 1px rgba(27, 140, 82, 0.15);
+      background: #f4fcf8;
+    }
+
     .img-card img {
       width: 100%;
       height: 120px;
@@ -302,6 +410,22 @@
       color: #425272;
       line-height: 1.35;
       word-break: break-word;
+    }
+
+    .img-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin-left: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      border: 1px solid #8ad7ae;
+      background: #e8f8ef;
+      color: #14653f;
+      vertical-align: middle;
     }
 
     .fallback {
@@ -483,7 +607,8 @@
     }
 
     @media (max-width: 720px) {
-      .controls select {
+      .controls select,
+      .controls input[type="file"] {
         min-width: 100%;
       }
 
@@ -500,12 +625,15 @@
       <p>Direkter Vergleich von Original-PDF, Positionen, Betragszeilen und extrahierten Bildern.</p>
       <div class="controls">
         <select id="docSelect" aria-label="Dokument auswählen"></select>
+        <input id="uploadInput" type="file" accept=".pdf,application/pdf" aria-label="PDF hochladen">
+        <button class="strong" id="uploadBtn">PDF hochladen</button>
         <select id="processModeSelect" aria-label="Verarbeitungsmodus">
           <option value="hybrid_fill">Modus: Hybrid (Parser + LLM fuellt Luecken)</option>
           <option value="parser_only">Modus: Parser only (ohne LLM)</option>
           <option value="llm_override">Modus: LLM override (LLM ueberschreibt)</option>
           <option value="llm_only">Modus: LLM only (nur LLM Felder)</option>
         </select>
+        <button id="resetBtn">Ergebnis loeschen</button>
         <button id="reloadBtn">Dokumente neu laden</button>
         <button id="refreshBtn">Result neu laden</button>
         <button class="strong" id="processBtn">Process starten</button>
@@ -519,6 +647,16 @@
         <button id="csvDownloadBtn">CSV Download</button>
       </div>
       <div class="statusbar" id="statusBar">Lade Dokumentliste...</div>
+      <div class="debug-panel">
+        <div class="debug-head">
+          <div>
+            Live Debug
+            <span id="processLiveState" class="debug-state">idle</span>
+          </div>
+          <button id="clearDebugBtn" type="button">Debug leeren</button>
+        </div>
+        <div class="debug-log" id="debugLog" aria-live="polite"></div>
+      </div>
     </div>
 
     <div class="workspace">
@@ -604,7 +742,7 @@
 
           <div class="section">
             <h2>Bilder</h2>
-            <div class="small" id="imageHint">Thumbnails nach Seite gruppiert. Bei JP2 kann der Browser evtl. keine Vorschau anzeigen.</div>
+            <div class="small" id="imageHint">Thumbnails nach Seite gruppiert. Gruener Rahmen + Badge "LLM Match" = vom LLM den Positionen zugeordnet. Bei JP2 kann der Browser evtl. keine Vorschau anzeigen.</div>
             <div class="img-grid" id="imageGrid"></div>
           </div>
         </div>
@@ -636,10 +774,21 @@
       fieldSources: {},
       previewFormat: null,
       previewContent: "",
+      processingPollTimer: null,
+      processingDocumentId: null,
+      processingStartedAtMs: 0,
+      processingPollInFlight: false,
+      processingLastSnapshot: null,
+      processingHeartbeatAtMs: 0,
+      processingMode: null,
+      processingLastProgressKey: null,
     };
 
     const ui = {
       docSelect: document.getElementById("docSelect"),
+      uploadInput: document.getElementById("uploadInput"),
+      uploadBtn: document.getElementById("uploadBtn"),
+      resetBtn: document.getElementById("resetBtn"),
       processModeSelect: document.getElementById("processModeSelect"),
       reloadBtn: document.getElementById("reloadBtn"),
       refreshBtn: document.getElementById("refreshBtn"),
@@ -653,6 +802,9 @@
       jsonDownloadBtn: document.getElementById("jsonDownloadBtn"),
       csvDownloadBtn: document.getElementById("csvDownloadBtn"),
       statusBar: document.getElementById("statusBar"),
+      processLiveState: document.getElementById("processLiveState"),
+      clearDebugBtn: document.getElementById("clearDebugBtn"),
+      debugLog: document.getElementById("debugLog"),
       pdfFrame: document.getElementById("pdfFrame"),
       summary: document.getElementById("summary"),
       llmRunInfo: document.getElementById("llmRunInfo"),
@@ -683,6 +835,7 @@
       if (level === "ok") ui.statusBar.classList.add("ok");
       if (level === "warn") ui.statusBar.classList.add("warn");
       if (level === "err") ui.statusBar.classList.add("err");
+      addDebug(text, level);
     }
 
     function fmt(value, fallback = "-") {
@@ -706,6 +859,181 @@
 
     function clearNode(node) {
       while (node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    function debugNow() {
+      return new Date().toLocaleTimeString("de-DE", { hour12: false });
+    }
+
+    function addDebug(text, level = "info") {
+      if (!ui.debugLog) return;
+      const line = document.createElement("div");
+      line.className = `debug-line ${level}`;
+      line.textContent = `[${debugNow()}] ${String(text)}`;
+      ui.debugLog.appendChild(line);
+      while (ui.debugLog.childElementCount > 180) {
+        ui.debugLog.removeChild(ui.debugLog.firstChild);
+      }
+      ui.debugLog.scrollTop = ui.debugLog.scrollHeight;
+    }
+
+    function setLiveState(text, kind = "idle") {
+      if (!ui.processLiveState) return;
+      ui.processLiveState.textContent = String(text || "idle");
+      ui.processLiveState.className = "debug-state";
+      if (kind === "running") ui.processLiveState.classList.add("running");
+      if (kind === "ok") ui.processLiveState.classList.add("ok");
+      if (kind === "err") ui.processLiveState.classList.add("err");
+    }
+
+    function formatElapsed(totalMs) {
+      const seconds = Math.max(0, Math.floor(totalMs / 1000));
+      const mm = Math.floor(seconds / 60);
+      const ss = String(seconds % 60).padStart(2, "0");
+      return `${mm}:${ss}`;
+    }
+
+    function stopProcessingMonitor() {
+      if (state.processingPollTimer) {
+        clearInterval(state.processingPollTimer);
+      }
+      state.processingPollTimer = null;
+      state.processingDocumentId = null;
+      state.processingStartedAtMs = 0;
+      state.processingPollInFlight = false;
+      state.processingLastSnapshot = null;
+      state.processingHeartbeatAtMs = 0;
+      state.processingMode = null;
+      state.processingLastProgressKey = null;
+    }
+
+    async function pollProcessingSnapshot() {
+      if (!state.processingDocumentId || state.processingPollInFlight) return;
+      state.processingPollInFlight = true;
+      try {
+        const [result, progressPayload] = await Promise.all([
+          apiJson(`/result/${state.processingDocumentId}`),
+          apiJson(`/progress/${state.processingDocumentId}`).catch(() => null),
+        ]);
+        const document = (result && result.document) || {};
+        const status = String(document.status || "unknown");
+        const lineCount = Array.isArray(result.line_items) ? result.line_items.length : 0;
+        const imageCount = Array.isArray(result.images) ? result.images.length : 0;
+        const elapsed = state.processingStartedAtMs
+          ? formatElapsed(Date.now() - state.processingStartedAtMs)
+          : "0:00";
+        const progress = progressPayload && progressPayload.progress && typeof progressPayload.progress === "object"
+          ? progressPayload.progress
+          : null;
+        const progressStage = progress ? String(progress.stage || "") : "";
+        const progressMessage = progress ? String(progress.message || "") : "";
+        const progressStep = progress ? Number(progress.step) : NaN;
+        const progressTotal = progress ? Number(progress.total) : NaN;
+        const hasProgressCounter = Number.isFinite(progressStep) && progressStep > 0 && Number.isFinite(progressTotal) && progressTotal > 0;
+        const progressCounter = hasProgressCounter ? `${progressStep}/${progressTotal}` : "";
+        const stageLabel = progressStage || status;
+        const badgeText = hasProgressCounter
+          ? `${status} · ${stageLabel} ${progressCounter} · ${elapsed}`
+          : `${status} · ${stageLabel} · ${elapsed}`;
+        const kind = status === "processing" ? "running" : (status === "processed" ? "ok" : (status === "failed" ? "err" : "idle"));
+        setLiveState(badgeText, kind);
+
+        if (progress) {
+          const progressKey = [
+            progress.status,
+            progress.stage,
+            progress.message,
+            progress.step,
+            progress.total,
+            progress.page_ref,
+            progress.error,
+            progress.updated_at,
+          ].map((value) => String(value ?? "")).join("|");
+          if (progressKey !== state.processingLastProgressKey) {
+            const pagePart = progress.page_ref ? ` | Seite ${progress.page_ref}` : "";
+            const counterPart = hasProgressCounter ? ` (${progressCounter})` : "";
+            addDebug(
+              `Dokument #${state.processingDocumentId}: Step=${stageLabel}${counterPart}${pagePart} | ${progressMessage || "Verarbeitung laeuft."}`,
+              status === "failed" ? "err" : "info"
+            );
+            state.processingLastProgressKey = progressKey;
+            state.processingHeartbeatAtMs = Date.now();
+          }
+        }
+
+        const next = {
+          status,
+          lineCount,
+          imageCount,
+          updatedAt: String(document.updated_at || ""),
+          errorMessage: String(document.error_message || ""),
+        };
+        const prev = state.processingLastSnapshot;
+        if (
+          !prev ||
+          prev.status !== next.status ||
+          prev.lineCount !== next.lineCount ||
+          prev.imageCount !== next.imageCount ||
+          prev.updatedAt !== next.updatedAt
+        ) {
+          addDebug(
+            `Dokument #${state.processingDocumentId}: status=${next.status}, positionen=${next.lineCount}, bilder=${next.imageCount}, updated=${next.updatedAt || "-"}`,
+            next.status === "failed" ? "err" : "info"
+          );
+          state.processingLastSnapshot = next;
+          state.processingHeartbeatAtMs = Date.now();
+        } else if (status === "processing") {
+          const nowMs = Date.now();
+          if (!state.processingHeartbeatAtMs || (nowMs - state.processingHeartbeatAtMs) >= 10000) {
+            const modeNote = state.processingMode === "llm_only"
+              ? "LLM-only rechnet (Zwischenergebnis kommt erst am Ende)."
+              : "Verarbeitung laeuft.";
+            addDebug(
+              `Dokument #${state.processingDocumentId}: ${progressMessage || modeNote} Laufzeit ${elapsed}.`,
+              "warn"
+            );
+            state.processingHeartbeatAtMs = nowMs;
+          }
+        }
+        if (status === "failed" && next.errorMessage) {
+          addDebug(`Fehler: ${next.errorMessage}`, "err");
+          ui.processBtn.disabled = false;
+          stopProcessingMonitor();
+        }
+        if (status === "processed") {
+          addDebug(`Dokument #${state.processingDocumentId} verarbeitet.`, "ok");
+          if (state.documentId === state.processingDocumentId) {
+            try {
+              await loadResult(state.processingDocumentId);
+              addDebug(`UI fuer Dokument #${state.processingDocumentId} aktualisiert.`, "ok");
+            } catch (error) {
+              addDebug(`UI-Refresh fehlgeschlagen: ${String(error.message).slice(0, 160)}`, "warn");
+            }
+          }
+          ui.processBtn.disabled = false;
+          stopProcessingMonitor();
+        }
+      } catch (error) {
+        addDebug(`Polling fehlgeschlagen: ${String(error.message).slice(0, 140)}`, "warn");
+      } finally {
+        state.processingPollInFlight = false;
+      }
+    }
+
+    function startProcessingMonitor(documentId, modeLabel, modeValue) {
+      stopProcessingMonitor();
+      state.processingDocumentId = documentId;
+      state.processingStartedAtMs = Date.now();
+      state.processingMode = modeValue || null;
+      setLiveState(`processing · 0:00`, "running");
+      addDebug(`Start processing fuer Dokument #${documentId} (Mode: ${modeLabel})`, "info");
+      if (modeValue === "llm_only") {
+        addDebug("Hinweis: Im LLM-only Modus bleiben Positionen/Bilder bis zum Ende oft bei 0.", "warn");
+      }
+      pollProcessingSnapshot();
+      state.processingPollTimer = setInterval(() => {
+        pollProcessingSnapshot();
+      }, 2500);
     }
 
     function sourceTagHtml(source) {
@@ -835,6 +1163,47 @@
         throw new Error(text || `HTTP ${response.status}`);
       }
       return text;
+    }
+
+    function selectedUploadFile() {
+      const files = ui.uploadInput.files;
+      if (!files || !files.length) return null;
+      return files[0];
+    }
+
+    async function uploadSelectedPdf() {
+      const file = selectedUploadFile();
+      if (!file) {
+        setStatus("Bitte zuerst eine PDF-Datei auswaehlen.", "warn");
+        return;
+      }
+      const fileName = String(file.name || "");
+      if (!fileName.toLowerCase().endsWith(".pdf")) {
+        setStatus("Nur PDF-Dateien sind erlaubt.", "warn");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      ui.uploadBtn.disabled = true;
+      setStatus(`Lade PDF hoch: ${fileName} ...`);
+      try {
+        const payload = await apiJson("/upload", { method: "POST", body: formData });
+        const newDocId = Number(payload.document_id);
+        ui.uploadInput.value = "";
+        if (Number.isFinite(newDocId) && newDocId > 0) {
+          state.documentId = newDocId;
+          await loadDocuments();
+          setStatus(`Upload erfolgreich: Dokument #${newDocId} (${fileName}).`, "ok");
+        } else {
+          setStatus("Upload erfolgreich, aber keine gueltige Dokument-ID erhalten.", "warn");
+        }
+      } catch (error) {
+        setStatus(`Upload fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        ui.uploadBtn.disabled = false;
+      }
     }
 
     function renderDocuments() {
@@ -1123,6 +1492,11 @@
       for (const image of images) {
         const card = document.createElement("div");
         card.className = "img-card";
+        const isLlmMatched = !!image.is_llm_matched;
+        if (isLlmMatched) card.classList.add("llm-assigned");
+        const llmMatchCount = Number(image.llm_match_count || 0);
+        const llmItemIds = Array.isArray(image.llm_matched_line_item_ids) ? image.llm_matched_line_item_ids : [];
+        const llmItemLabel = llmItemIds.length ? llmItemIds.join(", ") : "-";
 
         const preview = document.createElement("img");
         preview.src = `/document/${state.documentId}/image/${image.id}`;
@@ -1138,8 +1512,9 @@
         const meta = document.createElement("div");
         meta.className = "img-meta";
         meta.innerHTML = `
-          <div><strong>#${escapeHtml(fmt(image.id))}</strong> | Seite ${escapeHtml(fmt(image.page_ref))} | Img ${escapeHtml(fmt(image.image_index))}</div>
+          <div><strong>#${escapeHtml(fmt(image.id))}</strong>${isLlmMatched ? "<span class=\"img-badge\">LLM Match</span>" : ""} | Seite ${escapeHtml(fmt(image.page_ref))} | Img ${escapeHtml(fmt(image.image_index))}</div>
           <div>${escapeHtml(fmt(image.mime_type))} | ${escapeHtml(fmt(image.width))}x${escapeHtml(fmt(image.height))} | ${escapeHtml(fmt(image.bytes_size))} bytes</div>
+          ${isLlmMatched ? `<div>LLM zugeordnet: ${escapeHtml(fmt(llmMatchCount))} Position(en) [${escapeHtml(llmItemLabel)}]</div>` : ""}
         `;
 
         card.appendChild(preview);
@@ -1205,6 +1580,7 @@
       if (!state.documentId) return;
       const processMode = ui.processModeSelect.value || "hybrid_fill";
       const modeLabel = PROCESS_MODE_LABELS[processMode] || processMode;
+      startProcessingMonitor(state.documentId, modeLabel, processMode);
       setStatus(
         `Starte Verarbeitung fuer Dokument #${state.documentId} ... (Mode: ${modeLabel})`
       );
@@ -1222,11 +1598,39 @@
           `Verarbeitung fertig: ${payload.line_item_count} Positionen, ${payload.image_count} Bilder, Status ${payload.status}. Mode ${payload.process_mode_effective || payload.process_mode_requested}. ${llmInfo}`,
           level
         );
+        setLiveState("fertig", "ok");
         await loadDocuments();
       } catch (error) {
         setStatus(`Verarbeitung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+        setLiveState("fehler", "err");
+        await pollProcessingSnapshot();
       } finally {
+        stopProcessingMonitor();
         ui.processBtn.disabled = false;
+      }
+    }
+
+    async function resetCurrentDocument() {
+      if (!state.documentId) return;
+      const ok = window.confirm(
+        `Alte Ergebnisse fuer Dokument #${state.documentId} wirklich loeschen?\n` +
+        "Upload-Datei bleibt erhalten."
+      );
+      if (!ok) return;
+
+      ui.resetBtn.disabled = true;
+      setStatus(`Loesche Ergebnisse fuer Dokument #${state.documentId} ...`);
+      try {
+        const payload = await apiJson(`/reset/${state.documentId}?delete_logs=true`, { method: "POST" });
+        await loadDocuments();
+        setStatus(
+          `Ergebnis geloescht: ${payload.deleted_line_items} Positionen, ${payload.deleted_images} Bilder, ${payload.deleted_amount_lines} Betragszeilen entfernt.`,
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Loeschen fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        ui.resetBtn.disabled = false;
       }
     }
 
@@ -1371,6 +1775,19 @@
       await loadDocuments();
     });
 
+    ui.resetBtn.addEventListener("click", async () => {
+      await resetCurrentDocument();
+    });
+
+    ui.uploadBtn.addEventListener("click", async () => {
+      await uploadSelectedPdf();
+    });
+    ui.uploadInput.addEventListener("change", async () => {
+      const file = selectedUploadFile();
+      if (!file) return;
+      setStatus(`Ausgewaehlt: ${file.name}. Klick auf "PDF hochladen".`);
+    });
+
     ui.refreshBtn.addEventListener("click", async () => {
       if (state.documentId) {
         await loadResult(state.documentId);
@@ -1404,6 +1821,11 @@
     ui.copyPreviewBtn.addEventListener("click", async () => {
       await copyPreviewContent();
     });
+    ui.clearDebugBtn.addEventListener("click", () => {
+      clearNode(ui.debugLog);
+      setLiveState("idle", "idle");
+      addDebug("Debug-Log geleert.");
+    });
     ui.downloadPreviewBtn.addEventListener("click", () => {
       downloadPreviewContent();
     });
@@ -1424,6 +1846,7 @@
     closePreviewModal();
     renderLlmRun(null);
     renderCompare(null);
+    addDebug("UI initialisiert.");
 
     loadDocuments().catch((error) => {
       setStatus(`Initialisierung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");

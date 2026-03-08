@@ -1,4 +1,5 @@
 import os
+import json
 from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
@@ -367,6 +368,108 @@ def replace_document_images(document_id: int, rows: list[dict[str, Any]]) -> int
     return len(rows)
 
 
+def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list[int]]) -> int:
+    if not assignments:
+        return 0
+
+    updated_rows = 0
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for line_item_id, image_ids in assignments.items():
+                unique_ids: list[int] = []
+                seen: set[int] = set()
+                for value in image_ids:
+                    try:
+                        parsed = int(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if parsed <= 0 or parsed in seen:
+                        continue
+                    seen.add(parsed)
+                    unique_ids.append(parsed)
+                if not unique_ids:
+                    continue
+
+                patch = json.dumps(
+                    {
+                        "source": "llm",
+                        "llm_image_ids": unique_ids,
+                        "image_assignment_source": "vlm",
+                    },
+                    ensure_ascii=True,
+                )
+                cur.execute(
+                    """
+                    UPDATE line_items
+                    SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || %s::jsonb
+                    WHERE document_id = %s AND id = %s;
+                    """,
+                    (patch, document_id, line_item_id),
+                )
+                updated_rows += int(cur.rowcount or 0)
+    return updated_rows
+
+
+def reset_document_results(document_id: int) -> dict[str, Any] | None:
+    with get_db() as conn:
+        document = conn.execute(
+            """
+            SELECT id, source_file, raw_text_path
+            FROM documents
+            WHERE id = %s;
+            """,
+            (document_id,),
+        ).fetchone()
+        if not document:
+            return None
+
+        amount_lines_deleted = conn.execute(
+            "DELETE FROM document_amount_lines WHERE document_id = %s;",
+            (document_id,),
+        ).rowcount or 0
+        line_items_deleted = conn.execute(
+            "DELETE FROM line_items WHERE document_id = %s;",
+            (document_id,),
+        ).rowcount or 0
+        images_deleted = conn.execute(
+            "DELETE FROM document_images WHERE document_id = %s;",
+            (document_id,),
+        ).rowcount or 0
+
+        updated = conn.execute(
+            """
+            UPDATE documents
+            SET
+                supplier_name = NULL,
+                document_number = NULL,
+                document_date = NULL,
+                project_ref = NULL,
+                currency = NULL,
+                net_total = NULL,
+                vat_total = NULL,
+                gross_total = NULL,
+                parse_confidence = NULL,
+                status = 'uploaded',
+                error_message = NULL,
+                raw_text_path = NULL,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, status, updated_at;
+            """,
+            (document_id,),
+        ).fetchone()
+
+    return {
+        "id": updated["id"],
+        "status": updated["status"],
+        "updated_at": updated["updated_at"],
+        "previous_raw_text_path": document["raw_text_path"],
+        "deleted_amount_lines": amount_lines_deleted,
+        "deleted_line_items": line_items_deleted,
+        "deleted_images": images_deleted,
+    }
+
+
 def _to_int(value: Any) -> int | None:
     if value is None:
         return None
@@ -374,6 +477,33 @@ def _to_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _metadata_dict(item: dict[str, Any]) -> dict[str, Any]:
+    raw = item.get("metadata_json")
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _metadata_image_ids(item: dict[str, Any], valid_ids: set[int]) -> list[int]:
+    metadata = _metadata_dict(item)
+    raw = metadata.get("llm_image_ids")
+    if not isinstance(raw, list):
+        return []
+    values: list[int] = []
+    for value in raw:
+        parsed = _to_int(value)
+        if parsed is None or parsed not in valid_ids:
+            continue
+        values.append(parsed)
+    return _dedupe_ints(values)
 
 
 def _line_item_sort_key(item: dict[str, Any]) -> tuple[int, int, int]:
@@ -398,6 +528,9 @@ def _is_probably_decorative_image(image: dict[str, Any], repeated_hashes: set[st
 
     # Small assets (logos/icons) tend to be tiny in both area and bytes.
     if area and area < 45_000 and bytes_size < 20_000:
+        # Keep compact but non-repeated near-square sketches as non-decorative.
+        if not repeated and min(width, height) >= 60 and ratio <= 3.0:
+            return False
         return True
     if max(width, height) and max(width, height) < 180 and bytes_size < 12_000:
         return True
@@ -509,6 +642,9 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             hash_pages.setdefault(sha256, set()).add(page_ref)
 
     repeated_hashes = {sha for sha, pages in hash_pages.items() if len(pages) >= 2}
+    valid_image_ids = {
+        image_id for image_id in (_to_int(image.get("id")) for image in image_list) if image_id is not None
+    }
 
     for image in image_list:
         image["is_repeated_across_pages"] = bool(image.get("sha256") in repeated_hashes if image.get("sha256") else False)
@@ -530,6 +666,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         item["image_ids_primary"] = []
         item["image_ids_page_all"] = []
         item["image_count_page_all"] = 0
+        item["_llm_image_ids"] = _metadata_image_ids(item, valid_image_ids)
         page_ref = _to_int(item.get("page_ref"))
         if page_ref is None:
             continue
@@ -553,11 +690,43 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         sorted_item_indexes = sorted(item_indexes, key=lambda idx: _line_item_sort_key(line_item_list[idx]))
         for item_idx in sorted_item_indexes:
             item = line_item_list[item_idx]
-            item["image_ids"] = merged_candidates
-            item["image_count"] = len(merged_candidates)
-            item["image_ids_primary"] = current_candidates[:1] if current_candidates else merged_candidates[:1]
+            llm_image_ids = item.get("_llm_image_ids") if isinstance(item.get("_llm_image_ids"), list) else []
+            if llm_image_ids:
+                item["image_ids"] = llm_image_ids
+                item["image_count"] = len(llm_image_ids)
+                item["image_ids_primary"] = llm_image_ids[:1]
+            else:
+                item["image_ids"] = merged_candidates
+                item["image_count"] = len(merged_candidates)
+                item["image_ids_primary"] = current_candidates[:1] if current_candidates else merged_candidates[:1]
             item["image_ids_page_all"] = all_page_image_ids
             item["image_count_page_all"] = len(all_page_image_ids)
+
+    llm_image_to_items: dict[int, list[int]] = {}
+    for item in line_item_list:
+        item_id = _to_int(item.get("id"))
+        llm_image_ids = item.get("_llm_image_ids") if isinstance(item.get("_llm_image_ids"), list) else []
+        if item_id is None or not llm_image_ids:
+            continue
+        for image_id in llm_image_ids:
+            if image_id not in llm_image_to_items:
+                llm_image_to_items[image_id] = []
+            llm_image_to_items[image_id].append(item_id)
+
+    for image in image_list:
+        image_id = _to_int(image.get("id"))
+        matched_item_ids = llm_image_to_items.get(image_id, []) if image_id is not None else []
+        image["is_llm_matched"] = bool(matched_item_ids)
+        image["llm_matched_line_item_ids"] = matched_item_ids
+        image["llm_match_count"] = len(matched_item_ids)
+
+    for item in line_item_list:
+        llm_image_ids = item.get("_llm_image_ids") if isinstance(item.get("_llm_image_ids"), list) else []
+        if llm_image_ids and not item.get("image_ids"):
+            item["image_ids"] = llm_image_ids
+            item["image_count"] = len(llm_image_ids)
+            item["image_ids_primary"] = llm_image_ids[:1]
+        item.pop("_llm_image_ids", None)
 
     return {
         "document": document,
