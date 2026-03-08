@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS documents (
+    id BIGSERIAL PRIMARY KEY,
+    source_file TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    content_type TEXT,
+    supplier_name TEXT,
+    customer_name TEXT,
+    document_type TEXT NOT NULL DEFAULT 'angebot',
+    document_number TEXT,
+    document_date DATE,
+    project_ref TEXT,
+    currency TEXT,
+    net_total NUMERIC(14, 2),
+    vat_total NUMERIC(14, 2),
+    gross_total NUMERIC(14, 2),
+    parse_confidence NUMERIC(5, 4),
+    status TEXT NOT NULL DEFAULT 'uploaded',
+    error_message TEXT,
+    raw_text_path TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+

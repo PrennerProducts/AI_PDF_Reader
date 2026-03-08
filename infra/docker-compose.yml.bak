@@ -1,9 +1,11 @@
+version: "3.9"
+
 services:
   api:
     image: python:3.11-slim
     container_name: pdr-api
     working_dir: /app
-    command: bash -lc "pip install --no-cache-dir fastapi uvicorn[standard] python-multipart pydantic psycopg[binary] pypdf[image] && uvicorn main:app --host 0.0.0.0 --port 8000"
+    command: bash -lc "pip install --no-cache-dir fastapi uvicorn[standard] python-multipart pydantic && uvicorn main:app --host 0.0.0.0 --port 8000"
     volumes:
       - ../api:/app
       - ../data/uploads:/data/uploads
@@ -25,7 +27,7 @@ services:
     image: ollama/ollama:latest
     container_name: pdr-ollama
     ports:
-      - "11435:11434"
+      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     deploy:

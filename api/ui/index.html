@@ -1,0 +1,1433 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF Extraction Workbench</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --bg-accent: #e6eef9;
+      --card: #ffffff;
+      --ink: #172237;
+      --muted: #5c6b85;
+      --line: #d7deeb;
+      --brand: #0f4c81;
+      --brand-soft: #d9e9f8;
+      --ok: #0b7a48;
+      --warn: #8a4f00;
+      --err: #9f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+      background:
+        radial-gradient(circle at 10% -5%, var(--bg-accent), transparent 40%),
+        linear-gradient(150deg, var(--bg), #edf2fb);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .topbar {
+      background: linear-gradient(120deg, #113457, #0f4c81);
+      color: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 28px rgba(8, 25, 44, 0.2);
+      margin-bottom: 16px;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .topbar p {
+      margin: 6px 0 0;
+      color: #d8e6f5;
+      font-size: 14px;
+    }
+
+    .controls {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .controls select,
+    .controls button {
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 9px 12px;
+      font-size: 14px;
+      min-height: 38px;
+    }
+
+    #docSelect {
+      flex: 1 1 360px;
+      min-width: 260px;
+    }
+
+    #processModeSelect {
+      flex: 0 1 300px;
+      min-width: 220px;
+    }
+
+    .controls button {
+      flex: 0 0 auto;
+    }
+
+    .controls select {
+      background: rgba(255, 255, 255, 0.96);
+      color: #0a1624;
+    }
+
+    .controls button {
+      background: rgba(255, 255, 255, 0.17);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .controls button:hover {
+      background: rgba(255, 255, 255, 0.27);
+    }
+
+    .controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .controls .strong {
+      background: #1e8f57;
+      border-color: rgba(255, 255, 255, 0.4);
+      font-weight: 600;
+    }
+
+    .statusbar {
+      margin-top: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.15);
+      font-size: 13px;
+      color: #f5f9ff;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 14px;
+      min-height: 78vh;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(20, 32, 54, 0.08);
+    }
+
+    .panel-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--muted);
+      background: #fbfcff;
+    }
+
+    #pdfFrame {
+      width: 100%;
+      height: calc(78vh - 42px);
+      border: 0;
+      background: #f0f3f8;
+    }
+
+    .panel-body {
+      padding: 12px;
+      height: calc(78vh - 42px);
+      overflow: auto;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .summary .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #fcfdff;
+      min-height: 64px;
+    }
+
+    .summary .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .summary .value {
+      font-size: 14px;
+      font-weight: 600;
+      word-break: break-word;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .summary .card.source-llm {
+      border-color: #c6ead5;
+      background: #f4fcf8;
+    }
+
+    .summary .card.source-parser {
+      border-color: #d8e6f6;
+    }
+
+    .src-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .src-tag.src-llm {
+      color: #14653f;
+      background: #e8f8ef;
+      border-color: #bde4ce;
+    }
+
+    .src-tag.src-parser {
+      color: #1f4268;
+      background: #edf4ff;
+      border-color: #ccddf4;
+    }
+
+    .src-tag.src-unknown {
+      color: #5f6774;
+      background: #eef1f6;
+      border-color: #d8dde6;
+    }
+
+    .section {
+      margin-top: 10px;
+    }
+
+    .section h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #2d3d5b;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f7f9fd;
+      color: #344764;
+      font-weight: 600;
+    }
+
+    td code {
+      font-size: 11px;
+      color: #263a5a;
+    }
+
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    .img-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px;
+      background: #fbfdff;
+    }
+
+    .img-card img {
+      width: 100%;
+      height: 120px;
+      object-fit: contain;
+      background: #f0f4fb;
+      border-radius: 6px;
+      display: block;
+    }
+
+    .img-meta {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #425272;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .fallback {
+      min-height: 120px;
+      border-radius: 6px;
+      background: #fff7ed;
+      border: 1px dashed #f4b98a;
+      color: #8a4f00;
+      font-size: 11px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 99px;
+      font-size: 11px;
+      line-height: 1.6;
+      background: var(--brand-soft);
+      color: #0f4c81;
+    }
+
+    .chip.ok-chip {
+      background: #e7f8ef;
+      color: #0f6c3f;
+    }
+
+    .chip.no-chip {
+      background: #fdecee;
+      color: #9c2a3f;
+    }
+
+    .compare-summary {
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    .compare-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .compare-status.same {
+      color: #0f6c3f;
+      background: #e8f8ef;
+      border-color: #bde4ce;
+    }
+
+    .compare-status.different {
+      color: #9c2a3f;
+      background: #fdecee;
+      border-color: #f2c2cb;
+    }
+
+    .compare-status.missing {
+      color: #8a5a00;
+      background: #fff4dd;
+      border-color: #f3d8a3;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    .err {
+      color: var(--err);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 22, 38, 0.66);
+      backdrop-filter: blur(2px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99;
+      padding: 16px;
+    }
+
+    .modal-backdrop[hidden] {
+      display: none !important;
+    }
+
+    .modal {
+      width: min(1300px, 100%);
+      height: min(84vh, 900px);
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #d8e3f2;
+      box-shadow: 0 26px 70px rgba(8, 26, 46, 0.35);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #fbfdff;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #243754;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .modal-actions button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #1f3452;
+    }
+
+    .modal-actions button:hover {
+      background: #f3f7fe;
+    }
+
+    .modal-body {
+      margin: 0;
+      padding: 12px;
+      overflow: auto;
+      background: #f8fbff;
+      color: #1d2a42;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, Menlo, monospace;
+      flex: 1;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      #pdfFrame,
+      .panel-body {
+        height: 58vh;
+      }
+
+      .summary {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .controls select {
+        min-width: 100%;
+      }
+
+      .modal {
+        height: 88vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <h1>PDF Extraction Workbench</h1>
+      <p>Direkter Vergleich von Original-PDF, Positionen, Betragszeilen und extrahierten Bildern.</p>
+      <div class="controls">
+        <select id="docSelect" aria-label="Dokument auswählen"></select>
+        <select id="processModeSelect" aria-label="Verarbeitungsmodus">
+          <option value="hybrid_fill">Modus: Hybrid (Parser + LLM fuellt Luecken)</option>
+          <option value="parser_only">Modus: Parser only (ohne LLM)</option>
+          <option value="llm_override">Modus: LLM override (LLM ueberschreibt)</option>
+          <option value="llm_only">Modus: LLM only (nur LLM Felder)</option>
+        </select>
+        <button id="reloadBtn">Dokumente neu laden</button>
+        <button id="refreshBtn">Result neu laden</button>
+        <button class="strong" id="processBtn">Process starten</button>
+        <button id="llmRunPreviewBtn">LLM Run JSON</button>
+        <button id="llmHistoryPreviewBtn">LLM History</button>
+        <button id="comparePreviewBtn">Parser vs LLM aktualisieren</button>
+        <button id="imageMatchBtn">Bild-Match (PoC)</button>
+        <button id="jsonPreviewBtn">JSON ansehen</button>
+        <button id="csvPreviewBtn">CSV ansehen</button>
+        <button id="jsonDownloadBtn">JSON Download</button>
+        <button id="csvDownloadBtn">CSV Download</button>
+      </div>
+      <div class="statusbar" id="statusBar">Lade Dokumentliste...</div>
+    </div>
+
+    <div class="workspace">
+      <section class="panel">
+        <div class="panel-head">Original PDF</div>
+        <iframe id="pdfFrame" title="PDF Vorschau"></iframe>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">Extraktion</div>
+        <div class="panel-body">
+          <div class="summary" id="summary"></div>
+
+          <div class="section">
+            <h2>LLM Run</h2>
+            <div class="small" id="llmRunInfo">Kein Lauf geladen.</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Feld</th>
+                  <th>Parser</th>
+                  <th>LLM</th>
+                  <th>Angewendet</th>
+                </tr>
+              </thead>
+              <tbody id="llmChangeRows"></tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2>Parser vs LLM Vergleich</h2>
+            <div class="small" id="compareInfo">Noch kein Vergleich geladen. Klick auf "Parser vs LLM aktualisieren".</div>
+            <div class="small compare-summary" id="compareSummary"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Feld</th>
+                  <th>Parser</th>
+                  <th>LLM</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="compareRows"></tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2>Betragszeilen</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Typ</th>
+                  <th>Label</th>
+                  <th>Prozent</th>
+                  <th>Betrag</th>
+                  <th>Quelle</th>
+                </tr>
+              </thead>
+              <tbody id="amountRows"></tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2>Positionen</h2>
+            <div class="small">Aktuell sind Positionen parserbasiert; die Quellenanzeige ist fuer kuenftige LLM-Positionen vorbereitet.</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>LV</th>
+                  <th>Menge</th>
+                  <th>Text</th>
+                  <th>Einzel</th>
+                  <th>Gesamt</th>
+                  <th>Seite</th>
+                  <th>Bilder</th>
+                  <th>Quelle</th>
+                </tr>
+              </thead>
+              <tbody id="itemRows"></tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2>Bilder</h2>
+            <div class="small" id="imageHint">Thumbnails nach Seite gruppiert. Bei JP2 kann der Browser evtl. keine Vorschau anzeigen.</div>
+            <div class="img-grid" id="imageGrid"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="previewModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+      <div class="modal-head">
+        <div class="modal-title" id="previewTitle">Preview</div>
+        <div class="modal-actions">
+          <button id="copyPreviewBtn">Copy</button>
+          <button id="downloadPreviewBtn">Download</button>
+          <button id="closePreviewBtn">Schliessen</button>
+        </div>
+      </div>
+      <pre class="modal-body" id="previewContent"></pre>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      documentId: null,
+      documents: [],
+      result: null,
+      llmRun: null,
+      compare: null,
+      fieldSources: {},
+      previewFormat: null,
+      previewContent: "",
+    };
+
+    const ui = {
+      docSelect: document.getElementById("docSelect"),
+      processModeSelect: document.getElementById("processModeSelect"),
+      reloadBtn: document.getElementById("reloadBtn"),
+      refreshBtn: document.getElementById("refreshBtn"),
+      processBtn: document.getElementById("processBtn"),
+      llmRunPreviewBtn: document.getElementById("llmRunPreviewBtn"),
+      llmHistoryPreviewBtn: document.getElementById("llmHistoryPreviewBtn"),
+      comparePreviewBtn: document.getElementById("comparePreviewBtn"),
+      imageMatchBtn: document.getElementById("imageMatchBtn"),
+      jsonPreviewBtn: document.getElementById("jsonPreviewBtn"),
+      csvPreviewBtn: document.getElementById("csvPreviewBtn"),
+      jsonDownloadBtn: document.getElementById("jsonDownloadBtn"),
+      csvDownloadBtn: document.getElementById("csvDownloadBtn"),
+      statusBar: document.getElementById("statusBar"),
+      pdfFrame: document.getElementById("pdfFrame"),
+      summary: document.getElementById("summary"),
+      llmRunInfo: document.getElementById("llmRunInfo"),
+      llmChangeRows: document.getElementById("llmChangeRows"),
+      compareInfo: document.getElementById("compareInfo"),
+      compareSummary: document.getElementById("compareSummary"),
+      compareRows: document.getElementById("compareRows"),
+      amountRows: document.getElementById("amountRows"),
+      itemRows: document.getElementById("itemRows"),
+      imageGrid: document.getElementById("imageGrid"),
+      previewModal: document.getElementById("previewModal"),
+      previewTitle: document.getElementById("previewTitle"),
+      previewContent: document.getElementById("previewContent"),
+      copyPreviewBtn: document.getElementById("copyPreviewBtn"),
+      downloadPreviewBtn: document.getElementById("downloadPreviewBtn"),
+      closePreviewBtn: document.getElementById("closePreviewBtn"),
+    };
+    const PROCESS_MODE_LABELS = {
+      parser_only: "Parser only",
+      hybrid_fill: "Hybrid fill",
+      llm_override: "LLM override",
+      llm_only: "LLM only",
+    };
+
+    function setStatus(text, level = "info") {
+      ui.statusBar.textContent = text;
+      ui.statusBar.className = "statusbar";
+      if (level === "ok") ui.statusBar.classList.add("ok");
+      if (level === "warn") ui.statusBar.classList.add("warn");
+      if (level === "err") ui.statusBar.classList.add("err");
+    }
+
+    function fmt(value, fallback = "-") {
+      if (value === null || value === undefined || value === "") return fallback;
+      return String(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function euro(value) {
+      if (value === null || value === undefined || value === "") return "-";
+      return String(value).replace(".", ",");
+    }
+
+    function clearNode(node) {
+      while (node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    function sourceTagHtml(source) {
+      if (source === "llm") return "<span class=\"src-tag src-llm\">LLM</span>";
+      if (source === "parser") return "<span class=\"src-tag src-parser\">Parser</span>";
+      return "<span class=\"src-tag src-unknown\">-</span>";
+    }
+
+    function sourceTagElement(source) {
+      const wrap = document.createElement("span");
+      wrap.innerHTML = sourceTagHtml(source);
+      return wrap.firstElementChild;
+    }
+
+    function getPathValue(obj, path) {
+      if (!obj || typeof obj !== "object") return null;
+      const parts = path.split(".");
+      let current = obj;
+      for (const part of parts) {
+        if (!current || typeof current !== "object" || !(part in current)) return null;
+        current = current[part];
+      }
+      return current;
+    }
+
+    function buildAppliedChangeSet(changes) {
+      const set = new Set();
+      for (const item of (Array.isArray(changes) ? changes : [])) {
+        if (item && item.applied && item.field) {
+          set.add(String(item.field));
+        }
+      }
+      return set;
+    }
+
+    function deriveFieldSources(llmRun) {
+      const keys = [
+        "supplier_name",
+        "document_number",
+        "document_date",
+        "project_ref",
+        "currency",
+        "totals.net_total",
+        "totals.vat_total",
+        "totals.gross_total",
+      ];
+      const out = {};
+      for (const key of keys) out[key] = "parser";
+
+      if (!llmRun || typeof llmRun !== "object") return out;
+      const result = (llmRun.result && typeof llmRun.result === "object") ? llmRun.result : {};
+      const llmUsed = !!(llmRun.enabled_effective && result.ok);
+      const mode = String(llmRun.process_mode_effective || llmRun.process_mode_requested || "");
+      if (!llmUsed || mode.startsWith("parser_only")) return out;
+      if (mode === "llm_only") {
+        for (const key of keys) out[key] = "llm";
+        return out;
+      }
+
+      const applied = buildAppliedChangeSet(llmRun.changes);
+      const before = (llmRun.parser_snapshot_before && typeof llmRun.parser_snapshot_before === "object")
+        ? llmRun.parser_snapshot_before
+        : {};
+      const after = (llmRun.parser_snapshot_after && typeof llmRun.parser_snapshot_after === "object")
+        ? llmRun.parser_snapshot_after
+        : {};
+      const llmFields = (result.fields && typeof result.fields === "object") ? result.fields : {};
+
+      for (const key of keys) {
+        if (applied.has(key)) {
+          out[key] = "llm";
+          continue;
+        }
+        const beforeVal = fmt(getPathValue(before, key), "");
+        const afterVal = fmt(getPathValue(after, key), "");
+        const llmVal = fmt(getPathValue(llmFields, key), "");
+        if (llmVal && beforeVal !== afterVal && afterVal === llmVal) {
+          out[key] = "llm";
+        }
+      }
+      return out;
+    }
+
+    function syncFieldSources() {
+      state.fieldSources = deriveFieldSources(state.llmRun);
+      if (state.result) {
+        renderSummary(state.result);
+        renderAmountLines(state.result.amount_lines || []);
+      }
+    }
+
+    function createSummaryCard(label, value, sourceKey = null) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const labelEl = document.createElement("div");
+      labelEl.className = "label";
+      labelEl.textContent = label;
+      const valueEl = document.createElement("div");
+      valueEl.className = "value";
+      const valueText = document.createElement("span");
+      valueText.textContent = fmt(value);
+      valueEl.appendChild(valueText);
+      if (sourceKey) {
+        const source = state.fieldSources[sourceKey] || "unknown";
+        if (source === "llm") card.classList.add("source-llm");
+        if (source === "parser") card.classList.add("source-parser");
+        valueEl.appendChild(sourceTagElement(source));
+      }
+      card.appendChild(labelEl);
+      card.appendChild(valueEl);
+      return card;
+    }
+
+    async function apiJson(path, options) {
+      const response = await fetch(path, options);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    async function apiText(path, options) {
+      const response = await fetch(path, options);
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(text || `HTTP ${response.status}`);
+      }
+      return text;
+    }
+
+    function renderDocuments() {
+      clearNode(ui.docSelect);
+      if (!state.documents.length) {
+        state.documentId = null;
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "Keine Dokumente vorhanden";
+        ui.docSelect.appendChild(option);
+        ui.docSelect.disabled = true;
+        return;
+      }
+
+      ui.docSelect.disabled = false;
+      for (const doc of state.documents) {
+        const option = document.createElement("option");
+        option.value = String(doc.id);
+        const supplier = doc.supplier_name || "ohne Lieferant";
+        option.textContent = `#${doc.id} | ${doc.original_filename} | ${supplier} | ${doc.status}`;
+        ui.docSelect.appendChild(option);
+      }
+
+      const hasCurrent = state.documents.some((doc) => doc.id === state.documentId);
+      if (!hasCurrent) {
+        state.documentId = state.documents[0].id;
+      }
+      ui.docSelect.value = String(state.documentId);
+    }
+
+    async function loadDocuments() {
+      setStatus("Lade Dokumente...");
+      const payload = await apiJson("/documents?limit=200");
+      state.documents = payload.items || [];
+      renderDocuments();
+      if (state.documentId) {
+        await selectDocument(Number(state.documentId));
+      } else {
+        setStatus("Keine Dokumente gefunden.", "warn");
+      }
+    }
+
+    function renderSummary(result) {
+      clearNode(ui.summary);
+      const document = result.document || {};
+      const amountLines = result.amount_lines || [];
+      const lineItems = result.line_items || [];
+      const images = result.images || [];
+
+      const cards = [
+        ["Dokument-ID", document.id, null],
+        ["Status", document.status, null],
+        ["Lieferant", document.supplier_name, "supplier_name"],
+        ["Angebot-Nr", document.document_number, "document_number"],
+        ["Datum", document.document_date, "document_date"],
+        ["Projekt", document.project_ref, "project_ref"],
+        ["Waehrung", document.currency, "currency"],
+        ["Netto", euro(document.net_total), "totals.net_total"],
+        ["MwSt", euro(document.vat_total), "totals.vat_total"],
+        ["Gesamt", euro(document.gross_total), "totals.gross_total"],
+        ["Positionen", lineItems.length, null],
+        ["Bilder", images.length, null],
+        ["Betragszeilen", amountLines.length, null],
+        ["Confidence", document.parse_confidence, null],
+      ];
+
+      for (const [label, value, sourceKey] of cards) {
+        ui.summary.appendChild(createSummaryCard(label, value, sourceKey));
+      }
+    }
+
+    function renderLlmRun(runPayload) {
+      clearNode(ui.llmChangeRows);
+      if (!runPayload || typeof runPayload !== "object") {
+        ui.llmRunInfo.textContent = "Kein LLM Lauf fuer dieses Dokument gefunden.";
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan=\"4\" class=\"small\">Noch keine LLM-Aenderungen vorhanden.</td>";
+        ui.llmChangeRows.appendChild(row);
+        return;
+      }
+
+      const result = (runPayload.result && typeof runPayload.result === "object") ? runPayload.result : {};
+      const changes = Array.isArray(runPayload.changes) ? runPayload.changes : [];
+      const appliedCount = changes.filter((item) => item && item.applied).length;
+      const modeRequested = fmt(runPayload.process_mode_requested);
+      const modeEffective = fmt(runPayload.process_mode_effective);
+      const status = fmt(result.status);
+      const model = fmt(result.model);
+      const runId = fmt(runPayload.run_id);
+      const createdAt = fmt(runPayload.created_at_utc);
+      const errorText = result.error ? ` | Error: ${String(result.error).slice(0, 140)}` : "";
+      ui.llmRunInfo.textContent =
+        `Run ${runId} | ${createdAt} | Mode ${modeRequested} -> ${modeEffective} | Status ${status} | Model ${model} | Changes ${appliedCount}/${changes.length}${errorText}`;
+
+      if (!changes.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan=\"4\" class=\"small\">Keine Feld-Aenderungen in diesem Lauf.</td>";
+        ui.llmChangeRows.appendChild(row);
+        return;
+      }
+
+      for (const change of changes) {
+        const row = document.createElement("tr");
+        const appliedChip = change && change.applied
+          ? "<span class=\"chip ok-chip\">ja</span>"
+          : "<span class=\"chip no-chip\">nein</span>";
+        row.innerHTML = `
+          <td><code>${escapeHtml(fmt(change && change.field))}</code></td>
+          <td>${escapeHtml(fmt(change && change.old))}</td>
+          <td>${escapeHtml(fmt(change && change.new))}</td>
+          <td>${appliedChip}</td>
+        `;
+        ui.llmChangeRows.appendChild(row);
+      }
+    }
+
+    function compareStatusLabel(item) {
+      const status = String((item && item.status) || "");
+      if (status === "same") {
+        const parserVal = fmt(item.parser_value, "");
+        const llmVal = fmt(item.llm_value, "");
+        if (parserVal && llmVal && parserVal !== llmVal) return "gleich (normalisiert)";
+        return "gleich";
+      }
+      if (status === "different") return "anders";
+      if (status === "missing_in_parser") return "Parser fehlt";
+      if (status === "missing_in_llm") return "LLM fehlt";
+      if (status === "missing_both") return "beide fehlen";
+      return status || "-";
+    }
+
+    function compareStatusClass(status) {
+      if (status === "same") return "same";
+      if (status === "different") return "different";
+      return "missing";
+    }
+
+    function renderCompare(comparePayload) {
+      clearNode(ui.compareRows);
+      ui.compareSummary.textContent = "";
+
+      if (!comparePayload || typeof comparePayload !== "object") {
+        ui.compareInfo.textContent = "Noch kein Vergleich geladen. Klick auf \"Parser vs LLM aktualisieren\".";
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan=\"4\" class=\"small\">Noch kein Parser-vs-LLM Vergleich vorhanden.</td>";
+        ui.compareRows.appendChild(row);
+        return;
+      }
+
+      const summary = (comparePayload.summary && typeof comparePayload.summary === "object")
+        ? comparePayload.summary
+        : {};
+      const llmStatus = fmt(comparePayload.llm_status);
+      const llmModel = fmt(comparePayload.llm_model);
+      const llmUsed = comparePayload.llm_used ? "ja" : "nein";
+      const llmError = comparePayload.llm_error ? ` | Error: ${String(comparePayload.llm_error).slice(0, 140)}` : "";
+      ui.compareInfo.textContent = `LLM genutzt: ${llmUsed} | Status: ${llmStatus} | Model: ${llmModel}${llmError}`;
+      ui.compareSummary.textContent =
+        `Felder: ${summary.total || 0} | gleich: ${summary.same || 0} | anders: ${summary.different || 0} | Parser fehlt: ${summary.missing_in_parser || 0} | LLM fehlt: ${summary.missing_in_llm || 0}`;
+
+      const rows = Array.isArray(comparePayload.comparison) ? comparePayload.comparison : [];
+      if (!rows.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan=\"4\" class=\"small\">Keine Vergleichswerte verfuegbar.</td>";
+        ui.compareRows.appendChild(row);
+        return;
+      }
+
+      for (const item of rows) {
+        const status = String((item && item.status) || "");
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td><code>${escapeHtml(fmt(item && item.field))}</code></td>
+          <td>${escapeHtml(fmt(item && item.parser_value))}</td>
+          <td>${escapeHtml(fmt(item && item.llm_value))}</td>
+          <td><span class="compare-status ${escapeHtml(compareStatusClass(status))}">${escapeHtml(compareStatusLabel(item))}</span></td>
+        `;
+        ui.compareRows.appendChild(row);
+      }
+    }
+
+    function renderAmountLines(lines) {
+      clearNode(ui.amountRows);
+      if (!lines.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan=\"5\" class=\"small\">Keine Betragszeilen vorhanden.</td>";
+        ui.amountRows.appendChild(row);
+        return;
+      }
+
+      const lineSourceKey = {
+        net_total: "totals.net_total",
+        vat: "totals.vat_total",
+        total: "totals.gross_total",
+      };
+
+      for (const line of lines) {
+        const sourceKey = lineSourceKey[String(line.line_type || "")] || null;
+        const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "parser";
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(fmt(line.line_type))}</td>
+          <td>${escapeHtml(fmt(line.label_raw))}</td>
+          <td>${escapeHtml(fmt(line.percent))}</td>
+          <td>${escapeHtml(euro(line.amount))}</td>
+          <td>${sourceTagHtml(source)}</td>
+        `;
+        ui.amountRows.appendChild(row);
+      }
+    }
+
+    function imageLinks(documentId, imageIds) {
+      if (!Array.isArray(imageIds) || !imageIds.length) return "-";
+      return imageIds
+        .map((imageId) => `<a href="/document/${documentId}/image/${imageId}" target="_blank" rel="noopener">#${imageId}</a>`)
+        .join(", ");
+    }
+
+    function mappedImageLabel(item) {
+      const mapped = Number(item.image_count || 0);
+      const allPage = Number(item.image_count_page_all || 0);
+      if (mapped <= 0) return "0 Bilder";
+      if (allPage > 0 && mapped <= allPage) {
+        return `${mapped}/${allPage} Seitenbilder`;
+      }
+      return `${mapped} Kandidaten`;
+    }
+
+    function lineItemSource(item) {
+      const direct = String(item && (item.source || item.extraction_source || "")).trim().toLowerCase();
+      if (direct === "llm") return "llm";
+      if (direct === "parser") return "parser";
+
+      const metaRaw = item && item.metadata_json;
+      if (metaRaw && typeof metaRaw === "string") {
+        try {
+          const meta = JSON.parse(metaRaw);
+          const fromMeta = String((meta && (meta.source || meta.extraction_source || "")) || "").trim().toLowerCase();
+          if (fromMeta === "llm") return "llm";
+          if (fromMeta === "parser") return "parser";
+        } catch (_error) {
+          // Ignore invalid metadata JSON and keep parser fallback.
+        }
+      }
+
+      return "parser";
+    }
+
+    function renderLineItems(items) {
+      clearNode(ui.itemRows);
+      if (!items.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan=\"9\" class=\"small\">Keine Positionen extrahiert.</td>";
+        ui.itemRows.appendChild(row);
+        return;
+      }
+
+      for (const item of items) {
+        const source = lineItemSource(item);
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(fmt(item.position_no))}</td>
+          <td>${escapeHtml(fmt(item.lv_pos))}</td>
+          <td>${escapeHtml(fmt(item.quantity))} ${escapeHtml(fmt(item.unit, ""))}</td>
+          <td>${escapeHtml(fmt(item.description_short))}</td>
+          <td>${escapeHtml(euro(item.unit_price))}</td>
+          <td>${escapeHtml(euro(item.line_total))}</td>
+          <td>${escapeHtml(fmt(item.page_ref))}</td>
+          <td><span class="chip">${escapeHtml(mappedImageLabel(item))}</span><br>${imageLinks(state.documentId, item.image_ids)}</td>
+          <td>${sourceTagHtml(source)}</td>
+        `;
+        ui.itemRows.appendChild(row);
+      }
+    }
+
+    function renderImages(images) {
+      clearNode(ui.imageGrid);
+      if (!images.length) {
+        const empty = document.createElement("div");
+        empty.className = "small";
+        empty.textContent = "Keine Bilder extrahiert.";
+        ui.imageGrid.appendChild(empty);
+        return;
+      }
+
+      for (const image of images) {
+        const card = document.createElement("div");
+        card.className = "img-card";
+
+        const preview = document.createElement("img");
+        preview.src = `/document/${state.documentId}/image/${image.id}`;
+        preview.alt = `Bild ${image.id}`;
+        preview.loading = "lazy";
+        preview.onerror = () => {
+          const fallback = document.createElement("div");
+          fallback.className = "fallback";
+          fallback.innerHTML = `Keine Browser-Vorschau fuer ${escapeHtml(fmt(image.mime_type))}<br><a href="/document/${state.documentId}/image/${image.id}" target="_blank" rel="noopener">Datei oeffnen</a>`;
+          preview.replaceWith(fallback);
+        };
+
+        const meta = document.createElement("div");
+        meta.className = "img-meta";
+        meta.innerHTML = `
+          <div><strong>#${escapeHtml(fmt(image.id))}</strong> | Seite ${escapeHtml(fmt(image.page_ref))} | Img ${escapeHtml(fmt(image.image_index))}</div>
+          <div>${escapeHtml(fmt(image.mime_type))} | ${escapeHtml(fmt(image.width))}x${escapeHtml(fmt(image.height))} | ${escapeHtml(fmt(image.bytes_size))} bytes</div>
+        `;
+
+        card.appendChild(preview);
+        card.appendChild(meta);
+        ui.imageGrid.appendChild(card);
+      }
+    }
+
+    async function loadLatestLlmRun(documentId) {
+      try {
+        const payload = await apiJson(`/llm-runs/${documentId}/latest`);
+        state.llmRun = payload;
+        renderLlmRun(payload);
+        syncFieldSources();
+      } catch (_error) {
+        state.llmRun = null;
+        renderLlmRun(null);
+        syncFieldSources();
+      }
+    }
+
+    async function loadResult(documentId) {
+      try {
+        const result = await apiJson(`/result/${documentId}`);
+        state.result = result;
+        state.compare = null;
+        state.fieldSources = deriveFieldSources(null);
+        renderSummary(result);
+        renderCompare(null);
+        renderAmountLines(result.amount_lines || []);
+        renderLineItems(result.line_items || []);
+        renderImages(result.images || []);
+        await loadLatestLlmRun(documentId);
+        const imageCount = (result.images || []).length;
+        const itemCount = (result.line_items || []).length;
+        setStatus(`Dokument #${documentId} geladen: ${itemCount} Positionen, ${imageCount} Bilder.`, "ok");
+      } catch (error) {
+        clearNode(ui.summary);
+        clearNode(ui.llmChangeRows);
+        clearNode(ui.compareRows);
+        clearNode(ui.amountRows);
+        clearNode(ui.itemRows);
+        clearNode(ui.imageGrid);
+        ui.llmRunInfo.textContent = "LLM Run konnte nicht geladen werden.";
+        ui.compareInfo.textContent = "Vergleich konnte nicht geladen werden.";
+        ui.compareSummary.textContent = "";
+        state.result = null;
+        state.llmRun = null;
+        state.compare = null;
+        state.fieldSources = {};
+        setStatus(`Result konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
+      }
+    }
+
+    async function selectDocument(documentId) {
+      state.documentId = documentId;
+      ui.docSelect.value = String(documentId);
+      ui.pdfFrame.src = `/document/${documentId}/file#view=FitH`;
+      await loadResult(documentId);
+    }
+
+    async function processCurrent() {
+      if (!state.documentId) return;
+      const processMode = ui.processModeSelect.value || "hybrid_fill";
+      const modeLabel = PROCESS_MODE_LABELS[processMode] || processMode;
+      setStatus(
+        `Starte Verarbeitung fuer Dokument #${state.documentId} ... (Mode: ${modeLabel})`
+      );
+      ui.processBtn.disabled = true;
+      try {
+        const query = new URLSearchParams({ process_mode: processMode });
+        const payload = await apiJson(`/process/${state.documentId}?${query.toString()}`, { method: "POST" });
+        const llmInfo = payload.llm_requested
+          ? (payload.llm_used
+            ? `LLM ${payload.llm_status || "ok"} (${payload.llm_model || "-"})`
+            : `LLM ${payload.llm_status || "off"}${payload.llm_error ? `: ${payload.llm_error}` : ""}`)
+          : "LLM off";
+        const level = payload.llm_requested && !payload.llm_used ? "warn" : "ok";
+        setStatus(
+          `Verarbeitung fertig: ${payload.line_item_count} Positionen, ${payload.image_count} Bilder, Status ${payload.status}. Mode ${payload.process_mode_effective || payload.process_mode_requested}. ${llmInfo}`,
+          level
+        );
+        await loadDocuments();
+      } catch (error) {
+        setStatus(`Verarbeitung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        ui.processBtn.disabled = false;
+      }
+    }
+
+    function openExport(format) {
+      if (!state.documentId) return;
+      window.open(`/export/${state.documentId}?format=${format}`, "_blank", "noopener");
+    }
+
+    function previewFilename(format) {
+      return `document_${state.documentId || "x"}_preview.${format}`;
+    }
+
+    function openPreviewModal() {
+      ui.previewModal.removeAttribute("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closePreviewModal() {
+      ui.previewModal.setAttribute("hidden", "");
+      document.body.style.overflow = "";
+    }
+
+    function downloadPreviewContent() {
+      if (!state.previewContent || !state.previewFormat) return;
+      const blob = new Blob([state.previewContent], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = previewFilename(state.previewFormat);
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copyPreviewContent() {
+      if (!state.previewContent) return;
+      try {
+        await navigator.clipboard.writeText(state.previewContent);
+        setStatus("Vorschau in Zwischenablage kopiert.", "ok");
+      } catch (error) {
+        setStatus(`Copy fehlgeschlagen: ${String(error.message).slice(0, 120)}`, "warn");
+      }
+    }
+
+    async function previewExport(format) {
+      if (!state.documentId) return;
+      setStatus(`Lade ${format.toUpperCase()} Vorschau...`);
+      try {
+        const text = await apiText(`/preview/${state.documentId}?format=${format}`);
+        state.previewFormat = format;
+        state.previewContent = text;
+        ui.previewTitle.textContent = `${format.toUpperCase()} Vorschau - Dokument #${state.documentId}`;
+        ui.previewContent.textContent = text;
+        openPreviewModal();
+        setStatus(`${format.toUpperCase()} Vorschau geladen.`, "ok");
+      } catch (error) {
+        setStatus(`Vorschau konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    async function previewLatestLlmRun() {
+      if (!state.documentId) return;
+      setStatus("Lade LLM Run...");
+      try {
+        const payload = await apiJson(`/llm-runs/${state.documentId}/latest`);
+        const text = JSON.stringify(payload, null, 2);
+        state.previewFormat = "json";
+        state.previewContent = text;
+        ui.previewTitle.textContent = `LLM Run - Dokument #${state.documentId}`;
+        ui.previewContent.textContent = text;
+        openPreviewModal();
+        setStatus("LLM Run geladen.", "ok");
+      } catch (error) {
+        setStatus(`LLM Run konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
+      }
+    }
+
+    async function previewLlmHistory() {
+      if (!state.documentId) return;
+      setStatus("Lade LLM History...");
+      try {
+        const payload = await apiJson(`/llm-runs/${state.documentId}?limit=25`);
+        const text = JSON.stringify(payload, null, 2);
+        state.previewFormat = "json";
+        state.previewContent = text;
+        ui.previewTitle.textContent = `LLM History - Dokument #${state.documentId}`;
+        ui.previewContent.textContent = text;
+        openPreviewModal();
+        setStatus("LLM History geladen.", "ok");
+      } catch (error) {
+        setStatus(`LLM History konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
+      }
+    }
+
+    async function previewParserLlmCompare() {
+      if (!state.documentId) return;
+      setStatus("Vergleiche Parser vs LLM...");
+      try {
+        const payload = await apiJson(`/compare/${state.documentId}`);
+        state.compare = payload;
+        renderCompare(payload);
+        const summary = payload.summary || {};
+        setStatus(
+          `Vergleich fertig: gleich ${summary.same || 0}, unterschiedlich ${summary.different || 0}, parser fehlt ${summary.missing_in_parser || 0}, llm fehlt ${summary.missing_in_llm || 0}.`,
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Vergleich konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
+      }
+    }
+
+    async function previewImageMatch() {
+      if (!state.documentId) return;
+      setStatus("Starte Bild-Matching (PoC)...");
+      try {
+        const payload = await apiJson(`/match-images/${state.documentId}?strategy=hybrid&max_candidates=4&max_items=80`, {
+          method: "POST",
+        });
+        const text = JSON.stringify(payload, null, 2);
+        state.previewFormat = "json";
+        state.previewContent = text;
+        ui.previewTitle.textContent = `Bild-Match (PoC) - Dokument #${state.documentId}`;
+        ui.previewContent.textContent = text;
+        openPreviewModal();
+        const summary = payload.summary || {};
+        setStatus(
+          `Bild-Matching fertig: ${summary.matched_items || 0}/${summary.line_items_processed || 0} Positionen gematcht, Quelle VLM ${summary.vlm_selected_items || 0}.`,
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Bild-Matching fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "warn");
+      }
+    }
+
+    ui.docSelect.addEventListener("change", async (event) => {
+      const nextId = Number(event.target.value);
+      if (Number.isFinite(nextId) && nextId > 0) {
+        await selectDocument(nextId);
+      }
+    });
+
+    ui.reloadBtn.addEventListener("click", async () => {
+      await loadDocuments();
+    });
+
+    ui.refreshBtn.addEventListener("click", async () => {
+      if (state.documentId) {
+        await loadResult(state.documentId);
+      }
+    });
+
+    ui.processBtn.addEventListener("click", async () => {
+      await processCurrent();
+    });
+    ui.llmRunPreviewBtn.addEventListener("click", async () => {
+      await previewLatestLlmRun();
+    });
+    ui.llmHistoryPreviewBtn.addEventListener("click", async () => {
+      await previewLlmHistory();
+    });
+    ui.comparePreviewBtn.addEventListener("click", async () => {
+      await previewParserLlmCompare();
+    });
+    ui.imageMatchBtn.addEventListener("click", async () => {
+      await previewImageMatch();
+    });
+
+    ui.jsonPreviewBtn.addEventListener("click", async () => {
+      await previewExport("json");
+    });
+    ui.csvPreviewBtn.addEventListener("click", async () => {
+      await previewExport("csv");
+    });
+    ui.jsonDownloadBtn.addEventListener("click", () => openExport("json"));
+    ui.csvDownloadBtn.addEventListener("click", () => openExport("csv"));
+    ui.copyPreviewBtn.addEventListener("click", async () => {
+      await copyPreviewContent();
+    });
+    ui.downloadPreviewBtn.addEventListener("click", () => {
+      downloadPreviewContent();
+    });
+    ui.closePreviewBtn.addEventListener("click", () => {
+      closePreviewModal();
+    });
+    ui.previewModal.addEventListener("click", (event) => {
+      if (event.target === ui.previewModal) {
+        closePreviewModal();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !ui.previewModal.hidden) {
+        closePreviewModal();
+      }
+    });
+
+    closePreviewModal();
+    renderLlmRun(null);
+    renderCompare(null);
+
+    loadDocuments().catch((error) => {
+      setStatus(`Initialisierung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+    });
+  </script>
+</body>
+</html>
