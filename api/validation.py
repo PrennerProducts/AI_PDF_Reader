@@ -5,6 +5,15 @@ from typing import Any
 SUM_TOLERANCE = Decimal("0.02")
 CONFIDENCE_AUTO_ACCEPT = Decimal("0.85")
 CONFIDENCE_REVIEW = Decimal("0.60")
+COMPLEX_PRICING_TERMS = (
+    "rabatt",
+    "zuschlag",
+    "teuerungszuschlag",
+    "objektrabatt",
+    "sonderrabatt",
+    "händlerrabatt",
+    "haendlerrabatt",
+)
 
 
 def _to_decimal(value: Any) -> Decimal | None:
@@ -39,6 +48,12 @@ def _has_text(value: Any) -> bool:
     if value is None:
         return False
     return bool(str(value).strip())
+
+
+def _normalized_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).strip().lower().split())
 
 
 def _make_issue(
@@ -86,6 +101,76 @@ def _count_pages(raw_text_path: str | None) -> int | None:
     return stripped.count("\f") + 1
 
 
+def _provider_key(document: dict[str, Any]) -> str:
+    supplier_name = _normalized_text(document.get("supplier_name"))
+    if supplier_name == "alu-one metallbaupartner gmbh":
+        return "alu_one"
+    if supplier_name == "entholzer":
+        return "entholzer"
+    if supplier_name == "lupre ai solutions":
+        return "sr_schauraum"
+    if supplier_name == "newo":
+        return "newo"
+    if supplier_name == "rekord vomp gmbh":
+        return "rekord_vomp"
+    if supplier_name == "rieder":
+        return "rieder"
+    return supplier_name or "generic"
+
+
+def _is_informational_item(provider_key: str, item: dict[str, Any]) -> bool:
+    description = _normalized_text(item.get("description_short"))
+    lv_pos = _normalized_text(item.get("lv_pos"))
+    unit_price = _to_decimal(item.get("unit_price"))
+    line_total = _to_decimal(item.get("line_total"))
+
+    if provider_key == "alu_one":
+        return description == "vorbemerkungen"
+    if provider_key == "entholzer":
+        return lv_pos == "system" and unit_price is None and line_total is None
+    if provider_key == "newo":
+        return description.startswith("diese position")
+    if provider_key == "rekord_vomp":
+        return lv_pos == "umfang" or "summe-umfang" in description or "summe-rahmen" in description
+    return False
+
+
+def _counts_towards_component_sum(provider_key: str, item: dict[str, Any]) -> bool:
+    description = _normalized_text(item.get("description_short"))
+    if provider_key == "sr_schauraum":
+        return True
+    if provider_key == "alu_one" and description.startswith("az - "):
+        return False
+    if _is_informational_item(provider_key, item):
+        return False
+    return not bool(item.get("is_alternative"))
+
+
+def _component_check_mode(provider_key: str, amount_lines: list[dict[str, Any]]) -> tuple[str, str | None]:
+    discount_count = 0
+    surcharge_count = 0
+    subtotal_count = 0
+    embedded_complexity = False
+
+    for amount_line in amount_lines:
+        line_type = _normalized_text(amount_line.get("line_type"))
+        label_raw = _normalized_text(amount_line.get("label_raw"))
+        if line_type == "discount":
+            discount_count += 1
+        elif line_type == "surcharge":
+            surcharge_count += 1
+        elif line_type == "subtotal":
+            subtotal_count += 1
+        if line_type not in {"discount", "surcharge"} and any(term in label_raw for term in COMPLEX_PRICING_TERMS):
+            embedded_complexity = True
+
+    if provider_key in {"entholzer", "rekord_vomp", "rieder"}:
+        return "heuristic", "provider_complex_pricing"
+    if discount_count > 0 or surcharge_count > 0 or subtotal_count > 1 or embedded_complexity:
+        return "heuristic", "complex_pricing_breakdown"
+    return "strict", None
+
+
 def _confidence_policy(parse_confidence: Any) -> dict[str, Any]:
     confidence = _to_decimal(parse_confidence)
     if confidence is None:
@@ -128,6 +213,7 @@ def build_document_validation(
 ) -> dict[str, Any]:
     document_issues: list[dict[str, Any]] = []
     required_fields, recommended_fields = _build_required_field_summary(document)
+    provider_key = _provider_key(document)
 
     for field_name, present in required_fields.items():
         if not present:
@@ -185,6 +271,7 @@ def build_document_validation(
         totals_summary["page_count"] = page_count
 
     non_alternative_item_sum = Decimal("0.00")
+    component_item_sum = Decimal("0.00")
     discount_sum = Decimal("0.00")
     surcharge_sum = Decimal("0.00")
 
@@ -200,6 +287,8 @@ def build_document_validation(
         line_total = _to_decimal(item.get("line_total"))
         is_alternative = bool(item.get("is_alternative"))
         page_ref = item.get("page_ref")
+        is_informational_item = _is_informational_item(provider_key, item)
+        counts_towards_component_sum = _counts_towards_component_sum(provider_key, item)
 
         if not _has_text(item.get("position_no")):
             issues.append(
@@ -228,7 +317,7 @@ def build_document_validation(
                     message="Menge fehlt.",
                 )
             )
-        elif quantity <= 0 and not is_alternative:
+        elif quantity <= 0 and not is_alternative and not is_informational_item:
             issues.append(
                 _make_issue(
                     code="non_positive_quantity",
@@ -238,7 +327,7 @@ def build_document_validation(
                     actual=quantity,
                 )
             )
-        if unit_price is None:
+        if unit_price is None and not is_informational_item:
             issues.append(
                 _make_issue(
                     code="missing_unit_price",
@@ -247,7 +336,7 @@ def build_document_validation(
                     message="Einzelpreis fehlt.",
                 )
             )
-        if line_total is None and not is_alternative:
+        if line_total is None and not is_alternative and not is_informational_item:
             issues.append(
                 _make_issue(
                     code="missing_line_total",
@@ -256,7 +345,7 @@ def build_document_validation(
                     message="Positionsgesamtpreis fehlt.",
                 )
             )
-        elif line_total == 0 and not is_alternative:
+        elif line_total == 0 and not is_alternative and not is_informational_item:
             issues.append(
                 _make_issue(
                     code="zero_line_total",
@@ -287,7 +376,7 @@ def build_document_validation(
                 )
             )
 
-        if quantity is not None and unit_price is not None and line_total is not None:
+        if quantity is not None and unit_price is not None and line_total is not None and not is_informational_item:
             expected_line_total = (quantity * unit_price).quantize(SUM_TOLERANCE)
             if abs(line_total - expected_line_total) > SUM_TOLERANCE:
                 issues.append(
@@ -313,6 +402,8 @@ def build_document_validation(
 
         if line_total is not None and not is_alternative:
             non_alternative_item_sum += line_total
+        if line_total is not None and counts_towards_component_sum:
+            component_item_sum += line_total
 
     for amount_line in amount_lines:
         amount = _to_decimal(amount_line.get("amount"))
@@ -324,16 +415,21 @@ def build_document_validation(
         elif line_type == "surcharge":
             surcharge_sum += amount
 
-    computed_net_from_components = (non_alternative_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
+    component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
+    computed_net_from_components = (component_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
     totals_summary["non_alternative_line_item_sum"] = non_alternative_item_sum.quantize(SUM_TOLERANCE)
+    totals_summary["component_included_line_item_sum"] = component_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["discount_sum"] = discount_sum.quantize(SUM_TOLERANCE)
     totals_summary["surcharge_sum"] = surcharge_sum.quantize(SUM_TOLERANCE)
     totals_summary["computed_net_from_components"] = computed_net_from_components
+    totals_summary["component_check_mode"] = component_check_mode
+    if component_check_reason is not None:
+        totals_summary["component_check_reason"] = component_check_reason
 
     if net_total is not None:
         totals_summary["net_delta_from_components"] = net_total - computed_net_from_components
         totals_summary["component_sum_matches_net"] = abs(net_total - computed_net_from_components) <= SUM_TOLERANCE
-        if line_items and not totals_summary["component_sum_matches_net"]:
+        if line_items and component_check_mode == "strict" and not totals_summary["component_sum_matches_net"]:
             document_issues.append(
                 _make_issue(
                     code="net_component_mismatch",
@@ -400,6 +496,7 @@ def build_document_validation(
             "error_count": line_item_error_count,
             "warning_count": line_item_warning_count,
             "non_alternative_total_sum": non_alternative_item_sum.quantize(SUM_TOLERANCE),
+            "component_included_total_sum": component_item_sum.quantize(SUM_TOLERANCE),
         },
         "image_summary": {
             "total": len(images),
