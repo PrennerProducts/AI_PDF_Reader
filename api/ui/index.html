@@ -3,20 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PDF Extraction Workbench</title>
+  <title>SR.SCHAURAUM PDF Workbench</title>
   <style>
     :root {
-      --bg: #f5f7fb;
-      --bg-accent: #e6eef9;
-      --card: #ffffff;
-      --ink: #172237;
-      --muted: #5c6b85;
-      --line: #d7deeb;
-      --brand: #0f4c81;
-      --brand-soft: #d9e9f8;
+      --bg: #f3efeb;
+      --bg-accent: #fde9e7;
+      --card: rgba(255, 255, 255, 0.96);
+      --card-strong: #ffffff;
+      --ink: #232020;
+      --muted: #6a6360;
+      --line: #ded6d1;
+      --brand: #d51a0f;
+      --brand-strong: #96150d;
+      --brand-soft: #fde8e6;
+      --accent: #5c5c5b;
+      --accent-soft: #ece9e6;
       --ok: #0b7a48;
       --warn: #8a4f00;
       --err: #9f172a;
+      --shadow: 0 24px 60px rgba(34, 25, 22, 0.11);
+      --shadow-strong: 0 28px 70px rgba(28, 19, 17, 0.16);
     }
 
     * {
@@ -25,147 +31,449 @@
 
     body {
       margin: 0;
-      font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+      font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
       background:
-        radial-gradient(circle at 10% -5%, var(--bg-accent), transparent 40%),
-        linear-gradient(150deg, var(--bg), #edf2fb);
+        radial-gradient(circle at 0% 0%, rgba(213, 26, 15, 0.12), transparent 30%),
+        radial-gradient(circle at 100% 6%, rgba(92, 92, 91, 0.14), transparent 18%),
+        linear-gradient(180deg, #f7f7f8, var(--bg));
       color: var(--ink);
       min-height: 100vh;
     }
 
     .app {
-      max-width: 1600px;
+      max-width: 1720px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 26px;
     }
 
     .topbar {
-      background: linear-gradient(120deg, #113457, #0f4c81);
-      color: #fff;
-      border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 10px 28px rgba(8, 25, 44, 0.2);
-      margin-bottom: 16px;
+      position: relative;
+      color: #ffffff;
+      border-radius: 30px;
+      padding: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: var(--shadow-strong);
+      margin-bottom: 22px;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 40%),
+        radial-gradient(circle at 88% 8%, rgba(213, 26, 15, 0.34), transparent 22%),
+        linear-gradient(130deg, #1b1d21, #5c5c5b 52%, #2a2b2e);
+    }
+
+    .topbar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 82% 14%, rgba(255, 255, 255, 0.1), transparent 14%),
+        radial-gradient(circle at 75% 18%, rgba(213, 26, 15, 0.12), transparent 16%),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: auto, auto, 42px 42px, 42px 42px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 96%);
+      opacity: 0.95;
+      pointer-events: none;
+      animation: heroGlow 10s ease-in-out infinite alternate;
+    }
+
+    .topbar::after {
+      content: "";
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      top: 0;
+      height: 5px;
+      border-radius: 0 0 12px 12px;
+      background: linear-gradient(90deg, var(--brand), #f34b3f 52%, #221e1d);
+      pointer-events: none;
+    }
+
+    .hero-head,
+    .controls,
+    .action-bar,
+    .status-strip,
+    .advanced-tools {
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 26px;
+      margin-bottom: 22px;
+    }
+
+    .hero-copy {
+      max-width: 920px;
+    }
+
+    .hero-aside {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+      min-width: 320px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f4f0ee;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 24px rgba(8, 8, 10, 0.16);
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--brand);
+      box-shadow: 0 0 0 5px rgba(213, 26, 15, 0.12);
     }
 
     .topbar h1 {
       margin: 0;
-      font-size: 24px;
-      line-height: 1.2;
+      font-size: clamp(38px, 5vw, 64px);
+      line-height: 0.98;
+      letter-spacing: -0.03em;
+      max-width: 11ch;
+      color: #ffffff;
     }
 
     .topbar p {
-      margin: 6px 0 0;
-      color: #d8e6f5;
-      font-size: 14px;
+      margin: 16px 0 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 16px;
+      line-height: 1.7;
+      max-width: 68ch;
+    }
+
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: 420px;
+    }
+
+    .customer-brand {
+      width: min(100%, 360px);
+      position: relative;
+      padding: 18px 20px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #ffffff, #f6f2ef);
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      box-shadow: 0 22px 48px rgba(28, 19, 17, 0.12);
+      overflow: hidden;
+    }
+
+    .customer-brand::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--brand), #f04a3d 58%, rgba(240, 74, 61, 0));
+    }
+
+    .customer-brand-label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .customer-logo {
+      display: block;
+      width: 100%;
+      max-width: 300px;
+      color: #4b4a49;
+    }
+
+    .customer-logo svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 9px 13px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #f7f4f2;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 12px 28px rgba(8, 8, 10, 0.12);
+    }
+
+    .hero-pill:first-child {
+      background: var(--brand);
+      color: #ffffff;
+      border-color: var(--brand);
     }
 
     .controls {
-      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.95fr 0.95fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .control-card {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 8px;
-      align-items: center;
+      position: relative;
+      padding: 16px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 14px 34px rgba(8, 8, 10, 0.14);
+      backdrop-filter: blur(12px);
+    }
+
+    .control-card-wide {
+      grid-column: span 1;
+    }
+
+    .control-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 16px;
+      right: 16px;
+      height: 4px;
+      border-radius: 0 0 10px 10px;
+      background: linear-gradient(90deg, var(--brand), rgba(213, 26, 15, 0));
+    }
+
+    .control-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.78);
     }
 
     .controls select,
-    .controls input[type="file"],
-    .controls button {
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 9px 12px;
+    .controls input[type="file"] {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      padding: 12px 14px;
       font-size: 14px;
-      min-height: 38px;
-    }
-
-    #docSelect {
-      flex: 1 1 360px;
-      min-width: 260px;
-    }
-
-    #processModeSelect {
-      flex: 0 1 300px;
-      min-width: 220px;
-    }
-
-    .controls button {
-      flex: 0 0 auto;
-    }
-
-    .controls select {
-      background: rgba(255, 255, 255, 0.96);
-      color: #0a1624;
+      min-height: 48px;
+      background: #ffffff;
+      color: #1a1a1d;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
 
     .controls input[type="file"] {
-      flex: 1 1 320px;
-      min-width: 240px;
-      background: rgba(255, 255, 255, 0.96);
-      color: #0a1624;
       cursor: pointer;
     }
 
-    .controls button {
-      background: rgba(255, 255, 255, 0.17);
-      color: #fff;
+    .controls select:focus,
+    .controls input[type="file"]:focus {
+      outline: 2px solid rgba(213, 26, 15, 0.18);
+      border-color: rgba(213, 26, 15, 0.55);
+      box-shadow: 0 0 0 4px rgba(213, 26, 15, 0.1);
+    }
+
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .action-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 12px 18px;
+      min-height: 48px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
       cursor: pointer;
-      transition: background-color 0.15s ease;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
     }
 
-    .controls button:hover {
-      background: rgba(255, 255, 255, 0.27);
+    .btn:hover {
+      transform: translateY(-1px);
     }
 
-    .controls button:disabled {
+    .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
 
-    .controls .strong {
-      background: #1e8f57;
-      border-color: rgba(255, 255, 255, 0.4);
-      font-weight: 600;
+    .btn-primary {
+      background: linear-gradient(135deg, #ea2a1f, var(--brand));
+      color: #ffffff;
+      border-color: rgba(149, 18, 10, 0.42);
+      box-shadow: 0 16px 30px rgba(213, 26, 15, 0.24);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #6a6a69, var(--accent));
+      color: #ffffff;
+      border-color: rgba(92, 92, 91, 0.2);
+      box-shadow: 0 14px 28px rgba(50, 45, 43, 0.18);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.92);
+      color: #262223;
+      border-color: rgba(35, 32, 32, 0.1);
+      box-shadow: 0 12px 26px rgba(28, 19, 17, 0.07);
+    }
+
+    .btn-danger {
+      background: rgba(213, 26, 15, 0.08);
+      color: var(--brand);
+      border-color: rgba(213, 26, 15, 0.22);
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      margin-top: 18px;
+      align-items: stretch;
     }
 
     .statusbar {
-      margin-top: 12px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.15);
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.1));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-left: 5px solid var(--brand);
       font-size: 13px;
-      color: #f5f9ff;
-      min-height: 36px;
+      color: #ffffff;
+      min-height: 52px;
       display: flex;
       align-items: center;
+      box-shadow: 0 14px 30px rgba(8, 8, 10, 0.12);
+    }
+
+    .statusbar.ok {
+      border-left-color: var(--ok);
+    }
+
+    .statusbar.warn {
+      border-left-color: var(--warn);
+    }
+
+    .statusbar.err {
+      border-left-color: var(--err);
+    }
+
+    .live-state-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #6b6b6a, var(--accent));
+      border: 1px solid rgba(35, 32, 32, 0.14);
+      min-height: 52px;
+      box-shadow: 0 16px 30px rgba(20, 19, 22, 0.18);
+    }
+
+    .live-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .advanced-tools {
+      margin-top: 14px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
+      box-shadow: 0 16px 32px rgba(8, 8, 10, 0.14);
+      overflow: hidden;
+    }
+
+    .advanced-tools summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 16px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #ffffff;
+    }
+
+    .advanced-tools summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .advanced-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 0 18px 18px;
     }
 
     .debug-panel {
-      margin-top: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 10px;
-      background: rgba(5, 21, 38, 0.24);
-      padding: 8px;
+      margin: 0 18px 18px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      border-radius: 20px;
+      background: linear-gradient(180deg, #6a6a69, var(--accent));
+      padding: 12px;
     }
 
     .debug-head {
       display: flex;
       align-items: center;
       gap: 8px;
-      justify-content: space-between;
-      color: #e4effb;
+      color: #f6f3f1;
       font-size: 12px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .debug-state {
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      padding: 2px 8px;
+      padding: 3px 9px;
       font-size: 11px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(255, 255, 255, 0.08);
-      color: #dcecff;
+      color: #f0ece9;
       margin-left: 6px;
     }
 
@@ -188,30 +496,31 @@
     }
 
     #clearDebugBtn {
-      border: 1px solid rgba(255, 255, 255, 0.35);
+      margin-left: auto;
+      border: 1px solid rgba(255, 255, 255, 0.18);
       background: rgba(255, 255, 255, 0.08);
       color: #ffffff;
       font-size: 12px;
-      border-radius: 8px;
-      padding: 4px 8px;
+      border-radius: 999px;
+      padding: 7px 11px;
       cursor: pointer;
     }
 
     #clearDebugBtn:hover {
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.12);
     }
 
     .debug-log {
-      max-height: 120px;
+      max-height: 160px;
       overflow: auto;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(3, 12, 22, 0.35);
-      padding: 6px 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(31, 29, 29, 0.22);
+      padding: 10px 12px;
       font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, Menlo, monospace;
       font-size: 11px;
       line-height: 1.45;
-      color: #d7e6f8;
+      color: #f3efee;
     }
 
     .debug-line {
@@ -234,65 +543,110 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: 0.95fr 1.05fr;
-      gap: 14px;
+      grid-template-columns: minmax(420px, 0.92fr) minmax(520px, 1.08fr);
+      gap: 22px;
       min-height: 78vh;
+      align-items: start;
     }
 
     .panel {
       background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      border-radius: 28px;
       overflow: hidden;
-      box-shadow: 0 6px 24px rgba(20, 32, 54, 0.08);
+      box-shadow: var(--shadow-strong);
+      backdrop-filter: blur(12px);
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .panel:nth-child(2) {
+      animation-delay: 0.08s;
     }
 
     .panel-head {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--line);
-      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 20px;
+      border-bottom: 1px solid rgba(35, 32, 32, 0.08);
+      font-weight: 700;
       font-size: 14px;
-      color: var(--muted);
-      background: #fbfcff;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #322d2c;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+    }
+
+    .panel-head::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--brand);
+      box-shadow: 0 0 0 6px rgba(213, 26, 15, 0.1);
+      flex: 0 0 auto;
     }
 
     #pdfFrame {
       width: 100%;
       height: calc(78vh - 42px);
       border: 0;
-      background: #f0f3f8;
+      background: #f0edeb;
     }
 
     .panel-body {
-      padding: 12px;
+      padding: 18px;
       height: calc(78vh - 42px);
       overflow: auto;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(213, 26, 15, 0.05), transparent 20%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 241, 238, 0.98));
     }
 
     .summary {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
     }
 
     .summary .card {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px;
-      background: #fcfdff;
-      min-height: 64px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      border-radius: 22px;
+      padding: 14px;
+      background: linear-gradient(180deg, #ffffff, #f6f2ef);
+      min-height: 92px;
+      box-shadow: 0 16px 30px rgba(28, 19, 17, 0.07);
+      animation: fadeUp 0.55s ease both;
+    }
+
+    .summary .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 5px;
+      background: linear-gradient(180deg, var(--brand), rgba(213, 26, 15, 0.14));
     }
 
     .summary .label {
       font-size: 12px;
       color: var(--muted);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     .summary .value {
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 16px;
+      font-weight: 700;
       word-break: break-word;
       display: flex;
       align-items: center;
@@ -301,12 +655,12 @@
     }
 
     .summary .card.source-llm {
-      border-color: #c6ead5;
-      background: #f4fcf8;
+      border-color: rgba(213, 26, 15, 0.18);
+      background: linear-gradient(180deg, #fff6f5, #fdf0ee);
     }
 
     .summary .card.source-parser {
-      border-color: #d8e6f6;
+      border-color: rgba(92, 92, 91, 0.12);
     }
 
     .src-tag {
@@ -324,15 +678,15 @@
     }
 
     .src-tag.src-llm {
-      color: #14653f;
-      background: #e8f8ef;
-      border-color: #bde4ce;
+      color: var(--brand-strong);
+      background: var(--brand-soft);
+      border-color: rgba(213, 26, 15, 0.18);
     }
 
     .src-tag.src-parser {
-      color: #1f4268;
-      background: #edf4ff;
-      border-color: #ccddf4;
+      color: #3e3b3a;
+      background: #efedeb;
+      border-color: rgba(92, 92, 91, 0.14);
     }
 
     .src-tag.src-unknown {
@@ -342,51 +696,77 @@
     }
 
     .section {
-      margin-top: 10px;
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 241, 238, 0.98));
+      box-shadow: 0 14px 30px rgba(28, 19, 17, 0.06);
     }
 
     .section h2 {
-      margin: 0 0 8px;
-      font-size: 14px;
-      color: #2d3d5b;
+      margin: 0 0 12px;
+      padding-left: 12px;
+      border-left: 4px solid var(--brand);
+      font-size: 15px;
+      color: #282425;
+      letter-spacing: -0.01em;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       font-size: 12px;
+      overflow: hidden;
+      border-radius: 16px;
     }
 
     th,
     td {
-      border: 1px solid var(--line);
-      padding: 6px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      padding: 9px 10px;
       text-align: left;
       vertical-align: top;
     }
 
     th {
-      background: #f7f9fd;
-      color: #344764;
-      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #efedeb;
+      color: #393433;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+
+    tr:nth-child(even) td {
+      background: rgba(248, 245, 243, 0.72);
+    }
+
+    tr:hover td {
+      background: rgba(213, 26, 15, 0.04);
     }
 
     td code {
       font-size: 11px;
-      color: #263a5a;
+      color: #3b3534;
     }
 
     .img-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
     }
 
     .img-card {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 6px;
-      background: #fbfdff;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      border-radius: 18px;
+      padding: 10px;
+      background: #ffffff;
+      box-shadow: 0 14px 28px rgba(28, 19, 17, 0.06);
+      transition: transform 0.16s ease, box-shadow 0.16s ease;
     }
 
     .img-card.llm-assigned {
@@ -395,19 +775,24 @@
       background: #f4fcf8;
     }
 
+    .img-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 34px rgba(28, 19, 17, 0.1);
+    }
+
     .img-card img {
       width: 100%;
       height: 120px;
       object-fit: contain;
-      background: #f0f4fb;
-      border-radius: 6px;
+      background: #f3efec;
+      border-radius: 10px;
       display: block;
     }
 
     .img-meta {
-      margin-top: 6px;
+      margin-top: 8px;
       font-size: 11px;
-      color: #425272;
+      color: #56514f;
       line-height: 1.35;
       word-break: break-word;
     }
@@ -430,9 +815,9 @@
 
     .fallback {
       min-height: 120px;
-      border-radius: 6px;
-      background: #fff7ed;
-      border: 1px dashed #f4b98a;
+      border-radius: 10px;
+      background: #fff7f5;
+      border: 1px dashed rgba(213, 26, 15, 0.34);
       color: #8a4f00;
       font-size: 11px;
       padding: 8px;
@@ -449,12 +834,12 @@
 
     .chip {
       display: inline-block;
-      padding: 1px 6px;
+      padding: 2px 7px;
       border-radius: 99px;
       font-size: 11px;
       line-height: 1.6;
       background: var(--brand-soft);
-      color: #0f4c81;
+      color: var(--brand-strong);
     }
 
     .chip.ok-chip {
@@ -534,22 +919,22 @@
       width: min(1300px, 100%);
       height: min(84vh, 900px);
       background: #ffffff;
-      border-radius: 12px;
-      border: 1px solid #d8e3f2;
-      box-shadow: 0 26px 70px rgba(8, 26, 46, 0.35);
+      border-radius: 26px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      box-shadow: 0 30px 74px rgba(28, 19, 17, 0.24);
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
     .modal-head {
-      padding: 10px 12px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--line);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      background: #fbfdff;
+      background: #f7f4f1;
     }
 
     .modal-title {
@@ -565,25 +950,25 @@
     }
 
     .modal-actions button {
-      border: 1px solid var(--line);
+      border: 1px solid rgba(35, 32, 32, 0.08);
       background: #fff;
-      border-radius: 8px;
+      border-radius: 999px;
       padding: 6px 10px;
       font-size: 13px;
       cursor: pointer;
-      color: #1f3452;
+      color: #2d2828;
     }
 
     .modal-actions button:hover {
-      background: #f3f7fe;
+      background: #f5efec;
     }
 
     .modal-body {
       margin: 0;
-      padding: 12px;
+      padding: 14px;
       overflow: auto;
-      background: #f8fbff;
-      color: #1d2a42;
+      background: #faf7f4;
+      color: #2b2828;
       font-size: 12px;
       line-height: 1.4;
       white-space: pre;
@@ -591,9 +976,57 @@
       flex: 1;
     }
 
+    @keyframes heroGlow {
+      from {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      to {
+        transform: translate3d(-1.5%, 1.5%, 0) scale(1.02);
+      }
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     @media (max-width: 1100px) {
+      .hero-head {
+        flex-direction: column;
+      }
+
+      .hero-aside,
+      .hero-pills {
+        align-items: flex-start;
+        justify-content: flex-start;
+      }
+
+      .customer-brand {
+        width: min(100%, 420px);
+      }
+
+      .topbar h1 {
+        max-width: none;
+      }
+
       .workspace {
         grid-template-columns: 1fr;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .action-bar,
+      .status-strip {
+        grid-template-columns: 1fr;
+        display: grid;
       }
 
       #pdfFrame,
@@ -602,18 +1035,34 @@
       }
 
       .summary {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 720px) {
-      .controls select,
-      .controls input[type="file"] {
-        min-width: 100%;
+      .app {
+        padding: 14px;
+      }
+
+      .topbar {
+        padding: 20px;
+        border-radius: 24px;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
       }
 
       .modal {
         height: 88vh;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .topbar::before,
+      .panel,
+      .summary .card {
+        animation: none;
       }
     }
   </style>
@@ -621,42 +1070,137 @@
 <body>
   <div class="app">
     <div class="topbar">
-      <h1>PDF Extraction Workbench</h1>
-      <p>Direkter Vergleich von Original-PDF, Positionen, Betragszeilen und extrahierten Bildern.</p>
-      <div class="controls">
-        <select id="docSelect" aria-label="Dokument auswählen"></select>
-        <input id="uploadInput" type="file" accept=".pdf,application/pdf" aria-label="PDF hochladen">
-        <button class="strong" id="uploadBtn">PDF hochladen</button>
-        <select id="processModeSelect" aria-label="Verarbeitungsmodus">
-          <option value="hybrid_fill">Modus: Hybrid (Parser + LLM fuellt Luecken)</option>
-          <option value="parser_only">Modus: Parser only (ohne LLM)</option>
-          <option value="llm_override">Modus: LLM override (LLM ueberschreibt)</option>
-          <option value="llm_only">Modus: LLM only (nur LLM Felder)</option>
-        </select>
-        <button id="resetBtn">Ergebnis loeschen</button>
-        <button id="reloadBtn">Dokumente neu laden</button>
-        <button id="refreshBtn">Result neu laden</button>
-        <button class="strong" id="processBtn">Process starten</button>
-        <button id="llmRunPreviewBtn">LLM Run JSON</button>
-        <button id="llmHistoryPreviewBtn">LLM History</button>
-        <button id="comparePreviewBtn">Parser vs LLM aktualisieren</button>
-        <button id="imageMatchBtn">Bild-Match (PoC)</button>
-        <button id="jsonPreviewBtn">JSON ansehen</button>
-        <button id="csvPreviewBtn">CSV ansehen</button>
-        <button id="jsonDownloadBtn">JSON Download</button>
-        <button id="csvDownloadBtn">CSV Download</button>
-      </div>
-      <div class="statusbar" id="statusBar">Lade Dokumentliste...</div>
-      <div class="debug-panel">
-        <div class="debug-head">
-          <div>
-            Live Debug
-            <span id="processLiveState" class="debug-state">idle</span>
-          </div>
-          <button id="clearDebugBtn" type="button">Debug leeren</button>
+      <div class="hero-head">
+        <div class="hero-copy">
+          <div class="eyebrow">SR.SCHAURAUM</div>
+          <h1>Angebote und ABs. Schnell geprüft. Klar entschieden.</h1>
+          <p>Upload, strukturierte Extraktion, Summencheck, Bildzuordnung und Review in einer Oberfläche, die wie ein modernes Schauraum-Tool wirkt statt wie ein internes Backend.</p>
         </div>
-        <div class="debug-log" id="debugLog" aria-live="polite"></div>
+        <div class="hero-aside">
+          <div class="customer-brand">
+            <span class="customer-brand-label">SR.SCHAURAUM</span>
+            <div class="customer-logo" role="img" aria-label="Kundenlogo">
+              <svg width="142" height="47" viewBox="0 0 142 47" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0_339_2452)">
+                  <path d="M62.7018 11.9967H70.8837C71.5041 11.9967 71.9694 12.4626 71.9694 13.0838C71.9694 13.705 71.5041 14.2097 70.8837 14.2097H59.4446V17.0051H70.8837C73.0164 17.0051 74.7226 15.3356 74.7613 13.2003V13.1226C74.7613 10.9873 73.0164 9.24019 70.8837 9.24019H62.7018C62.4304 9.24019 62.1589 9.12372 61.9651 8.9296C61.7324 8.69665 61.6548 8.42488 61.5773 8.11428C61.5773 7.84251 61.6936 7.57074 61.8875 7.3378C62.0814 7.10485 62.3528 7.0272 62.663 7.0272H74.1021V4.19303H62.663C60.5303 4.19303 58.7854 5.97895 58.7854 8.11428C58.7854 10.2884 60.5691 11.9967 62.663 11.9967" fill="#4B4A49"></path>
+                  <path d="M81.0044 17.0051H91.2026V14.2097H80.9656C80.3064 14.2097 79.6472 13.9379 79.1431 13.4332C78.6778 12.9673 78.4064 12.3073 78.3676 11.6085V9.58961C78.3676 8.15311 79.5309 7.0272 80.9268 7.0272H91.1639V4.19303H80.9656C78.0186 4.19303 75.6144 6.60014 75.5757 9.55079V11.5697C75.5757 14.5203 77.9798 16.9274 80.9656 16.9274" fill="#4B4A49"></path>
+                  <path d="M107.954 17.0051V9.62844C107.954 6.67779 105.55 4.27068 102.564 4.23185H97.9885C97.0967 4.23185 96.2048 4.4648 95.4293 4.89187V0H92.6761V17.0051H95.4681V9.62844C95.4681 8.19193 96.6314 7.06603 98.0273 7.06603H102.603C104.038 7.06603 105.162 8.23076 105.162 9.66726V17.0439H107.954V17.0051Z" fill="#4B4A49"></path>
+                  <path d="M113.616 17.0051H125.21V8.619C125.21 6.21189 123.232 4.23185 120.789 4.23185H111.909V7.0272H120.789C121.642 7.0272 122.34 7.72604 122.418 8.58018H113.577C112.452 8.58018 111.366 9.00725 110.552 9.78373C109.738 10.5602 109.234 11.6473 109.234 12.7732C109.234 13.3556 109.35 13.9379 109.622 14.4427C110.358 15.9956 111.871 16.9662 113.616 16.9662M122.379 11.4144V14.2485H113.538C113.15 14.2485 112.762 14.0932 112.452 13.8215C112.181 13.5497 112.026 13.2003 112.026 12.8509C112.026 12.5014 112.297 11.9191 112.685 11.7249C112.956 11.5697 113.267 11.4532 113.538 11.4532H122.34L122.379 11.4144Z" fill="#4B4A49"></path>
+                  <path d="M139.247 4.23185V14.2097H132.034C131.375 14.2097 130.716 13.9379 130.251 13.4332C129.785 12.9673 129.514 12.3073 129.475 11.6085V4.23185H126.683V11.6085C126.683 14.5591 129.087 16.9662 132.034 17.0051H141.961V4.23185H139.208H139.247Z" fill="#4B4A49"></path>
+                  <path d="M85.5413 21.3146H76.739C73.7919 21.3146 71.3878 23.7217 71.3878 26.6723V34.0489H74.1797V26.6723C74.1797 25.2358 75.343 24.1099 76.739 24.1099H85.5413V21.3146Z" fill="#4B4A49"></path>
+                  <path d="M95.7395 21.3146H86.8597V24.1099H95.7395C96.5926 24.1099 97.2906 24.8087 97.3681 25.6629H88.5271C87.4025 25.6629 86.3556 26.09 85.5025 26.8664C84.6882 27.6429 84.1841 28.73 84.1841 29.8559C84.1841 30.9818 84.3004 30.9818 84.5331 31.5254C85.2698 33.0783 86.7821 34.0489 88.4883 34.0489H100.082V25.7017C100.082 23.2558 98.1437 21.3146 95.7395 21.3146ZM87.4413 30.8653C87.1699 30.5936 87.0148 30.2442 87.0148 29.8947C87.0148 29.5453 87.2862 28.963 87.674 28.7688C87.9454 28.6135 88.2556 28.4971 88.5271 28.4971H97.3294V31.3312H88.4883C88.1005 31.3312 87.7127 31.1759 87.4025 30.9042" fill="#4B4A49"></path>
+                  <path d="M114.042 31.2536H106.83C106.17 31.2536 105.511 30.9818 105.046 30.4771C104.581 30.0112 104.27 29.3512 104.27 28.6524V21.2757H101.517V28.6524C101.517 31.603 103.921 34.0101 106.868 34.0489H116.795V21.3146H114.003V31.2536H114.042Z" fill="#4B4A49"></path>
+                  <path d="M136.61 21.2757H134.245C132.655 21.2757 131.22 21.9746 130.251 23.0617C129.281 21.9746 127.847 21.2757 126.257 21.2757H123.853C122.961 21.2757 121.952 21.5475 121.293 22.0522V21.2757H118.54V34.0489H121.332V26.6723C121.332 25.2358 122.495 24.1099 123.891 24.1099H126.295C127.73 24.1099 128.855 25.2746 128.855 26.7111V34.0878H131.647V26.7111C131.647 25.2746 132.81 24.1487 134.206 24.1099H136.61C138.045 24.1099 139.169 25.2746 139.169 26.7111V34.0878H141.961V26.7111C141.961 23.7605 139.557 21.3534 136.571 21.3146L136.61 21.2757Z" fill="#4B4A49"></path>
+                  <path d="M66.7734 29.1571C66.7734 31.8748 64.5631 34.0878 61.8487 34.0878C59.1344 34.0878 56.9241 31.8748 56.9241 29.1571C56.9241 26.4394 59.1344 24.2264 61.8487 24.2264C64.5631 24.2264 66.7734 26.4394 66.7734 29.1571Z" fill="#E63329"></path>
+                  <path d="M45.2523 20.2663C50.8362 20.2663 55.373 15.7239 55.373 10.1332C55.373 4.54245 50.8362 0 45.2523 0H29.5478L26.2906 6.44484H45.2523C47.2687 6.44484 48.9361 8.07546 48.9361 10.1332C48.9361 12.1908 47.3075 13.8215 45.2523 13.8215H29.0049L45.3687 34.0878H53.6668L42.4992 20.2663H45.2523Z" fill="#4B4A49"></path>
+                  <path d="M21.5986 13.8215H10.4309C8.41454 13.8215 6.74714 12.1908 6.74714 10.1332C6.74714 8.07546 8.37576 6.44484 10.4309 6.44484H24.5456L27.8416 0H10.4697C4.88586 0 0.348999 4.54245 0.348999 10.1332C0.348999 15.7239 4.88586 20.2663 10.4697 20.2663H21.6374C23.6537 20.2663 25.3211 21.8969 25.3211 23.9546C25.3211 26.0123 23.6925 27.6429 21.6374 27.6429H2.05517V34.0878H21.6374C27.2212 34.0878 31.7581 29.5453 31.7581 23.9546C31.7581 18.3639 27.2212 13.8215 21.6374 13.8215H21.5986Z" fill="#4B4A49"></path>
+                  <path d="M0.969416 42.5903V43.6774H2.4817V44.4927H0.969416V46.3174H0V41.8138H2.79192V42.6291H0.969416V42.5903Z" fill="#4B4A49"></path>
+                  <path d="M3.37355 46.3174V41.8138H6.32058V42.6291H4.34297V43.6386H6.01036V44.415H4.34297V45.5021H6.39813V46.3174H3.33478H3.37355Z" fill="#4B4A49"></path>
+                  <path d="M10.8962 46.3951L8.37576 44.0268L8.06555 43.755V46.3174H7.09613V41.7362L9.61661 44.1044L9.92682 44.3762V41.8138H10.8962V46.3951Z" fill="#4B4A49"></path>
+                  <path d="M11.7493 46.1233V45.1915C12.0595 45.3468 12.4861 45.5021 12.9126 45.5021C13.0677 45.5021 13.1841 45.5021 13.3392 45.5021C13.6881 45.4633 13.882 45.308 13.882 45.1139C13.882 44.9198 13.6106 44.648 12.9902 44.415C12.1759 44.1433 11.7105 43.7939 11.7105 43.0174C11.7105 42.2409 12.3697 41.6973 13.3779 41.6973C13.8433 41.6973 14.2698 41.8138 14.58 41.9303V42.8232C14.3086 42.6679 13.882 42.5515 13.4555 42.5515C12.9902 42.5515 12.68 42.7456 12.68 43.0174C12.68 43.2891 12.9126 43.4444 13.5718 43.6774C14.3861 43.988 14.8902 44.3374 14.8902 45.0751C14.8902 45.8127 14.2698 46.3951 13.1841 46.3951C12.68 46.3951 12.1371 46.2786 11.8269 46.1233H11.7493Z" fill="#4B4A49"></path>
+                  <path d="M17.2556 42.5903V46.3174H16.2862V42.5903H15.0066V41.775H18.5352V42.5903H17.2556Z" fill="#4B4A49"></path>
+                  <path d="M19.0005 46.3174V41.8138H21.9476V42.6291H19.97V43.6386H21.6373V44.415H19.97V45.5021H22.0251V46.3174H18.9618H19.0005Z" fill="#4B4A49"></path>
+                  <path d="M24.3517 41.8138C25.3987 41.8138 26.1355 42.3185 26.1355 43.2891C26.1355 44.2597 25.7477 44.3762 25.2436 44.5703L26.213 46.3174H25.166L24.3517 44.7256H23.6925V46.3174H22.7231V41.8138H24.3517ZM23.6925 42.5903V43.9491H24.3905C24.8171 43.9491 25.1273 43.755 25.1273 43.2891C25.1273 42.8232 24.8171 42.6291 24.3517 42.6291H23.6925V42.5903Z" fill="#4B4A49"></path>
+                  <path d="M29.0049 43.3668C29.4702 43.3668 29.7417 43.6386 29.7417 44.0656C29.7417 44.4927 29.4702 44.7645 29.0049 44.7645C28.5784 44.7645 28.2682 44.4927 28.2682 44.0656C28.2682 43.6386 28.5396 43.3668 29.0049 43.3668Z" fill="#4B4A49"></path>
+                  <path d="M33.9683 42.6291V46.3563H32.9989V42.6291H31.7193V41.8138H35.2479V42.6291H33.9683Z" fill="#4B4A49"></path>
+                  <path d="M39.5522 44.6868C39.5522 45.7351 38.8542 46.4339 37.6521 46.4339C36.45 46.4339 35.752 45.7351 35.752 44.6868V41.8138H36.7215V44.6092C36.7215 45.1915 37.0705 45.5409 37.6521 45.5409C38.2725 45.5409 38.5827 45.1915 38.5827 44.6092V41.8138H39.5522V44.6868ZM36.9153 40.2997C37.2256 40.2997 37.4582 40.4938 37.4582 40.8044C37.4582 41.115 37.2643 41.3091 36.9153 41.3091C36.6051 41.3091 36.3725 41.115 36.3725 40.8044C36.3725 40.4938 36.5664 40.2997 36.9153 40.2997ZM38.3113 40.2997C38.6215 40.2997 38.8542 40.4938 38.8542 40.8044C38.8542 41.115 38.6603 41.3091 38.3113 41.3091C38.0011 41.3091 37.7684 41.115 37.7684 40.8044C37.7684 40.4938 37.9623 40.2997 38.3113 40.2997Z" fill="#4B4A49"></path>
+                  <path d="M42.0726 41.8138C43.1196 41.8138 43.8564 42.3185 43.8564 43.2891C43.8564 44.2597 43.4686 44.3762 42.9645 44.5703L43.9339 46.3174H42.887L42.0726 44.7256H41.4134V46.3174H40.444V41.8138H42.0726ZM41.4134 42.6291V43.988H42.1114C42.538 43.988 42.8482 43.7938 42.8482 43.328C42.8482 42.8621 42.538 42.6679 42.0726 42.6679H41.4134V42.6291Z" fill="#4B4A49"></path>
+                  <path d="M44.5931 46.3174V41.8138H47.5402V42.6291H45.5625V43.6386H47.2299V44.415H45.5625V45.5021H47.6177V46.3174H44.5544H44.5931Z" fill="#4B4A49"></path>
+                  <path d="M52.1158 46.3951L49.5953 44.0268L49.2851 43.755V46.3174H48.3157V41.7362L50.8362 44.1044L51.1464 44.3762V41.8138H52.1158V46.3951Z" fill="#4B4A49"></path>
+                  <path d="M55.2567 43.4056C55.722 43.4056 55.9934 43.6774 55.9934 44.1044C55.9934 44.5315 55.722 44.8033 55.2567 44.8033C54.8301 44.8033 54.5199 44.5315 54.5199 44.1044C54.5199 43.6774 54.7914 43.4056 55.2567 43.4056Z" fill="#4B4A49"></path>
+                  <path d="M90.7373 46.1621V45.2304C91.0475 45.3856 91.4741 45.5409 91.9006 45.5409C92.0557 45.5409 92.172 45.5409 92.3271 45.5409C92.6761 45.5021 92.87 45.3468 92.87 45.1527C92.87 44.9586 92.5986 44.6868 91.9781 44.4539C91.1638 44.1821 90.6985 43.8327 90.6985 43.0562C90.6985 42.2797 91.3577 41.7362 92.3659 41.7362C92.8312 41.7362 93.2578 41.8526 93.568 41.9691V42.8621C93.2966 42.7068 92.87 42.5903 92.4435 42.5903C91.9781 42.5903 91.6679 42.7844 91.6679 43.0562C91.6679 43.328 91.9006 43.4833 92.5598 43.7162C93.3741 44.0268 93.8782 44.3762 93.8782 45.1139C93.8782 45.8515 93.2578 46.4339 92.172 46.4339C91.6679 46.4339 91.1251 46.3174 90.8148 46.1621H90.7373Z" fill="#4B4A49"></path>
+                  <path d="M96.5538 41.7362C97.9498 41.7362 98.958 42.7844 98.958 44.1044C98.958 45.4245 97.9498 46.4339 96.5538 46.4339C95.1578 46.4339 94.1497 45.3856 94.1497 44.0656C94.1497 42.7456 95.1578 41.7362 96.5538 41.7362ZM96.5538 45.5409C97.3681 45.5409 97.9498 44.8809 97.9498 44.0656C97.9498 43.2503 97.3681 42.5903 96.5538 42.5903C95.7395 42.5903 95.1578 43.2503 95.1578 44.0656C95.1578 44.8809 95.7395 45.5409 96.5538 45.5409Z" fill="#4B4A49"></path>
+                  <path d="M103.417 46.4339L100.897 44.0656L100.587 43.7939V46.3563H99.6171V41.775L102.138 44.1433L102.448 44.415V41.8526H103.417V46.4339Z" fill="#4B4A49"></path>
+                  <path d="M108.187 46.4339L105.666 44.0656L105.356 43.7939V46.3563H104.387V41.775L106.907 44.1433L107.217 44.415V41.8526H108.187V46.4339Z" fill="#4B4A49"></path>
+                  <path d="M109.195 46.3563V41.8526H112.142V42.6679H110.164V43.6774H111.832V44.4539H110.164V45.5409H112.22V46.3563H109.156H109.195Z" fill="#4B4A49"></path>
+                  <path d="M116.718 46.4339L114.197 44.0656L113.887 43.7939V46.3563H112.918V41.775L115.438 44.1433L115.748 44.415V41.8526H116.718V46.4339Z" fill="#4B4A49"></path>
+                  <path d="M117.571 46.201V45.2692C117.881 45.4245 118.307 45.5798 118.734 45.5798C118.889 45.5798 119.005 45.5798 119.161 45.5798C119.51 45.5409 119.703 45.3856 119.703 45.1915C119.703 44.9974 119.432 44.7256 118.812 44.4927C117.997 44.2209 117.532 43.8715 117.532 43.095C117.532 42.3185 118.191 41.775 119.199 41.775C119.665 41.775 120.091 41.8915 120.401 42.0079V42.9009C120.13 42.7456 119.703 42.6291 119.277 42.6291C118.812 42.6291 118.501 42.8232 118.501 43.095C118.501 43.3668 118.734 43.5221 119.393 43.755C120.208 44.0656 120.712 44.415 120.712 45.1527C120.712 45.8904 120.091 46.4727 119.005 46.4727C118.501 46.4727 117.958 46.3563 117.648 46.201H117.571Z" fill="#4B4A49"></path>
+                  <path d="M124.744 42.9397C124.473 42.7844 124.046 42.6291 123.465 42.6291C122.534 42.6291 121.952 43.2891 121.952 44.1044C121.952 44.9198 122.534 45.5798 123.426 45.5798C124.008 45.5798 124.473 45.4245 124.744 45.2692V46.1621C124.512 46.2786 123.969 46.4727 123.348 46.4727C121.952 46.4727 120.944 45.4633 120.944 44.1044C120.944 42.7456 121.952 41.775 123.387 41.775C124.046 41.775 124.473 41.9691 124.706 42.0856V42.9785L124.744 42.9397Z" fill="#4B4A49"></path>
+                  <path d="M128.351 46.3563V44.4539H126.451V46.3563H125.481V41.8526H126.451V43.6774H128.351V41.8526H129.32V46.3563H128.351Z" fill="#4B4A49"></path>
+                  <path d="M134.09 44.7256C134.09 45.7739 133.392 46.4727 132.19 46.4727C130.987 46.4727 130.289 45.7739 130.289 44.7256V41.8526H131.259V44.648C131.259 45.2304 131.608 45.5798 132.19 45.5798C132.81 45.5798 133.12 45.2304 133.12 44.648V41.8526H134.09V44.7256Z" fill="#4B4A49"></path>
+                  <path d="M136.804 42.6679V46.3951H135.834V42.6679H134.555V41.8526H138.084V42.6679H136.804Z" fill="#4B4A49"></path>
+                  <path d="M140.526 42.6679H138.51V41.8526H142L139.79 45.5798H141.922V46.3951H138.277L140.488 42.6679H140.526Z" fill="#4B4A49"></path>
+                  <path d="M88.0229 43.4056C88.4883 43.4056 88.7597 43.6774 88.7597 44.1044C88.7597 44.5315 88.4883 44.8033 88.0229 44.8033C87.5964 44.8033 87.2862 44.5315 87.2862 44.1044C87.2862 43.6774 87.5576 43.4056 88.0229 43.4056Z" fill="#4B4A49"></path>
+                  <path d="M59.2895 44.8421V46.3951H58.32V41.8915H59.7936C60.8405 41.8915 61.5385 42.3962 61.5385 43.3668C61.5385 44.3374 60.8405 44.8421 59.7936 44.8421H59.2895ZM59.2895 42.6679V44.0268H59.8323C60.2589 44.0268 60.5691 43.7939 60.5691 43.3668C60.5691 42.9397 60.2589 42.7068 59.8323 42.7068H59.2895V42.6679Z" fill="#4B4A49"></path>
+                  <path d="M63.4386 41.775L65.6488 46.3563H64.6406L64.2529 45.5409H62.5467L62.1977 46.3563H61.1895L63.3998 41.775H63.4386ZM64.0202 44.9198C63.8263 44.4539 63.5937 43.988 63.4773 43.5609C63.361 43.8715 63.0896 44.4927 62.8957 44.9198H64.0202Z" fill="#4B4A49"></path>
+                  <path d="M67.7428 41.8526C68.7897 41.8526 69.5265 42.3573 69.5265 43.328C69.5265 44.2986 69.1387 44.415 68.6346 44.6092L69.604 46.3563H68.5571L67.7428 44.7645H67.0836V46.3563H66.1141V41.8526H67.7428ZM67.0836 42.6679V44.0268H67.7815C68.2081 44.0268 68.5183 43.8327 68.5183 43.3668C68.5183 42.9009 68.2081 42.7068 67.7428 42.7068H67.0836V42.6679Z" fill="#4B4A49"></path>
+                  <path d="M71.2326 43.988L73.0164 41.8526H74.1797L72.551 43.755L74.2184 46.3951H73.1327L71.9306 44.3762L71.2714 45.1139V46.3951H70.302V41.8915H71.2714V44.0268L71.2326 43.988Z" fill="#4B4A49"></path>
+                  <path d="M74.645 46.3951V41.8915H77.592V42.7068H75.6144V43.7162H77.2818V44.4927H75.6144V45.5798H77.6696V46.3951H74.6062H74.645Z" fill="#4B4A49"></path>
+                  <path d="M80.2288 42.6679V46.3951H79.2594V42.6679H77.9798V41.8526H81.5085V42.6679H80.2288Z" fill="#4B4A49"></path>
+                  <path d="M84.029 42.6679V46.3951H83.0595V42.6679H81.7799V41.8526H85.3086V42.6679H84.029Z" fill="#4B4A49"></path>
+                </g>
+                <defs>
+                  <clipPath id="clip0_339_2452">
+                    <rect width="142" height="46.4727" fill="white"></rect>
+                  </clipPath>
+                </defs>
+              </svg>
+            </div>
+          </div>
+          <div class="hero-pills">
+            <span class="hero-pill">Angebote</span>
+            <span class="hero-pill">Auftragsbestätigungen</span>
+            <span class="hero-pill">Validierung + Export</span>
+          </div>
+        </div>
       </div>
+      <div class="controls">
+        <div class="control-card control-card-wide">
+          <label class="control-label" for="docSelect">Dokument</label>
+          <select id="docSelect" aria-label="Dokument auswählen"></select>
+        </div>
+        <div class="control-card">
+          <label class="control-label" for="uploadInput">Upload</label>
+          <input id="uploadInput" type="file" accept=".pdf,application/pdf" aria-label="PDF hochladen">
+        </div>
+        <div class="control-card">
+          <label class="control-label" for="processModeSelect">Verarbeitungsmodus</label>
+          <select id="processModeSelect" aria-label="Verarbeitungsmodus">
+            <option value="hybrid_fill">Hybrid: Parser + LLM fuellt Luecken</option>
+            <option value="parser_only">Parser only</option>
+            <option value="llm_override">LLM override</option>
+            <option value="llm_only">LLM only</option>
+          </select>
+        </div>
+      </div>
+      <div class="action-bar">
+        <div class="action-group">
+          <button class="btn btn-primary" id="uploadBtn">PDF hochladen</button>
+          <button class="btn btn-primary" id="processBtn">Verarbeiten</button>
+          <button class="btn btn-secondary" id="refreshBtn">Ergebnis laden</button>
+          <button class="btn btn-ghost" id="reloadBtn">Dokumentliste</button>
+        </div>
+        <div class="action-group">
+          <button class="btn btn-danger" id="resetBtn">Reset</button>
+        </div>
+      </div>
+      <div class="status-strip">
+        <div class="statusbar" id="statusBar">Lade Dokumentliste...</div>
+        <div class="live-state-wrap">
+          <span class="live-label">Run</span>
+          <span id="processLiveState" class="debug-state">idle</span>
+        </div>
+      </div>
+      <details class="advanced-tools">
+        <summary>Erweiterte Aktionen und Debug</summary>
+        <div class="advanced-actions">
+          <button class="btn btn-ghost" id="comparePreviewBtn">Parser vs LLM</button>
+          <button class="btn btn-ghost" id="jsonPreviewBtn">JSON Vorschau</button>
+          <button class="btn btn-secondary" id="csvDownloadBtn">CSV Download</button>
+          <button class="btn btn-ghost" id="llmRunPreviewBtn">LLM Run JSON</button>
+          <button class="btn btn-ghost" id="llmHistoryPreviewBtn">LLM History</button>
+          <button class="btn btn-ghost" id="imageMatchBtn">Bild-Match</button>
+          <button class="btn btn-ghost" id="csvPreviewBtn">CSV Vorschau</button>
+          <button class="btn btn-ghost" id="jsonDownloadBtn">JSON Download</button>
+        </div>
+        <div class="debug-panel">
+          <div class="debug-head">
+            <div>Live Debug</div>
+            <button id="clearDebugBtn" type="button">Debug leeren</button>
+          </div>
+          <div class="debug-log" id="debugLog" aria-live="polite"></div>
+        </div>
+      </details>
     </div>
 
     <div class="workspace">
