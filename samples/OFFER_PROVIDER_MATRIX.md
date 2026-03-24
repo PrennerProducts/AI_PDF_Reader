@@ -14,8 +14,8 @@ Stand: 2026-03-24
 
 | Anbieter | Gruene Regression | Gruene Kandidaten | Aktueller Status | Hauptthema |
 | --- | ---: | ---: | --- | --- |
-| `rieder` | 3 | 4 | stabil | 3 ältere Kandidaten ohne `document_number` |
-| `entholzer` | 3 | 3 | weitgehend stabil | 1 älterer Kandidat ohne `document_number` |
+| `rieder` | 3 | 4 | stabil | ältere AB-Varianten liefern jetzt ebenfalls Kopfwerte |
+| `entholzer` | 3 | 3 | weitgehend stabil | ältere AB-Variante liefert jetzt ebenfalls Kopfwerte |
 | `newo` | 3 | 1 | stabil | kein akuter Parserblocker |
 | `alu_one` | 2 | 0 | stabil | nach API-Neustart immer Upload-Canary mitprüfen |
 | `rekord_vomp` | 3 | 0 | stabil | VAX-Korpus ist jetzt eigener Anbieter und grün |
@@ -27,13 +27,13 @@ Stand: 2026-03-24
 - Regression: `samples/pdfs/regression/offers/rieder/`
 - Kandidaten: `samples/pdfs/candidates/offers/rieder/`
 - Parserstatus: alle `7` Angebots-PDFs liefern Positionen und vollständige Summen
-- Offene Kopfwert-Lücke: `131584_Sevignani, zu 130629_3.pdf`, `132047_IB-Karlpassage_3.pdf`, `132475_Moonlight - Söll, zu 132207 + 132476_3.pdf` ohne `document_number`
+- Kopfwerte: auch die älteren `Auftragsbestätigung`-Varianten liefern jetzt `document_number` und `Kommission`
 
 ### Entholzer
 - Regression: `samples/pdfs/regression/offers/entholzer/`
 - Kandidaten: `samples/pdfs/candidates/offers/entholzer/`
 - Parserstatus: `6` reguläre Angebots-PDFs grün
-- Offene Kopfwert-Lücke: `Angebot 12402032-10_20250415_Email.pdf` ohne `document_number`
+- Kopfwerte: die ältere `Auftragsbestätigung`-Variante liefert jetzt ebenfalls `document_number`
 
 ### NeWo
 - Regression: `samples/pdfs/regression/offers/newo/`
@@ -70,6 +70,6 @@ python -m pytest tests/test_template_regression.py -q
 
 ## Priority Order
 
-1. fehlende `document_number` bei älteren `rieder`- und `entholzer`-Kandidaten nachziehen
+1. pro Anbieter einen echten Upload-Canary gegen die API fahren, damit `pypdf`-Extraktion und Testkorpus synchron bleiben
 2. pro Anbieter weitere PDFs nur dann in den Regression-Satz heben, wenn sie einen echten Layout-Unterschied abdecken
 3. nach jedem Anbieterblock den grünen Gesamtkorpus plus kanonische Regression laufen lassen

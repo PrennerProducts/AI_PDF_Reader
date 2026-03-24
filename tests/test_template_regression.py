@@ -85,7 +85,7 @@ def test_sr_schauraum_regression() -> None:
     assert parsed["document_number"] == "AN-2025-113"
     assert parsed["document_date"] == "08.12.2025"
     assert parsed["project_ref"] == "KI-PDF-Reader Version ON-PREM (Physischer Server beim Kunden vor Ort)"
-    _assert_totals(parsed, ("4.600,00", "920,00", "EUR 5.520,00"))
+    _assert_totals(parsed, ("4.600,00", "920,00", "5.520,00"))
     assert len(items) == 3
     assert items[0]["description_short"] == "MODUL 1 – ON-PREM KI-PDF-READER & SQL-EXPORT"
     assert items[2]["is_alternative"] is True
@@ -111,6 +111,68 @@ def test_rekord_vomp_regression() -> None:
     assert items[-1]["lv_pos"] == "Lieferung"
     assert items[-1]["line_total_raw"] == "578,59"
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
+def test_sr_schauraum_compact_extractor_regression() -> None:
+    text = """
+Lupre AI Solutions FlexCo
+SR. Schauraum GmbH
+Angebot
+Angebotsnummer AN-2025-113
+Datum 08.12.2025
+Projekt KI-PDF-Reader Version ON-PREM (Physischer Server beim Kunden vor Ort)
+Beschreibung Menge Einheit Preis Betrag
+MODUL 1 – ON-PREM KI-PDF-READER & SQL-EXPORT
+- Automatische Verarbeitung von PDF-Dokumenten
+22 Stunde(n) 100,00 € 2.200,00 €
+MODUL 2 – DOCKER- & PRODUKTIV-SETUP
+16 Stunde(n) 100,00 € 1.600,00 €
+OPTIONAL: ON-PREM-INBETRIEBNAHME & ÜBERGABE VOR
+ORT
+1 pauschal 800,00 € 800,00 €
+Zwischensumme ohne USt. 4.600,00 €
+USt. 20 % von 4.600,00 € 920,00 €
+Gesamt EUR 5.520,00 €
+""".strip()
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "sr_schauraum"
+    assert parsed["document_number"] == "AN-2025-113"
+    _assert_totals(parsed, ("4.600,00", "920,00", "5.520,00"))
+    assert len(items) == 3
+    assert items[0]["description_short"] == "MODUL 1 – ON-PREM KI-PDF-READER & SQL-EXPORT"
+    assert items[1]["line_total_raw"] == "1.600,00"
+    assert items[2]["description_short"] == "OPTIONAL: ON-PREM-INBETRIEBNAHME & ÜBERGABE VOR ORT"
+    assert items[2]["is_alternative"] is True
+
+
+def test_rekord_vomp_compact_extractor_regression() -> None:
+    text = """
+REKORD Vomp GmbH
+Rekord Vomp GmbH-Au 48-AT-6134VompFirmaSR. Schauraum GmbH Bauvorhaben:Kom. Hagsteiner L. -Daniela Feldes
+Angebot: VAX60326Vorgang : VV2600196
+Belegdatum: 02.02.2026Seite: 1von 12
+Pos. 1 1 Stück
+2tlg. Element bestehend aus:Serie: 88MD1tlg.Kunststoff Fenster 881tlg.Kunststoff Balkontüre 88RAM: 3000 mm x 2300 mm
+1 Stück2.364,00 Gesamt 1 Stück4.028,95Pos. 2 2 Stück
+1tlg.Kunststoff FensterSerie: 88MDRAM: 1000 mm x 2300 mm
+1 Stück1.076,49 Gesamt 2 Stück2.152,98
+Summe der Positionen 43.343,19Händlerrabatt -39,00 %-16.903,84Zusatzrabatt -15,00 %-3.965,90Summe Netto 22.473,45MwSt 20,00 %4.494,69Summe Brutto 26.968,14
+""".strip()
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "rekord_vomp"
+    assert parsed["supplier_name"] == "Rekord Vomp GmbH"
+    assert parsed["document_number"] == "VAX60326"
+    assert parsed["document_date"] == "02.02.2026"
+    assert parsed["project_ref"] == "Kom. Hagsteiner L. -Daniela Feldes"
+    _assert_totals(parsed, ("22.473,45", "4.494,69", "26.968,14"))
+    assert len(items) == 2
+    assert items[0]["description_short"].startswith("2tlg. Element")
+    assert items[0]["line_total_raw"] == "4.028,95"
+    assert items[1]["line_total_raw"] == "2.152,98"
 
 
 def test_alu_one_a2602224mc_regression() -> None:

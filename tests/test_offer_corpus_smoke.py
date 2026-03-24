@@ -140,8 +140,9 @@ GREEN_OFFER_CASES = [
         "path": "samples/pdfs/candidates/offers/entholzer/Angebot 12402032-10_20250415_Email.pdf",
         "template": "entholzer",
         "supplier_name": "Entholzer",
-        "document_number": None,
+        "document_number": "12402032.10",
         "document_date": "10.04.2025",
+        "project_ref": "Neue Heimat - Südtiroler Siedlung Kufstein",
         "position_count": 17,
     },
     {
@@ -172,24 +173,27 @@ GREEN_OFFER_CASES = [
         "path": "samples/pdfs/candidates/offers/rieder/131584_Sevignani, zu 130629_3.pdf",
         "template": "rieder",
         "supplier_name": "Rieder",
-        "document_number": None,
+        "document_number": "131584-2",
         "document_date": "11.06.2025",
+        "project_ref": "Sevignani, zu 130629",
         "position_count": 5,
     },
     {
         "path": "samples/pdfs/candidates/offers/rieder/132047_IB-Karlpassage_3.pdf",
         "template": "rieder",
         "supplier_name": "Rieder",
-        "document_number": None,
+        "document_number": "132047-3",
         "document_date": "23.05.2025",
+        "project_ref": "IB-Karlpassage",
         "position_count": 9,
     },
     {
         "path": "samples/pdfs/candidates/offers/rieder/132475_Moonlight - Söll, zu 132207 + 132476_3.pdf",
         "template": "rieder",
         "supplier_name": "Rieder",
-        "document_number": None,
+        "document_number": "132475-4",
         "document_date": "15.07.2025",
+        "project_ref": "Moonlight - Söll, zu 132207 + 132476",
         "position_count": 17,
     },
     {
@@ -225,6 +229,10 @@ def test_green_offer_corpus(case: dict[str, object]) -> None:
     expected_document_number = case["document_number"]
     if expected_document_number is not None:
         assert parsed["document_number"] == expected_document_number
+
+    expected_project_ref = case.get("project_ref")
+    if expected_project_ref is not None:
+        assert parsed["project_ref"] == expected_project_ref
 
 
 def test_rekord_vomp_regression_folder() -> None:

@@ -4,7 +4,7 @@ from typing import Any
 
 from template_common import extract_first_description, normalize_line, normalize_text, page_ref_from_offset, trim_block_lines
 
-POSITION_RE = re.compile(r"(?m)^Pos\.\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:[.,][0-9]+)?)\s+St[üu]ck\b")
+POSITION_RE = re.compile(r"(?m)^Pos\.\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:[.,][0-9]+)?)\s+St[üu]ck(?:\b|(?=[A-ZÄÖÜ]))")
 RAM_RE = re.compile(r"RAM:\s*([0-9.,]+)\s*mm\s*x\s*([0-9.,]+)\s*mm", flags=re.IGNORECASE)
 ARCH_POS_RE = re.compile(r"Arch\.-Pos\.:\s*(.+)", flags=re.IGNORECASE)
 TOTAL_LINE_RE = re.compile(
@@ -13,12 +13,16 @@ TOTAL_LINE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 LEADING_DIAGRAM_MARKERS_RE = re.compile(r"^(?:[0-9]+(?:\.[0-9]+)?\s+){1,3}(?=[A-Za-zÄÖÜäöüß])")
+STRUCTURE_MARKER_RE = re.compile(
+    r"(?<!\n)(Alternative:|Arch\.-Pos\.:|Pos\.\s*[0-9]+(?:\.[0-9]+)?\s+[0-9]+(?:[.,][0-9]+)?\s+St[üu]ck|Summe der Positionen)",
+    flags=re.IGNORECASE,
+)
 
 
 def detect(normalized_lower: str) -> bool:
     return (
         "rekord vomp gmbh" in normalized_lower
-        and "angebot :" in normalized_lower
+        and ("angebot :" in normalized_lower or "angebot:" in normalized_lower)
         and "belegdatum" in normalized_lower
         and "bauvorhaben" in normalized_lower
     )
@@ -52,6 +56,14 @@ def _extract_total_from_block(block_text: str) -> str | None:
     if matches:
         return matches[-1]
     return None
+
+
+def _prepare_compact_text(text: str) -> str:
+    normalized = normalize_text(text)
+    prepared = STRUCTURE_MARKER_RE.sub(r"\n\1", normalized)
+    prepared = re.sub(r"(Gesamt\s+[0-9]+(?:[.,][0-9]+)?\s*(?:St[üu]ck|PA|lfm|m²)?)(?=[0-9(])", r"\1 ", prepared)
+    prepared = re.sub(r"([0-9]{2}\.[0-9]{2}\.[0-9]{4})Seite", r"\1\nSeite", prepared)
+    return prepared
 
 
 def _extract_arch_pos(text_before: str) -> tuple[str | None, bool]:
@@ -101,7 +113,7 @@ def _extract_description_short(block_lines: list[str], arch_pos: str | None) -> 
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:
-    normalized_text = normalize_text(text)
+    normalized_text = _prepare_compact_text(text)
     matches = list(POSITION_RE.finditer(normalized_text))
     items: list[dict[str, Any]] = []
 
