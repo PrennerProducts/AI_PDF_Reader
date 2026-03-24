@@ -7,6 +7,7 @@ Diese Doku ist der zentrale Einstieg fuer Planung, Status und technische Funktio
 - `docs/STATUS.md`: was schon umgesetzt ist, was offen ist, naechste Schritte
 - `docs/HOW_IT_WORKS.md`: technischer Ablauf und Architektur (Ist-Stand)
 - `docs/API.md`: kompakte API-Referenz inkl. Felduebersicht
+- `docs/PROVIDER_ONBOARDING.md`: fester Ablauf fuer neue Anbieter-Templates
 
 ## Bestehende Feature-Docs
 - `features/PROJ-1-poc-plan-roadmap.md`

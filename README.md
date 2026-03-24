@@ -24,6 +24,14 @@ Starts/recreates the stack, runs quick health checks, then streams all container
 
 Runs a fixed provider canary set against the live API stack and fails fast if supplier, document number, date, position count, or validation status drift.
 
+## New Provider Scaffold
+
+```bash
+./infra/new-provider.sh muster_anbieter "Muster Anbieter GmbH"
+```
+
+Creates the template module, sample folders, onboarding note, and registry entry for a new provider.
+
 ## Verify
 
 ```bash
@@ -92,6 +100,7 @@ docker exec -it pdr-ollama ollama pull qwen2.5:7b-instruct
 - `docs/STATUS.md`
 - `docs/HOW_IT_WORKS.md`
 - `docs/API.md`
+- `docs/PROVIDER_ONBOARDING.md`
 
 ## Data dirs
 - `data/uploads`

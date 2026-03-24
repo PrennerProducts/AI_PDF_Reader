@@ -21,6 +21,7 @@ The PDF corpus is now split by purpose so parser work, regression coverage, and 
 ## Provider matrix
 - `samples/OFFER_PROVIDER_MATRIX.md`: current green/red parser status by provider
 - `samples/REGRESSION_SET.md`: canonical regression PDFs and candidate pool
+- `samples/providers/<anbieter>/ONBOARDING.md`: generated checklist for newly scaffolded providers
 
 ## Existing text dumps
 - `samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt`
@@ -45,4 +46,9 @@ pdftotext -layout "samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 A
 ```bash
 python -m pytest tests/test_template_regression.py -q
 python -m pytest tests/test_offer_corpus_smoke.py -q
+```
+
+## Add a new provider
+```bash
+./infra/new-provider.sh muster_anbieter "Muster Anbieter GmbH"
 ```
