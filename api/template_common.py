@@ -54,6 +54,8 @@ def is_decorative_or_footer(line: str) -> bool:
         return True
     if lower.startswith("tel 07682"):
         return True
+    if lower.startswith(("rekord vomp gmbh", "au 48, 6134 vomp", "vomp@rekord-fenster.com", "fn 623494d", "kto-nr.")):
+        return True
     if lower.startswith("pos.") and "anzahl" in lower and "einzelpreis" in lower:
         return True
     if lower.startswith("bankverbindung"):
@@ -65,6 +67,8 @@ def is_decorative_or_footer(line: str) -> bool:
     if lower.startswith("angebotsnummer:") and "seite" in lower:
         return True
     if lower.startswith("angebot n") and "seite" in lower:
+        return True
+    if lower.startswith("angebot :") and "seite" in lower:
         return True
     if lower.startswith("angebot ") and any(ch.isdigit() for ch in lower):
         return True

@@ -88,6 +88,33 @@ def _looks_like_document_date(value: str | None) -> bool:
     return bool(value and DATE_ONLY_RE.fullmatch(value.strip()))
 
 
+def _looks_like_rekord_project_part(value: str | None) -> bool:
+    if not value:
+        return False
+    clean = value.strip()
+    lower = clean.lower()
+    if not clean or clean.endswith(":"):
+        return False
+    if DATE_ONLY_RE.fullmatch(clean) or PHONE_ONLY_RE.fullmatch(clean):
+        return False
+    if lower.startswith(
+        (
+            "belegdatum",
+            "seite",
+            "angebot",
+            "vorgang",
+            "bearbeiter",
+            "kundenkontakt",
+            "name :",
+            "tel. :",
+            "mail :",
+            "sehr geehrte",
+        )
+    ):
+        return False
+    return bool(re.search(r"[A-Za-zÄÖÜäöüß]", clean))
+
+
 def _apply_alu_one_header_fallbacks(
     normalized_text: str,
     *,
@@ -105,6 +132,48 @@ def _apply_alu_one_header_fallbacks(
 
     if not _looks_like_project_ref(project_ref):
         project_ref = _find_nearby_label_value(lines, "Kommission:", _looks_like_project_ref)
+
+    return document_number, document_date, project_ref
+
+
+def _apply_rekord_vomp_header_fallbacks(
+    normalized_text: str,
+    *,
+    document_number: str | None,
+    document_date: str | None,
+    project_ref: str | None,
+) -> tuple[str | None, str | None, str | None]:
+    lines = _normalized_non_empty_lines(normalized_text)
+
+    if not _looks_like_document_number(document_number):
+        document_number = _first_match(
+            [
+                r"(?mi)^\s*Angebot\s*:\s*([A-Za-z0-9.-]+)\s*$",
+                r"Angebot\s*:\s*([A-Za-z0-9.-]+)",
+            ],
+            normalized_text,
+        )
+
+    if not _looks_like_project_ref(project_ref):
+        for idx, line in enumerate(lines):
+            if "bauvorhaben:" not in line.lower():
+                continue
+            collected: list[str] = []
+            for step in range(1, 5):
+                probe_idx = idx + step
+                if probe_idx >= len(lines):
+                    break
+                probe = lines[probe_idx]
+                if LABEL_ONLY_RE.match(probe):
+                    break
+                if DATE_ONLY_RE.fullmatch(probe):
+                    break
+                if not _looks_like_rekord_project_part(probe):
+                    break
+                collected.append(probe)
+            if collected:
+                project_ref = " ".join(collected)
+                break
 
     return document_number, document_date, project_ref
 
@@ -173,9 +242,9 @@ def _extract_totals(text: str) -> dict[str, str | None]:
     lines = [_normalize_line(line) for line in text.splitlines()]
     net_total = _find_labeled_amount(lines, ("nettosumme",), pick="first")
     if net_total is None:
-        net_total = _find_labeled_amount(lines, ("zwischensumme ohne ust", "zwischensumme", "nettowert"), pick="last")
+        net_total = _find_labeled_amount(lines, ("zwischensumme ohne ust", "zwischensumme", "nettowert", "summe netto"), pick="last")
     vat_total = _find_labeled_amount(lines, ("mehrwertsteuer", "ust.", "mwst"), pick="first")
-    gross_total = _find_labeled_amount(lines, ("angebotssumme", "gesamtsumme", "gesamt eur", "bruttobetrag"), pick="last")
+    gross_total = _find_labeled_amount(lines, ("angebotssumme", "gesamtsumme", "gesamt eur", "bruttobetrag", "summe brutto"), pick="last")
 
     net_dec = _parse_eu_decimal(net_total)
     vat_dec = _parse_eu_decimal(vat_total)
@@ -199,6 +268,7 @@ def parse_document_text(text: str) -> dict[str, Any]:
     template = detect_template(text)
     document_number = _first_match(
         [
+            r"(?mi)^\s*Angebot\s*:\s*([A-Za-z0-9.-]+)\s*$",
             r"(?m)^\s*Nummer:\s*([A-Za-z0-9.-]+)\s*$",
             r"(?mi)^\s*Angebotsnummer\s*:?\s*([A-Za-z0-9.-]*\d[A-Za-z0-9.-]*)\s*$",
             r"(?mi)^\s*Angebot:\s*([0-9]+)\s*$",
@@ -229,6 +299,13 @@ def parse_document_text(text: str) -> dict[str, Any]:
     )
     if template == "alu_one":
         document_number, document_date, project_ref = _apply_alu_one_header_fallbacks(
+            normalized_text,
+            document_number=document_number,
+            document_date=document_date,
+            project_ref=project_ref,
+        )
+    elif template == "rekord_vomp":
+        document_number, document_date, project_ref = _apply_rekord_vomp_header_fallbacks(
             normalized_text,
             document_number=document_number,
             document_date=document_date,

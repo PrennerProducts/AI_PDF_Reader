@@ -6,6 +6,7 @@ from template_common import normalize_text
 import template_alu_one
 import template_entholzer
 import template_newo
+import template_rekord_vomp
 import template_rieder
 import template_sr_schauraum
 
@@ -33,6 +34,13 @@ TEMPLATES = (
         detector=template_sr_schauraum.detect,
         count_positions=template_sr_schauraum.count_positions,
         extract_line_items=template_sr_schauraum.extract_line_items,
+    ),
+    TemplateSpec(
+        key="rekord_vomp",
+        supplier_name="Rekord Vomp GmbH",
+        detector=template_rekord_vomp.detect,
+        count_positions=template_rekord_vomp.count_positions,
+        extract_line_items=template_rekord_vomp.extract_line_items,
     ),
     TemplateSpec(
         key="newo",

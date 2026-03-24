@@ -10,7 +10,11 @@ PERCENT_RE = re.compile(r"([0-9]+(?:[.,][0-9]+)?)\s*%")
 
 def _classify_amount_line(label: str) -> str:
     lower = label.lower()
-    if "zwischensumme" in lower or "summe ohne montagekosten" in lower or lower.startswith("summe"):
+    if "nettosumme" in lower or "nettowert" in lower or "summe netto" in lower:
+        return "net_total"
+    if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower or "summe brutto" in lower:
+        return "total"
+    if "zwischensumme" in lower or "summe ohne montagekosten" in lower or "summe der positionen" in lower or lower.startswith("summe"):
         return "subtotal"
     if "mehrwertsteuer" in lower or "ust." in lower or "mwst" in lower:
         return "vat"
@@ -18,10 +22,6 @@ def _classify_amount_line(label: str) -> str:
         return "discount"
     if "zuschlag" in lower or "frachtkosten" in lower or "zustellung" in lower:
         return "surcharge"
-    if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower:
-        return "total"
-    if "nettosumme" in lower or "nettowert" in lower:
-        return "net_total"
     return "other"
 
 
@@ -33,10 +33,12 @@ def _has_amount_trigger(line: str) -> bool:
             "summe",
             "nettosumme",
             "nettowert",
+            "summe netto",
             "angebotssumme",
             "gesamtsumme",
             "gesamt eur",
             "bruttobetrag",
+            "summe brutto",
             "mehrwertsteuer",
             "ust.",
             "mwst",
@@ -65,7 +67,7 @@ def _candidate_amount_for_trigger(lines: list[str], idx: int, line: str) -> tupl
     if merged:
         merged_tokens = _extract_amount_tokens(f"{line} {' '.join(merged)}")
         if merged_tokens:
-            if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower:
+            if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower or "summe brutto" in lower:
                 return merged_tokens[-1], None
             if "%" in lower or any(word in lower for word in ("rabatt", "zuschlag", "mehrwertsteuer", "ust.", "mwst")):
                 base = merged_tokens[1] if len(merged_tokens) > 1 else None
@@ -88,7 +90,7 @@ def _candidate_amount_for_trigger(lines: list[str], idx: int, line: str) -> tupl
 
     if not lookahead_tokens:
         return None, None
-    if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower:
+    if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower or "summe brutto" in lower:
         return lookahead_tokens[-1], None
     return lookahead_tokens[0], None
 

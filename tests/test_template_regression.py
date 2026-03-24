@@ -92,6 +92,27 @@ def test_sr_schauraum_regression() -> None:
     assert [row["line_type"] for row in amount_lines] == ["subtotal", "vat", "total"]
 
 
+def test_rekord_vomp_regression() -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX60326.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    amount_lines = extract_amount_lines(text)
+
+    assert parsed["template"] == "rekord_vomp"
+    assert parsed["supplier_name"] == "Rekord Vomp GmbH"
+    assert parsed["document_number"] == "VAX60326"
+    assert parsed["document_date"] == "02.02.2026"
+    assert parsed["project_ref"] == "Kom. Hagsteiner L. - Daniela Feldes"
+    _assert_totals(parsed, ("22.473,45", "4.494,69", "26.968,14"))
+    assert len(items) == 14
+    assert items[0]["description_short"] == "2tlg. Element bestehend aus:"
+    assert items[1]["quantity_raw"] == "2"
+    assert items[-1]["lv_pos"] == "Lieferung"
+    assert items[-1]["line_total_raw"] == "578,59"
+    assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
 def test_alu_one_a2602224mc_regression() -> None:
     pdf_path = ROOT / "samples/pdfs/regression/offers/alu_one/Angebot A2602224MC.pdf"
     text = _read_pdf_text(pdf_path)

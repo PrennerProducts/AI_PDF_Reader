@@ -19,6 +19,11 @@ Stand: 2026-03-24
 - `samples/pdfs/regression/offers/newo/AN BV Gruber NEWO.pdf`
 - `samples/pdfs/regression/offers/newo/Angebot BV Praschberger NEWO.pdf`
 
+### Rekord Vomp
+- `samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX53456.pdf`
+- `samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX60326.pdf`
+- `samples/pdfs/regression/offers/rekord_vomp/VAX30295.pdf`
+
 ### SR-Schauraum
 - `samples/pdfs/regression/offers/sr_schauraum/Angebotsnr AN-2025-113 - SR Schauraum GmbH (2).pdf`
 
@@ -38,11 +43,6 @@ Stand: 2026-03-24
 - `samples/pdfs/candidates/offers/entholzer/Angebot 12402032-10_20250415_Email.pdf`
 - `samples/pdfs/candidates/offers/entholzer/Angebot 12600512-00_20260209_Email.pdf`
 - `samples/pdfs/candidates/offers/entholzer/Angebot 12600930.00 Sagun, Kirchberg in Tirol.pdf`
-
-### Entholzer Variant Fixes
-- `samples/pdfs/candidates/offers/entholzer/needs_variant_fix/Angebot_VAX53456.pdf`
-- `samples/pdfs/candidates/offers/entholzer/needs_variant_fix/Angebot_VAX60326.pdf`
-- `samples/pdfs/candidates/offers/entholzer/needs_variant_fix/VAX30295.pdf`
 
 ### NeWo
 - `samples/pdfs/candidates/offers/newo/BV Sagun.pdf`

@@ -13,9 +13,14 @@ The PDF corpus is now split by purpose so parser work, regression coverage, and 
 - `samples/pdfs/regression/offers/rieder/AN Rieder F 20252082 BV Achhorner.pdf`
 - `samples/pdfs/regression/offers/entholzer/AN Enth neu 12502888-00_20250909_Email.pdf`
 - `samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 Achhorner.pdf`
+- `samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX60326.pdf`
 - `samples/pdfs/regression/offers/sr_schauraum/Angebotsnr AN-2025-113 - SR Schauraum GmbH (2).pdf`
 - `samples/pdfs/regression/offers/alu_one/Angebot A2602224MC.pdf`
 - `samples/pdfs/regression/offers/alu_one/Angebot C2509283TB.pdf`
+
+## Provider matrix
+- `samples/OFFER_PROVIDER_MATRIX.md`: current green/red parser status by provider
+- `samples/REGRESSION_SET.md`: canonical regression PDFs and candidate pool
 
 ## Existing text dumps
 - `samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt`
@@ -31,7 +36,13 @@ pdftotext -layout "samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 A
 ```
 
 ## Why these samples matter
-- Different supplier templates: Rieder, Entholzer, NeWo, SR-Schauraum, alu-one
+- Different supplier templates: Rieder, Entholzer, NeWo, Rekord Vomp, SR-Schauraum, alu-one
 - Different table styles for line items and totals
 - Alternative positions, zero-value items, and VAT blocks
 - Good base set for deterministic parser regression
+
+## Test commands
+```bash
+python -m pytest tests/test_template_regression.py -q
+python -m pytest tests/test_offer_corpus_smoke.py -q
+```
