@@ -5,10 +5,10 @@ Stand: 2026-03-24
 ## Corpus Summary
 
 - Angebots-PDFs gesamt: `30`
-- Aktuell gruene Angebots-PDFs: `22`
-- Noch offene neue Angebotslayouts: `8`
-- Regression-Satz: `15` PDFs
-- Zusätzliche grüne Kandidaten: `7` PDFs
+- Aktuell gruene Angebots-PDFs: `30`
+- Noch offene neue Angebotslayouts: `0`
+- Regression-Satz: `17` PDFs
+- Zusätzliche grüne Kandidaten: `13` PDFs
 
 ## Provider Status
 
@@ -20,11 +20,11 @@ Stand: 2026-03-24
 | `alu_one` | 2 | 3 | stabil | drei zusätzliche Angebotsvarianten liefern bereits grüne Parser-Ergebnisse |
 | `rekord_vomp` | 3 | 0 | stabil | VAX-Korpus ist jetzt eigener Anbieter und grün |
 | `sr_schauraum` | 1 | 0 | stabil | kein akuter Parserblocker |
-| `koch` | 0 | 0 | offen | 3 neue Angebots-PDFs, noch kein Template |
-| `muigg` | 0 | 0 | offen | 3 neue Angebots-PDFs, derzeit Fehlklassifikation auf `entholzer` |
-| `schachermayer` | 0 | 0 | offen | 2 neue Angebots-PDFs plus 1 AB |
-| `schuchter` | 0 | 0 | AB-only | derzeit nur Auftragsbestätigungen vorhanden |
-| `schlotterer` | 0 | 0 | AB-only | derzeit nur Auftragsbestätigungen vorhanden |
+| `koch` | 1 | 2 | stabil | 3 Angebots-PDFs mit eigenem Template und gruenem Korpus |
+| `muigg` | 1 | 2 | stabil | Varianten in Klammern und Unterpositionen sind jetzt abgedeckt |
+| `schachermayer` | 1 | 1 | stabil | tabellarische Offert-Layouts plus Kommissionsfallback laufen gruen |
+| `schuchter` | 0 | 0 | AB-only | Angebotsfall fehlt noch, AB-Parser für 3 vorhandene PDFs ist umgesetzt |
+| `schlotterer` | 0 | 0 | AB-only | Angebotsfall fehlt noch, AB-Parser für 3 vorhandene PDFs ist umgesetzt |
 
 ## Green Provider Set
 
@@ -60,30 +60,33 @@ Stand: 2026-03-24
 - Regression: `samples/pdfs/regression/offers/sr_schauraum/`
 - Parserstatus: aktuell grünes Einzeltemplate
 
-## Pending Provider Set
-
 ### Koch
+- Regression: `samples/pdfs/regression/offers/koch/`
 - Kandidaten: `samples/pdfs/candidates/offers/koch/`
-- Aktueller Stand: `3` Angebots-PDFs im Korpus
-- Parserstatus: noch kein Anbieter-Template umgesetzt
+- Parserstatus: alle `3` Angebots-PDFs grün
 
 ### Muigg
+- Regression: `samples/pdfs/regression/offers/muigg/`
 - Kandidaten: `samples/pdfs/candidates/offers/muigg/`
-- Aktueller Stand: `3` Angebots-PDFs im Korpus
-- Parserstatus: noch kein Anbieter-Template, ein Fall wird aktuell fälschlich als `entholzer` erkannt
+- Parserstatus: alle `3` Angebots-PDFs grün, inklusive Varianten in Klammern und `001.1`-Unterpositionen
 
 ### Schachermayer
+- Regression: `samples/pdfs/regression/offers/schachermayer/`
 - Kandidaten: `samples/pdfs/candidates/offers/schachermayer/`
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schachermayer/`
-- Aktueller Stand: `2` Offerte-PDFs plus `1` Auftragsbestätigung
+- Parserstatus: beide Offerte-PDFs plus die AB-Trennung sind jetzt sauber eingeordnet
+
+## Pending Provider Set
 
 ### Schuchter
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/`
 - Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
+- Parserstatus: vorhandene ABs werden jetzt provider-spezifisch erkannt und positioniert
 
 ### Schlotterer
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/`
 - Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
+- Parserstatus: vorhandene ABs werden jetzt provider-spezifisch erkannt und positioniert
 
 ## Test Commands
 
@@ -99,6 +102,12 @@ Starke Regressionen der kanonischen Layouts:
 python -m pytest tests/test_template_regression.py -q
 ```
 
+Vorhandene Nicht-Angebote:
+
+```bash
+python -m pytest tests/test_non_offer_corpus_smoke.py -q
+```
+
 ## Priority Order
 
 1. pro Anbieter einen echten Upload-Canary gegen die API fahren, damit `pypdf`-Extraktion und Testkorpus synchron bleiben
@@ -107,7 +116,6 @@ python -m pytest tests/test_template_regression.py -q
 
 ## Next Provider Watchlist
 
-1. `muigg`
-2. `koch`
-3. `schachermayer`
-4. `schuchter`
+1. `schuchter`
+2. `schlotterer`
+3. weitere echte Angebotsanbieter aus dem Feldimport

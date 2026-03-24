@@ -12,6 +12,7 @@ from template_registry import supplier_name_for_template
 from template_headers import collapse_header_value as _collapse_header_value
 from template_headers import first_match as _first_match
 
+
 def _parse_eu_decimal(value: str | None) -> Decimal | None:
     if not value:
         return None
@@ -38,6 +39,18 @@ def _format_eu_decimal(value: Decimal) -> str:
     whole, frac = f"{absolute:.2f}".split(".")
     whole_grouped = f"{int(whole):,}".replace(",", ".")
     return f"{sign}{whole_grouped},{frac}"
+
+
+def _currency_prefix(*values: str | None) -> str:
+    for value in values:
+        if not value:
+            continue
+        stripped = value.strip()
+        if stripped.startswith("\u20ac"):
+            return "\u20ac "
+        if stripped.upper().startswith("EUR"):
+            return "EUR "
+    return ""
 
 
 def _find_labeled_amount(lines: list[str], labels: tuple[str, ...], *, pick: str = "first") -> str | None:
@@ -85,46 +98,64 @@ def _extract_totals(text: str) -> dict[str, str | None]:
     net_total = _extract_amount_via_inline_pattern(
         text,
         (
+            r"Gesamtbetrag netto\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Summe Positionen\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Gesamtpreis ohne Mwst\.\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Gesamtpreis ohne Mwst\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Summe Netto\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Nettosumme\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
         ),
     )
     if net_total is None:
-        net_total = _find_labeled_amount(lines, ("nettosumme",), pick="first")
+        net_total = _find_labeled_amount(lines, ("gesamtbetrag netto", "summe positionen", "gesamtpreis ohne mwst", "nettosumme"), pick="first")
     if net_total is None:
         net_total = _find_labeled_amount(lines, ("zwischensumme ohne ust", "zwischensumme", "nettowert", "summe netto"), pick="last")
     vat_total = _extract_amount_via_inline_pattern(
         text,
         (
+            r"zuzüglich\s*[0-9., ]*%\s*(?:MwSt|Mwst|Mehrwertsteuer|USt\.)\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"(?:MwSt|Mehrwertsteuer|USt\.)\s*[0-9., ]*%\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
         ),
     )
     if vat_total is None:
-        vat_total = _find_labeled_amount(lines, ("mehrwertsteuer", "ust.", "mwst"), pick="first")
+        vat_total = _find_labeled_amount(lines, ("zuzüglich", "mehrwertsteuer", "ust."), pick="first")
     gross_total = _extract_amount_via_inline_pattern(
         text,
         (
+            r"Endbetrag\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Gesamtbetrag(?!\s*netto)\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Gesamtpreis incl\. Mwst\.\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Gesamtpreis inkl\. Mwst\.\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Summe Brutto\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Gesamt EUR\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Bruttobetrag\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
         ),
     )
     if gross_total is None:
-        gross_total = _find_labeled_amount(lines, ("angebotssumme", "gesamtsumme", "gesamt eur", "bruttobetrag", "summe brutto"), pick="last")
+        gross_total = _find_labeled_amount(lines, ("endbetrag", "gesamtbetrag", "gesamtpreis incl. mwst", "gesamtpreis inkl. mwst", "angebotssumme", "gesamtsumme", "gesamt eur", "bruttobetrag", "summe brutto"), pick="last")
 
     net_dec = _parse_eu_decimal(net_total)
     vat_dec = _parse_eu_decimal(vat_total)
     gross_dec = _parse_eu_decimal(gross_total)
+    currency_prefix = _currency_prefix(net_total, vat_total, gross_total)
+
+    if currency_prefix:
+        if net_total and not net_total.strip().startswith(("\u20ac", "EUR")):
+            net_total = f"{currency_prefix}{net_total.strip()}"
+        if vat_total and not vat_total.strip().startswith(("\u20ac", "EUR")):
+            vat_total = f"{currency_prefix}{vat_total.strip()}"
+        if gross_total and not gross_total.strip().startswith(("\u20ac", "EUR")):
+            gross_total = f"{currency_prefix}{gross_total.strip()}"
 
     if net_dec is not None and gross_dec is not None:
         implied_vat = (gross_dec - net_dec).quantize(Decimal("0.01"))
         if vat_dec is None or abs(vat_dec - implied_vat) > Decimal("0.05"):
-            vat_total = _format_eu_decimal(implied_vat)
+            vat_total = f"{currency_prefix}{_format_eu_decimal(implied_vat)}"
 
     if gross_dec is None and net_dec is not None and vat_dec is not None:
-        gross_total = _format_eu_decimal((net_dec + vat_dec).quantize(Decimal("0.01")))
+        gross_total = f"{currency_prefix}{_format_eu_decimal((net_dec + vat_dec).quantize(Decimal('0.01')))}"
     if net_dec is None and gross_dec is not None and vat_dec is not None:
-        net_total = _format_eu_decimal((gross_dec - vat_dec).quantize(Decimal("0.01")))
+        net_total = f"{currency_prefix}{_format_eu_decimal((gross_dec - vat_dec).quantize(Decimal('0.01')))}"
 
     return {"net_total": net_total, "vat_total": vat_total, "gross_total": gross_total}
 

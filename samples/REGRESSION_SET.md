@@ -31,6 +31,15 @@ Stand: 2026-03-24
 - `samples/pdfs/regression/offers/alu_one/Angebot A2602224MC.pdf`
 - `samples/pdfs/regression/offers/alu_one/Angebot C2509283TB.pdf`
 
+### Koch
+- `samples/pdfs/regression/offers/koch/1050685_Angebot.pdf`
+
+### Muigg
+- `samples/pdfs/regression/offers/muigg/AN 251409.pdf`
+
+### Schachermayer
+- `samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF`
+
 ## Candidate Offer PDFs
 
 ### alu-one
@@ -50,17 +59,14 @@ Stand: 2026-03-24
 
 ### Koch
 - `samples/pdfs/candidates/offers/koch/1050211_Angebot.pdf`
-- `samples/pdfs/candidates/offers/koch/1050685_Angebot.pdf`
 - `samples/pdfs/candidates/offers/koch/1050824_Angebot.pdf`
 
 ### Muigg
 - `samples/pdfs/candidates/offers/muigg/AN 250947.pdf`
 - `samples/pdfs/candidates/offers/muigg/AN 251073.pdf`
-- `samples/pdfs/candidates/offers/muigg/AN 251409.pdf`
 
 ### Schachermayer
 - `samples/pdfs/candidates/offers/schachermayer/SCH Offert 225009480.PDF`
-- `samples/pdfs/candidates/offers/schachermayer/SCH Offert 225217709.PDF`
 
 ## Non-Offer Material
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/`

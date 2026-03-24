@@ -251,3 +251,67 @@ Bruttobetrag € 20.381,15
     _assert_totals(parsed, ("€ 16.984,29", "€ 3.396,86", "€ 20.381,15"))
     assert len(items) == 2
     assert items[1]["description_short"] == "Türelement 2650 mm x 2700 mm"
+
+
+def test_koch_regression() -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/koch/1050685_Angebot.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "koch"
+    assert parsed["supplier_name"] == "Koch Türen GmbH"
+    assert parsed["document_number"] == "1050685"
+    assert parsed["document_date"] == "21.01.2026"
+    assert parsed["project_ref"] == "Krigovszky Martin"
+    _assert_totals(parsed, ("€ 1.520,64", "€ 304,13", "€ 1.824,77"))
+    assert len(items) == 1
+    assert items[0]["description_short"] == "Stockelement Niveau, Schiebetür in die Wand laufend"
+    assert items[0]["width_raw"] == "1210"
+    assert items[0]["height_raw"] == "2480"
+    assert items[0]["line_total_raw"] == "2.304,00"
+
+
+def test_muigg_regression() -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/muigg/AN 251409.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    amount_lines = extract_amount_lines(text)
+
+    assert parsed["template"] == "muigg"
+    assert parsed["supplier_name"] == "Muigg"
+    assert parsed["document_number"] == "251409"
+    assert parsed["document_date"] == "15.12.2025"
+    assert parsed["project_ref"] == "BV WH Kilian Schwaz"
+    _assert_totals(parsed, ("18.280,31", "3.656,06", "21.936,37"))
+    assert len(items) == 9
+    assert items[0]["description_short"] == "Portal 4501 x 2500"
+    assert items[0]["width_raw"] == "4501"
+    assert items[0]["height_raw"] == "2500"
+    assert items[1]["position_no"] == "001.1"
+    assert items[1]["description_short"] == 'Az "2-farbig RAL/RAL"'
+    assert items[-1]["position_no"] == "Z01"
+    assert items[-1]["line_total_raw"] == "75,00"
+    assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
+def test_schachermayer_regression() -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    amount_lines = extract_amount_lines(text)
+
+    assert parsed["template"] == "schachermayer"
+    assert parsed["supplier_name"] == "Schachermayer GmbH"
+    assert parsed["document_number"] == "225217709"
+    assert parsed["document_date"] == "11.03.2024"
+    assert parsed["project_ref"] == "01 INNENTÜRELEMENT BIS MST 170"
+    _assert_totals(parsed, ("5.928,04", "1.185,61", "7.113,65"))
+    assert len(items) == 4
+    assert items[0]["description_short"] == "Kunex Tür"
+    assert items[0]["lv_pos"] == "01 INNENTÜRELEMENT BIS MST 170"
+    assert items[2]["lv_pos"] == "02 ZARGE BIS MST 295"
+    assert items[3]["description_short"] == "Rosettenlochbohrung (Önorm, 7,5 mm)"
+    assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]

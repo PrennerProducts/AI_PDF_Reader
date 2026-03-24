@@ -5,9 +5,13 @@ from typing import Any, Callable
 from template_common import normalize_text
 import template_alu_one
 import template_entholzer
+import template_koch
+import template_muigg
 import template_newo
 import template_rekord_vomp
 import template_rieder
+import template_schlotterer
+import template_schachermayer
 import template_sr_schauraum
 import template_schuchter
 
@@ -60,12 +64,36 @@ TEMPLATES = (
         extract_line_items=template_newo.extract_line_items,
     ),
     TemplateSpec(
+        key="muigg",
+        supplier_name="Muigg",
+        detector=template_muigg.detect,
+        count_positions=template_muigg.count_positions,
+        extract_line_items=template_muigg.extract_line_items,
+        refine_headers=template_muigg.refine_headers,
+    ),
+    TemplateSpec(
         key="entholzer",
         supplier_name="Entholzer",
         detector=template_entholzer.detect,
         count_positions=template_entholzer.count_positions,
         extract_line_items=template_entholzer.extract_line_items,
         refine_headers=template_entholzer.refine_headers,
+    ),
+    TemplateSpec(
+        key="koch",
+        supplier_name="Koch Türen GmbH",
+        detector=template_koch.detect,
+        count_positions=template_koch.count_positions,
+        extract_line_items=template_koch.extract_line_items,
+        refine_headers=template_koch.refine_headers,
+    ),
+    TemplateSpec(
+        key="schachermayer",
+        supplier_name="Schachermayer GmbH",
+        detector=template_schachermayer.detect,
+        count_positions=template_schachermayer.count_positions,
+        extract_line_items=template_schachermayer.extract_line_items,
+        refine_headers=template_schachermayer.refine_headers,
     ),
     TemplateSpec(
         key="rieder",
@@ -82,6 +110,14 @@ TEMPLATES = (
         count_positions=template_schuchter.count_positions,
         extract_line_items=template_schuchter.extract_line_items,
         refine_headers=template_schuchter.refine_headers,
+    ),
+    TemplateSpec(
+        key="schlotterer",
+        supplier_name="Schlotterer Sonnenschutz Systeme GmbH",
+        detector=template_schlotterer.detect,
+        count_positions=template_schlotterer.count_positions,
+        extract_line_items=template_schlotterer.extract_line_items,
+        refine_headers=template_schlotterer.refine_headers,
     ),
 )
 

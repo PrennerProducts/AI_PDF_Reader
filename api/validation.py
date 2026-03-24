@@ -111,10 +111,20 @@ def _provider_key(document: dict[str, Any]) -> str:
         return "sr_schauraum"
     if supplier_name == "newo":
         return "newo"
+    if supplier_name == "muigg":
+        return "muigg"
+    if supplier_name == "schachermayer gmbh":
+        return "schachermayer"
+    if supplier_name == "schlotterer sonnenschutz systeme gmbh":
+        return "schlotterer"
+    if supplier_name == "schuchter fenster gmbh":
+        return "schuchter"
     if supplier_name == "rekord vomp gmbh":
         return "rekord_vomp"
     if supplier_name == "rieder":
         return "rieder"
+    if supplier_name == "koch türen gmbh":
+        return "koch"
     return supplier_name or "generic"
 
 

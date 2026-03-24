@@ -8,14 +8,25 @@ from template_registry import extract_line_items_for_template
 PERCENT_RE = re.compile(r"([0-9]+(?:[.,][0-9]+)?)\s*%")
 
 
+def _is_amount_header_line(line: str) -> bool:
+    lower = line.lower()
+    return ("einzelpreis" in lower and "gesamtpreis" in lower) or ("preis/me" in lower and "nettobetrag" in lower)
+
+
 def _classify_amount_line(label: str) -> str:
     lower = label.lower()
-    if "nettosumme" in lower or "nettowert" in lower or "summe netto" in lower:
+    if "gesamtbetrag netto" in lower or "summe positionen" in lower:
         return "net_total"
-    if "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower or "summe brutto" in lower:
+    if "gesamtpreis ohne mwst" in lower or "gesamtpreis ohne ust" in lower or "nettosumme" in lower or "nettowert" in lower or "summe netto" in lower:
+        return "net_total"
+    if "endbetrag" in lower or "gesamtbetrag" in lower:
+        return "total"
+    if "gesamtpreis incl. mwst" in lower or "gesamtpreis inkl. mwst" in lower or "angebotssumme" in lower or "gesamtsumme" in lower or "gesamt eur" in lower or "bruttobetrag" in lower or "summe brutto" in lower:
         return "total"
     if "zwischensumme" in lower or "summe ohne montagekosten" in lower or "summe der positionen" in lower or lower.startswith("summe"):
         return "subtotal"
+    if lower.startswith("zuzüglich") and ("mehrwertsteuer" in lower or "ust." in lower or "mwst" in lower):
+        return "vat"
     if "mehrwertsteuer" in lower or "ust." in lower or "mwst" in lower:
         return "vat"
     if "rabatt" in lower or "abzug" in lower:
@@ -27,10 +38,17 @@ def _classify_amount_line(label: str) -> str:
 
 def _has_amount_trigger(line: str) -> bool:
     lower = line.lower()
+    if _is_amount_header_line(line):
+        return False
     return any(
         word in lower
         for word in (
             "summe",
+            "summe positionen",
+            "gesamtbetrag netto",
+            "gesamtbetrag",
+            "endbetrag",
+            "gesamtpreis",
             "nettosumme",
             "nettowert",
             "summe netto",
@@ -103,6 +121,8 @@ def extract_amount_lines(text: str) -> list[dict[str, Any]]:
 
     for idx, line in enumerate(lines):
         if not line or not _has_amount_trigger(line):
+            continue
+        if _is_amount_header_line(line):
             continue
 
         amount_raw, base_amount_raw = _candidate_amount_for_trigger(lines, idx, line)
