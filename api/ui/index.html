@@ -315,6 +315,9 @@
     }
 
     .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border-radius: 999px;
       border: 1px solid transparent;
       padding: 12px 18px;
@@ -1031,30 +1034,187 @@
 
       #pdfFrame,
       .panel-body {
-        height: 58vh;
+        height: auto;
       }
 
       .summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      #pdfFrame {
+        min-height: 460px;
+        height: 58vh;
+      }
+
+      .workspace {
+        min-height: auto;
+      }
+
+      .panel-head {
+        position: static;
+      }
+
+      .panel-body {
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .section table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+      }
+
+      .section table tbody {
+        white-space: normal;
+      }
+
+      .img-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 720px) {
       .app {
-        padding: 14px;
+        padding: 10px;
       }
 
       .topbar {
-        padding: 20px;
-        border-radius: 24px;
+        padding: 18px 16px 16px;
+        border-radius: 22px;
+      }
+
+      .hero-head {
+        gap: 18px;
+        margin-bottom: 16px;
+      }
+
+      .hero-aside {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .customer-brand {
+        width: 100%;
+        padding: 16px;
+      }
+
+      .customer-logo {
+        max-width: 260px;
+      }
+
+      .hero-pills {
+        max-width: none;
+      }
+
+      .topbar h1 {
+        font-size: clamp(30px, 11vw, 46px);
+      }
+
+      .topbar p {
+        font-size: 14px;
+        line-height: 1.58;
+      }
+
+      .controls {
+        gap: 10px;
+      }
+
+      .control-card {
+        padding: 14px;
+        border-radius: 18px;
+      }
+
+      .action-bar {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .action-group {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .action-group:last-child {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+        min-height: 46px;
+        padding: 11px 14px;
+      }
+
+      .status-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .live-state-wrap {
+        justify-content: space-between;
+      }
+
+      .panel {
+        border-radius: 22px;
+      }
+
+      .panel-head {
+        padding: 14px 16px;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      #pdfFrame {
+        min-height: 360px;
+        height: 50vh;
       }
 
       .summary {
         grid-template-columns: 1fr;
       }
 
+      .summary .card {
+        min-height: 78px;
+      }
+
+      .section {
+        margin-top: 12px;
+        padding: 12px;
+      }
+
+      .section h2 {
+        font-size: 14px;
+      }
+
+      .small {
+        font-size: 11px;
+      }
+
       .modal {
-        height: 88vh;
+        height: 92vh;
+        border-radius: 20px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .action-group {
+        grid-template-columns: 1fr;
+      }
+
+      .img-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #pdfFrame {
+        min-height: 300px;
+        height: 44vh;
       }
     }
 
