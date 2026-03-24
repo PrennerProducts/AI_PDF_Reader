@@ -1,7 +1,14 @@
 import re
 from typing import Any
 
-from template_common import extract_amount_tokens, extract_dimensions, extract_first_description, normalize_text, trim_block_lines, page_ref_from_offset
+from template_common import extract_amount_tokens, extract_dimensions, extract_first_description, normalize_line, normalize_text, page_ref_from_offset, trim_block_lines
+from template_headers import (
+    collect_multiline_label_value,
+    extract_order_confirmation_number,
+    looks_like_document_number,
+    looks_like_project_ref,
+    normalized_non_empty_lines,
+)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -14,6 +21,25 @@ def detect(normalized_lower: str) -> bool:
 
 def count_positions(text: str) -> int:
     return len(re.findall(r"^Position:\s*\d+", text, flags=re.MULTILINE))
+
+
+def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
+    document_number = headers.get("document_number")
+    project_ref = headers.get("project_ref")
+
+    if not looks_like_document_number(document_number):
+        document_number = extract_order_confirmation_number(normalized_text)
+
+    if not looks_like_project_ref(project_ref) or (project_ref and project_ref.endswith("+")):
+        multiline_project_ref = collect_multiline_label_value(normalized_non_empty_lines(normalized_text, normalize_line), "Kommission")
+        if multiline_project_ref:
+            project_ref = multiline_project_ref
+
+    return {
+        **headers,
+        "document_number": document_number,
+        "project_ref": project_ref,
+    }
 
 
 def _extract_prices(block_lines: list[str]) -> tuple[str | None, str | None]:

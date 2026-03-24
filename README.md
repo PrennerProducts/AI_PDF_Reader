@@ -16,6 +16,14 @@ docker compose up -d --build
 
 Starts/recreates the stack, runs quick health checks, then streams all container logs in one terminal.
 
+## Live API Canary
+
+```bash
+./infra/api-canary.sh
+```
+
+Runs a fixed provider canary set against the live API stack and fails fast if supplier, document number, date, position count, or validation status drift.
+
 ## Verify
 
 ```bash

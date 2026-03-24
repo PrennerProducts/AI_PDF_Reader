@@ -10,6 +10,12 @@ import template_rekord_vomp
 import template_rieder
 import template_sr_schauraum
 
+HeaderFields = dict[str, str | None]
+
+
+def _identity_headers(_: str, headers: HeaderFields) -> HeaderFields:
+    return dict(headers)
+
 
 @dataclass(frozen=True)
 class TemplateSpec:
@@ -18,6 +24,7 @@ class TemplateSpec:
     detector: Callable[[str], bool]
     count_positions: Callable[[str], int]
     extract_line_items: Callable[[str], list[dict[str, Any]]]
+    refine_headers: Callable[[str, HeaderFields], HeaderFields] = _identity_headers
 
 
 TEMPLATES = (
@@ -27,6 +34,7 @@ TEMPLATES = (
         detector=template_alu_one.detect,
         count_positions=template_alu_one.count_positions,
         extract_line_items=template_alu_one.extract_line_items,
+        refine_headers=template_alu_one.refine_headers,
     ),
     TemplateSpec(
         key="sr_schauraum",
@@ -41,6 +49,7 @@ TEMPLATES = (
         detector=template_rekord_vomp.detect,
         count_positions=template_rekord_vomp.count_positions,
         extract_line_items=template_rekord_vomp.extract_line_items,
+        refine_headers=template_rekord_vomp.refine_headers,
     ),
     TemplateSpec(
         key="newo",
@@ -55,6 +64,7 @@ TEMPLATES = (
         detector=template_entholzer.detect,
         count_positions=template_entholzer.count_positions,
         extract_line_items=template_entholzer.extract_line_items,
+        refine_headers=template_entholzer.refine_headers,
     ),
     TemplateSpec(
         key="rieder",
@@ -62,6 +72,7 @@ TEMPLATES = (
         detector=template_rieder.detect,
         count_positions=template_rieder.count_positions,
         extract_line_items=template_rieder.extract_line_items,
+        refine_headers=template_rieder.refine_headers,
     ),
 )
 
@@ -96,3 +107,11 @@ def extract_line_items_for_template(text: str, template: str) -> list[dict[str, 
     if spec is None:
         return []
     return spec.extract_line_items(normalize_text(text))
+
+
+def refine_headers_for_template(template: str, text: str, headers: HeaderFields) -> HeaderFields:
+    spec = TEMPLATES_BY_KEY.get(template)
+    normalized_text = normalize_text(text)
+    if spec is None:
+        return dict(headers)
+    return spec.refine_headers(normalized_text, dict(headers))

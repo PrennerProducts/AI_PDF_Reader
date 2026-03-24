@@ -2,6 +2,13 @@ import re
 from typing import Any
 
 from template_common import extract_first_description, normalize_line, normalize_text, page_ref_from_offset, trim_block_lines
+from template_headers import (
+    find_nearby_label_value,
+    looks_like_document_date,
+    looks_like_document_number,
+    looks_like_project_ref,
+    normalized_non_empty_lines,
+)
 
 AMOUNT_PATTERN = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
 ITEM_HEADER_RE = re.compile(
@@ -28,6 +35,29 @@ def detect(normalized_lower: str) -> bool:
 
 def count_positions(text: str) -> int:
     return len(ITEM_HEADER_RE.findall(text))
+
+
+def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
+    lines = normalized_non_empty_lines(normalized_text, normalize_line)
+    document_number = headers.get("document_number")
+    document_date = headers.get("document_date")
+    project_ref = headers.get("project_ref")
+
+    if not looks_like_document_number(document_number):
+        document_number = find_nearby_label_value(lines, "Nummer:", looks_like_document_number)
+
+    if not looks_like_document_date(document_date):
+        document_date = find_nearby_label_value(lines, "Druckdatum:", looks_like_document_date)
+
+    if not looks_like_project_ref(project_ref):
+        project_ref = find_nearby_label_value(lines, "Kommission:", looks_like_project_ref)
+
+    return {
+        **headers,
+        "document_number": document_number,
+        "document_date": document_date,
+        "project_ref": project_ref,
+    }
 
 
 def _extract_dimensions(text: str) -> tuple[str | None, str | None]:

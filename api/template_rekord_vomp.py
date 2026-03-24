@@ -3,6 +3,13 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from template_common import extract_first_description, normalize_line, normalize_text, page_ref_from_offset, trim_block_lines
+from template_headers import (
+    first_match,
+    looks_like_document_number,
+    looks_like_project_ref,
+    looks_like_rekord_project_part,
+    normalized_non_empty_lines,
+)
 
 POSITION_RE = re.compile(r"(?m)^Pos\.\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:[.,][0-9]+)?)\s+St[üu]ck(?:\b|(?=[A-ZÄÖÜ]))")
 RAM_RE = re.compile(r"RAM:\s*([0-9.,]+)\s*mm\s*x\s*([0-9.,]+)\s*mm", flags=re.IGNORECASE)
@@ -30,6 +37,49 @@ def detect(normalized_lower: str) -> bool:
 
 def count_positions(text: str) -> int:
     return len(POSITION_RE.findall(text))
+
+
+def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
+    lines = normalized_non_empty_lines(normalized_text, normalize_line)
+    document_number = headers.get("document_number")
+    project_ref = headers.get("project_ref")
+
+    if not looks_like_document_number(document_number):
+        document_number = first_match(
+            [
+                r"Angebot\s*:\s*([A-Z]{2,6}[0-9]{4,}(?:[A-Z]{1,3}(?![a-z]))?)",
+                r"(?mi)^\s*Angebot\s*:\s*([A-Za-z0-9.-]+)\s*$",
+                r"Angebot\s*:\s*([A-Za-z0-9.-]+)",
+            ],
+            normalized_text,
+        )
+
+    if not looks_like_project_ref(project_ref):
+        for idx, line in enumerate(lines):
+            if "bauvorhaben:" not in line.lower():
+                continue
+            inline_value = line.split(":", 1)[1].strip() if ":" in line else ""
+            if looks_like_project_ref(inline_value):
+                project_ref = inline_value
+                break
+            collected: list[str] = []
+            for step in range(1, 5):
+                probe_idx = idx + step
+                if probe_idx >= len(lines):
+                    break
+                probe = lines[probe_idx]
+                if not looks_like_rekord_project_part(probe):
+                    break
+                collected.append(probe)
+            if collected:
+                project_ref = " ".join(collected)
+                break
+
+    return {
+        **headers,
+        "document_number": document_number,
+        "project_ref": project_ref,
+    }
 
 
 def _parse_eu_decimal(value: str | None) -> Decimal | None:
