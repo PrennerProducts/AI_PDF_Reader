@@ -4,9 +4,9 @@
 Auf Basis von 3 echten Kundenangeboten festlegen, was wir fuer eine robuste Extraktion und ERP-Speicherung benoetigen.
 
 ## Eingangsdateien
-- `samples/pdfs/AN Rieder F 20252082 BV Achhorner.pdf` (5 Seiten)
-- `samples/pdfs/AN Enth neu 12502888-00_20250909_Email.pdf` (18 Seiten)
-- `samples/pdfs/AN NEWO BVH Projekt 353 Achhorner.pdf` (5 Seiten)
+- `samples/pdfs/regression/offers/rieder/AN Rieder F 20252082 BV Achhorner.pdf` (5 Seiten)
+- `samples/pdfs/regression/offers/entholzer/AN Enth neu 12502888-00_20250909_Email.pdf` (18 Seiten)
+- `samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 Achhorner.pdf` (5 Seiten)
 
 ## Befund je Vorlage
 1. Rieder

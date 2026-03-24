@@ -8,8 +8,8 @@ if [[ ! -f .env ]]; then
   echo "[info] Created infra/.env from .env.example"
 fi
 
-echo "[1/4] Starting stack..."
-docker compose up -d --force-recreate
+echo "[1/4] Building and starting stack..."
+docker compose up -d --build --force-recreate
 
 echo "[2/4] Waiting for API health..."
 for _ in $(seq 1 90); do
@@ -25,4 +25,3 @@ echo "Ollama: $(curl -fsS http://localhost:11435/api/tags)"
 
 echo "[4/4] Live logs (Ctrl+C to stop log stream, containers keep running)"
 docker compose logs -f --tail=120
-

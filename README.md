@@ -5,7 +5,7 @@
 ```bash
 cd infra
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
 ```
 
 ## One-Terminal Live Mode

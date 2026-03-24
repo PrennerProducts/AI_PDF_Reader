@@ -2,11 +2,16 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-SPACE_CHARS_RE = re.compile(r"[\u00a0\u2007\u202f]")
-MULTI_SPACE_RE = re.compile(r"[ \t]+")
-AMOUNT_TOKEN_RE = re.compile(
-    r"-?\s*(?:EUR|\u20ac)?\s*[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|-?\s*(?:EUR|\u20ac)?\s*[0-9]+,[0-9]{2}"
-)
+from template_common import extract_amount_tokens as _extract_amount_tokens
+from template_common import normalize_line as _normalize_line
+from template_common import normalize_text as _normalize_text
+from template_registry import count_positions as _count_positions
+from template_registry import detect_template as _detect_template
+from template_registry import supplier_name_for_template
+
+LABEL_ONLY_RE = re.compile(r"^[A-Za-zÄÖÜäöüß .()/+-]+:\s*$")
+DATE_ONLY_RE = re.compile(r"^[0-9]{2}\.[0-9]{2}\.[0-9]{4}$")
+PHONE_ONLY_RE = re.compile(r"^\+?[0-9][0-9 /().-]{6,}$")
 
 
 def _first_match(patterns: list[str], text: str, flags: int = 0) -> str | None:
@@ -17,17 +22,91 @@ def _first_match(patterns: list[str], text: str, flags: int = 0) -> str | None:
     return None
 
 
-def _normalize_text(text: str) -> str:
-    return SPACE_CHARS_RE.sub(" ", text.replace("\r", ""))
+def _normalized_non_empty_lines(text: str) -> list[str]:
+    return [line for line in (_normalize_line(raw) for raw in text.splitlines()) if line]
 
 
-def _normalize_line(text: str) -> str:
-    return MULTI_SPACE_RE.sub(" ", _normalize_text(text)).strip()
+def _find_nearby_label_value(
+    lines: list[str],
+    label: str,
+    validator,
+    *,
+    search_before: int = 6,
+    search_after: int = 6,
+) -> str | None:
+    label_lower = label.lower()
+    for idx, line in enumerate(lines):
+        if line.lower() != label_lower:
+            continue
+        for step in range(1, search_after + 1):
+            probe_idx = idx + step
+            if probe_idx >= len(lines):
+                break
+            probe = lines[probe_idx]
+            if LABEL_ONLY_RE.match(probe):
+                continue
+            if validator(probe):
+                return probe
+        for step in range(1, search_before + 1):
+            probe_idx = idx - step
+            if probe_idx < 0:
+                break
+            probe = lines[probe_idx]
+            if LABEL_ONLY_RE.match(probe):
+                continue
+            if validator(probe):
+                return probe
+    return None
 
 
-def _extract_amount_tokens(text: str) -> list[str]:
-    normalized = _normalize_text(text)
-    return [MULTI_SPACE_RE.sub(" ", token).strip() for token in AMOUNT_TOKEN_RE.findall(normalized)]
+def _looks_like_document_number(value: str | None) -> bool:
+    if not value:
+        return False
+    clean = value.strip()
+    if " " in clean:
+        return False
+    if re.fullmatch(r"[A-Z][0-9]{7}[A-Z]{2}", clean):
+        return True
+    return bool(re.fullmatch(r"[A-Za-z0-9.-]*\d[A-Za-z0-9.-]*", clean) and re.search(r"[A-Za-z]", clean))
+
+
+def _looks_like_project_ref(value: str | None) -> bool:
+    if not value:
+        return False
+    clean = value.strip()
+    lower = clean.lower()
+    if not clean or clean.endswith(":"):
+        return False
+    if DATE_ONLY_RE.fullmatch(clean) or PHONE_ONLY_RE.fullmatch(clean):
+        return False
+    if lower.startswith(("nummer", "druckdatum", "anfrage", "kommission", "bearbeiter", "fax", "tel", "frau ", "herr ")):
+        return False
+    return bool(re.search(r"[A-Za-zÄÖÜäöüß]", clean))
+
+
+def _looks_like_document_date(value: str | None) -> bool:
+    return bool(value and DATE_ONLY_RE.fullmatch(value.strip()))
+
+
+def _apply_alu_one_header_fallbacks(
+    normalized_text: str,
+    *,
+    document_number: str | None,
+    document_date: str | None,
+    project_ref: str | None,
+) -> tuple[str | None, str | None, str | None]:
+    lines = _normalized_non_empty_lines(normalized_text)
+
+    if not _looks_like_document_number(document_number):
+        document_number = _find_nearby_label_value(lines, "Nummer:", _looks_like_document_number)
+
+    if not _looks_like_document_date(document_date):
+        document_date = _find_nearby_label_value(lines, "Druckdatum:", _looks_like_document_date)
+
+    if not _looks_like_project_ref(project_ref):
+        project_ref = _find_nearby_label_value(lines, "Kommission:", _looks_like_project_ref)
+
+    return document_number, document_date, project_ref
 
 
 def _parse_eu_decimal(value: str | None) -> Decimal | None:
@@ -87,23 +166,16 @@ def _find_labeled_amount(lines: list[str], labels: tuple[str, ...], *, pick: str
 
 
 def detect_template(text: str) -> str:
-    normalized = _normalize_text(text).lower()
-    if "newo-sachbearbeiter" in normalized or ("angebotsnummer:" in normalized and "newo" in normalized):
-        return "newo"
-    if "entholzer" in normalized or "angebot n" in normalized:
-        return "entholzer"
-    if "rieder-zillertal.at" in normalized or "ku.pos.:" in normalized:
-        return "rieder"
-    if "angebot:" in normalized and "kommission" in normalized:
-        return "rieder"
-    return "generic"
+    return _detect_template(text)
 
 
 def _extract_totals(text: str) -> dict[str, str | None]:
     lines = [_normalize_line(line) for line in text.splitlines()]
     net_total = _find_labeled_amount(lines, ("nettosumme",), pick="first")
-    vat_total = _find_labeled_amount(lines, ("mehrwertsteuer",), pick="first")
-    gross_total = _find_labeled_amount(lines, ("angebotssumme", "gesamtsumme"), pick="last")
+    if net_total is None:
+        net_total = _find_labeled_amount(lines, ("zwischensumme ohne ust", "zwischensumme", "nettowert"), pick="last")
+    vat_total = _find_labeled_amount(lines, ("mehrwertsteuer", "ust.", "mwst"), pick="first")
+    gross_total = _find_labeled_amount(lines, ("angebotssumme", "gesamtsumme", "gesamt eur", "bruttobetrag"), pick="last")
 
     net_dec = _parse_eu_decimal(net_total)
     vat_dec = _parse_eu_decimal(vat_total)
@@ -122,30 +194,23 @@ def _extract_totals(text: str) -> dict[str, str | None]:
     return {"net_total": net_total, "vat_total": vat_total, "gross_total": gross_total}
 
 
-def _count_positions(template: str, text: str) -> int:
-    if template == "rieder":
-        return len(re.findall(r"^Position:\s*\d+", text, flags=re.MULTILINE))
-    if template == "entholzer":
-        return len(re.findall(r"^Pos\.:", text, flags=re.MULTILINE))
-    if template == "newo":
-        return len(re.findall(r"^\s*\d{3}\s+\d+,\d{2}\s+\w+", text, flags=re.MULTILINE))
-    return len(re.findall(r"^Pos", text, flags=re.MULTILINE))
-
-
 def parse_document_text(text: str) -> dict[str, Any]:
     normalized_text = _normalize_text(text)
     template = detect_template(text)
     document_number = _first_match(
         [
-            r"Angebot:\s*([0-9]+)",
-            r"Angebot\s+([0-9]+\.[0-9]+)",
-            r"Angebot N[^:]*:\s*([0-9]+\.[0-9]+)",
-            r"Angebotsnummer:\s*([0-9]+)",
+            r"(?m)^\s*Nummer:\s*([A-Za-z0-9.-]+)\s*$",
+            r"(?mi)^\s*Angebotsnummer\s*:?\s*([A-Za-z0-9.-]*\d[A-Za-z0-9.-]*)\s*$",
+            r"(?mi)^\s*Angebot:\s*([0-9]+)\s*$",
+            r"(?mi)^\s*Angebot\s+([0-9]+\.[0-9]+)\s*$",
+            r"(?mi)^\s*Angebot N[^:]*:\s*([0-9]+\.[0-9]+)\s*$",
+            r"(?mi)^\s*Angebotsnummer:\s*([0-9]+)\s*$",
         ],
         normalized_text,
     )
     document_date = _first_match(
         [
+            r"(?m)^\s*Druckdatum:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"Belegdatum:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"Datum\s*:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"Ried,\s+am\s+([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
@@ -155,17 +220,26 @@ def parse_document_text(text: str) -> dict[str, Any]:
     )
     project_ref = _first_match(
         [
-            r"Kommission:\s*(.+)",
-            r"Kommission\s*:\s*(.+)",
+            r"Kommission:\s*([^\n]+)",
+            r"Kommission\s*:\s*([^\n]+)",
             r'Bauvorhaben\s*"([^"]+)"',
+            r"(?m)^Projekt\s+(.+)$",
         ],
         normalized_text,
     )
+    if template == "alu_one":
+        document_number, document_date, project_ref = _apply_alu_one_header_fallbacks(
+            normalized_text,
+            document_number=document_number,
+            document_date=document_date,
+            project_ref=project_ref,
+        )
     currency = "EUR" if ("\u20ac" in normalized_text or "EUR" in normalized_text.upper()) else None
     totals = _extract_totals(normalized_text)
 
     return {
         "template": template,
+        "supplier_name": supplier_name_for_template(template),
         "document_number": document_number,
         "document_date": document_date,
         "project_ref": project_ref,
@@ -173,7 +247,7 @@ def parse_document_text(text: str) -> dict[str, Any]:
         "position_count": _count_positions(template, normalized_text),
         "totals": totals,
         "notes": [
-            "Initial parser skeleton for supplier template detection and core field extraction.",
-            "Next step: replace regex-only extraction with template-specific line-item parsers.",
+            "Template detection and header extraction are now routed via a template registry.",
+            "Next step: expand golden regression coverage per customer layout.",
         ],
     }

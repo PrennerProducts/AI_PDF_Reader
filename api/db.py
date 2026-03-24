@@ -8,6 +8,7 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from validation import build_document_validation
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
@@ -728,11 +729,19 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             item["image_ids_primary"] = llm_image_ids[:1]
         item.pop("_llm_image_ids", None)
 
+    validation = build_document_validation(
+        document=document,
+        amount_lines=[dict(row) for row in amount_lines],
+        line_items=line_item_list,
+        images=image_list,
+    )
+
     return {
         "document": document,
         "amount_lines": [dict(row) for row in amount_lines],
         "line_items": line_item_list,
         "images": image_list,
+        "validation": validation,
     }
 
 

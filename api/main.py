@@ -32,7 +32,7 @@ from extractor import extract_pdf_images, extract_pdf_text
 from exporter import build_export_content
 from image_matcher import rank_line_item_candidates_with_vlm
 from llm import enrich_document_fields_with_ollama, extract_document_full_with_ollama
-from parser import parse_document_text
+from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
 
 app = FastAPI(title="KI PDF Reader PoC API")
@@ -45,11 +45,6 @@ LLM_DUMP_DIR = Path("/data/logs/llm")
 UI_DIR = Path(__file__).resolve().parent / "ui"
 UI_INDEX_PATH = UI_DIR / "index.html"
 SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
-SUPPLIER_BY_TEMPLATE = {
-    "rieder": "Rieder",
-    "entholzer": "Entholzer",
-    "newo": "NeWo",
-}
 PROCESS_MODES = ("parser_only", "hybrid_fill", "llm_override", "llm_only")
 COMPARE_FIELDS = (
     "supplier_name",
@@ -1089,7 +1084,7 @@ def compare_document(document_id: int):
         parsed_base = parse_document_text(extracted_text)
         template = _clean_optional_str(parsed_base.get("template")) or "generic"
         parser_snapshot = _document_field_snapshot(parsed_base)
-        parser_supplier = SUPPLIER_BY_TEMPLATE.get(template)
+        parser_supplier = supplier_name_for_template(template)
         if parser_snapshot.get("supplier_name") is None and parser_supplier:
             parser_snapshot["supplier_name"] = parser_supplier
 
@@ -1644,7 +1639,7 @@ def process_document(
         vat_total = _parse_eu_decimal(totals.get("vat_total"))
         gross_total = _parse_eu_decimal(totals.get("gross_total"))
         date_value = _parse_date(parsed.get("document_date"))
-        supplier_name = SUPPLIER_BY_TEMPLATE.get(template)
+        supplier_name = supplier_name_for_template(template)
         llm_supplier = _clean_optional_str((llm_result or {}).get("fields", {}).get("supplier_name"))
         if requested_mode == "llm_only":
             supplier_name = llm_supplier

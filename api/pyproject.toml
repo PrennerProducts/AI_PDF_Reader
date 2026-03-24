@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-pdf-reader-api"
+version = "0.1.0"
+description = "On-prem PDF extraction API for ERP-oriented document parsing."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "pydantic>=2,<3",
+  "pillow>=10,<12",
+  "psycopg[binary]>=3.2,<4",
+  "pypdf[image]>=5,<6",
+  "python-multipart>=0.0.9,<1",
+  "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
+
+[tool.setuptools]
+py-modules = [
+  "db",
+  "extractor",
+  "exporter",
+  "image_matcher",
+  "llm",
+  "main",
+  "parser",
+  "structured_parser",
+  "template_common",
+  "template_registry",
+  "template_rieder",
+  "template_entholzer",
+  "template_newo",
+  "template_sr_schauraum",
+  "validation",
+]
