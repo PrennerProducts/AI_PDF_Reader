@@ -4,36 +4,41 @@ Stand: 2026-03-24
 
 ## Corpus Summary
 
-- Angebots-PDFs gesamt: `23`
-- Aktuell gruene Angebots-PDFs: `23`
-- Bekannte Problemgruppe: `0`
+- Angebots-PDFs gesamt: `30`
+- Aktuell gruene Angebots-PDFs: `22`
+- Noch offene neue Angebotslayouts: `8`
 - Regression-Satz: `15` PDFs
-- Zusätzliche grüne Kandidaten: `8` PDFs
+- Zusätzliche grüne Kandidaten: `7` PDFs
 
 ## Provider Status
 
 | Anbieter | Gruene Regression | Gruene Kandidaten | Aktueller Status | Hauptthema |
 | --- | ---: | ---: | --- | --- |
-| `rieder` | 3 | 4 | stabil | ältere AB-Varianten liefern jetzt ebenfalls Kopfwerte |
-| `entholzer` | 3 | 3 | weitgehend stabil | ältere AB-Variante liefert jetzt ebenfalls Kopfwerte |
+| `rieder` | 3 | 1 | stabil | Angebotskorpus ist sauber von AB getrennt |
+| `entholzer` | 3 | 2 | stabil | ältere AB-Variante ist jetzt als AB einsortiert |
 | `newo` | 3 | 1 | stabil | kein akuter Parserblocker |
-| `alu_one` | 2 | 0 | stabil | nach API-Neustart immer Upload-Canary mitprüfen |
+| `alu_one` | 2 | 3 | stabil | drei zusätzliche Angebotsvarianten liefern bereits grüne Parser-Ergebnisse |
 | `rekord_vomp` | 3 | 0 | stabil | VAX-Korpus ist jetzt eigener Anbieter und grün |
 | `sr_schauraum` | 1 | 0 | stabil | kein akuter Parserblocker |
+| `koch` | 0 | 0 | offen | 3 neue Angebots-PDFs, noch kein Template |
+| `muigg` | 0 | 0 | offen | 3 neue Angebots-PDFs, derzeit Fehlklassifikation auf `entholzer` |
+| `schachermayer` | 0 | 0 | offen | 2 neue Angebots-PDFs plus 1 AB |
+| `schuchter` | 0 | 0 | AB-only | derzeit nur Auftragsbestätigungen vorhanden |
+| `schlotterer` | 0 | 0 | AB-only | derzeit nur Auftragsbestätigungen vorhanden |
 
 ## Green Provider Set
 
 ### Rieder
 - Regression: `samples/pdfs/regression/offers/rieder/`
 - Kandidaten: `samples/pdfs/candidates/offers/rieder/`
-- Parserstatus: alle `7` Angebots-PDFs liefern Positionen und vollständige Summen
-- Kopfwerte: auch die älteren `Auftragsbestätigung`-Varianten liefern jetzt `document_number` und `Kommission`
+- Parserstatus: alle `4` echten Angebots-PDFs liefern Positionen und vollständige Summen
+- Hinweis: die älteren `Auftragsbestätigung`-Dateien liegen jetzt korrekt unter `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/rieder/`
 
 ### Entholzer
 - Regression: `samples/pdfs/regression/offers/entholzer/`
 - Kandidaten: `samples/pdfs/candidates/offers/entholzer/`
-- Parserstatus: `6` reguläre Angebots-PDFs grün
-- Kopfwerte: die ältere `Auftragsbestätigung`-Variante liefert jetzt ebenfalls `document_number`
+- Parserstatus: `5` echte Angebots-PDFs grün
+- Hinweis: `12402032-10` ist jetzt fachlich korrekt als `Auftragsbestätigung` einsortiert
 
 ### NeWo
 - Regression: `samples/pdfs/regression/offers/newo/`
@@ -47,12 +52,38 @@ Stand: 2026-03-24
 
 ### alu-one
 - Regression: `samples/pdfs/regression/offers/alu_one/`
-- Parserstatus: beide Angebots-PDFs grün
+- Kandidaten: `samples/pdfs/candidates/offers/alu_one/`
+- Parserstatus: `5` Angebots-PDFs grün, davon `3` zusätzliche Kandidaten
 - Betriebshinweis: zur Sicherheit nach API-Neustarts einen echten Upload-Canary gegen `/process?...parser_only` laufen lassen, weil `pypdf`-Text und `pdftotext -layout` nicht immer identisch sind
 
 ### SR-Schauraum
 - Regression: `samples/pdfs/regression/offers/sr_schauraum/`
 - Parserstatus: aktuell grünes Einzeltemplate
+
+## Pending Provider Set
+
+### Koch
+- Kandidaten: `samples/pdfs/candidates/offers/koch/`
+- Aktueller Stand: `3` Angebots-PDFs im Korpus
+- Parserstatus: noch kein Anbieter-Template umgesetzt
+
+### Muigg
+- Kandidaten: `samples/pdfs/candidates/offers/muigg/`
+- Aktueller Stand: `3` Angebots-PDFs im Korpus
+- Parserstatus: noch kein Anbieter-Template, ein Fall wird aktuell fälschlich als `entholzer` erkannt
+
+### Schachermayer
+- Kandidaten: `samples/pdfs/candidates/offers/schachermayer/`
+- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schachermayer/`
+- Aktueller Stand: `2` Offerte-PDFs plus `1` Auftragsbestätigung
+
+### Schuchter
+- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/`
+- Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
+
+### Schlotterer
+- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/`
+- Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
 
 ## Test Commands
 
@@ -73,3 +104,10 @@ python -m pytest tests/test_template_regression.py -q
 1. pro Anbieter einen echten Upload-Canary gegen die API fahren, damit `pypdf`-Extraktion und Testkorpus synchron bleiben
 2. pro Anbieter weitere PDFs nur dann in den Regression-Satz heben, wenn sie einen echten Layout-Unterschied abdecken
 3. nach jedem Anbieterblock den grünen Gesamtkorpus plus kanonische Regression laufen lassen
+
+## Next Provider Watchlist
+
+1. `muigg`
+2. `koch`
+3. `schachermayer`
+4. `schuchter`

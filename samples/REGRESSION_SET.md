@@ -33,19 +33,34 @@ Stand: 2026-03-24
 
 ## Candidate Offer PDFs
 
+### alu-one
+- `samples/pdfs/candidates/offers/alu_one/Angebot 2400061DL-1_i.pdf`
+- `samples/pdfs/candidates/offers/alu_one/Angebot A2506340MC-1.pdf`
+- `samples/pdfs/candidates/offers/alu_one/Angebot C2308329MK.pdf`
+
 ### Rieder
-- `samples/pdfs/candidates/offers/rieder/131584_Sevignani, zu 130629_3.pdf`
-- `samples/pdfs/candidates/offers/rieder/132047_IB-Karlpassage_3.pdf`
-- `samples/pdfs/candidates/offers/rieder/132475_Moonlight - Söll, zu 132207 + 132476_3.pdf`
 - `samples/pdfs/candidates/offers/rieder/20260420 SR. Schauraum BV Baumgartner.pdf`
 
 ### Entholzer
-- `samples/pdfs/candidates/offers/entholzer/Angebot 12402032-10_20250415_Email.pdf`
 - `samples/pdfs/candidates/offers/entholzer/Angebot 12600512-00_20260209_Email.pdf`
 - `samples/pdfs/candidates/offers/entholzer/Angebot 12600930.00 Sagun, Kirchberg in Tirol.pdf`
 
 ### NeWo
 - `samples/pdfs/candidates/offers/newo/BV Sagun.pdf`
+
+### Koch
+- `samples/pdfs/candidates/offers/koch/1050211_Angebot.pdf`
+- `samples/pdfs/candidates/offers/koch/1050685_Angebot.pdf`
+- `samples/pdfs/candidates/offers/koch/1050824_Angebot.pdf`
+
+### Muigg
+- `samples/pdfs/candidates/offers/muigg/AN 250947.pdf`
+- `samples/pdfs/candidates/offers/muigg/AN 251073.pdf`
+- `samples/pdfs/candidates/offers/muigg/AN 251409.pdf`
+
+### Schachermayer
+- `samples/pdfs/candidates/offers/schachermayer/SCH Offert 225009480.PDF`
+- `samples/pdfs/candidates/offers/schachermayer/SCH Offert 225217709.PDF`
 
 ## Non-Offer Material
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/`

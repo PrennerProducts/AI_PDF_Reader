@@ -9,6 +9,7 @@ import template_newo
 import template_rekord_vomp
 import template_rieder
 import template_sr_schauraum
+import template_schuchter
 
 HeaderFields = dict[str, str | None]
 
@@ -73,6 +74,14 @@ TEMPLATES = (
         count_positions=template_rieder.count_positions,
         extract_line_items=template_rieder.extract_line_items,
         refine_headers=template_rieder.refine_headers,
+    ),
+    TemplateSpec(
+        key="schuchter",
+        supplier_name='SCHUCHTER Fenster GmbH',
+        detector=template_schuchter.detect,
+        count_positions=template_schuchter.count_positions,
+        extract_line_items=template_schuchter.extract_line_items,
+        refine_headers=template_schuchter.refine_headers,
     ),
 )
 

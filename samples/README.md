@@ -5,8 +5,11 @@ The PDF corpus is now split by purpose so parser work, regression coverage, and 
 ## Folder structure
 - `samples/pdfs/regression/offers/`: canonical offer PDFs used for parser regression
 - `samples/pdfs/candidates/offers/`: additional offer PDFs that are useful for expanding coverage
+- `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/<anbieter>/`: provider-specific order confirmations and order documents
+- `samples/pdfs/non_offer/grafik_technik/<anbieter>/`: provider-specific drawings, element overviews, and technical detail PDFs
 - `samples/pdfs/duplicates/hashed_imports/`: duplicate copies with hash prefixes, kept only for traceability
-- `samples/pdfs/non_offer/`: orders, confirmations, drawings, graphics, and technical PDFs that should not be mixed into offer-parser regression
+- `samples/pdfs/inbox/raw_company_tree/`: temporary drop zone for raw provider folder imports before resorting
+- `samples/pdfs/non_offer/`: non-offer documents that should not be mixed into offer-parser regression
 - `samples/text/`: generated text dumps for selected canonical regression files
 
 ## Current regression set
@@ -51,4 +54,9 @@ python -m pytest tests/test_offer_corpus_smoke.py -q
 ## Add a new provider
 ```bash
 ./infra/new-provider.sh muster_anbieter "Muster Anbieter GmbH"
+```
+
+## Import a local company tree
+```bash
+cp -r ~/Documents/Schauraum_Angebote/* samples/pdfs/inbox/raw_company_tree/
 ```
