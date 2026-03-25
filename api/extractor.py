@@ -33,6 +33,11 @@ EPS = 1e-6
 VECTOR_RENDER_SCALE = 2.0
 VECTOR_COMPONENT_MIN_AREA = 80
 VECTOR_COMPONENT_MAX_FILL = 0.15
+LEFT_SKETCH_STRIP_RIGHT_RATIO = 0.34
+LEFT_SKETCH_STRIP_TOP_RATIO = 0.12
+LEFT_SKETCH_STRIP_BOTTOM_RATIO = 0.92
+VECTOR_STRIP_MIN_NONWHITE_RATIO = 0.34
+VECTOR_STRIP_MAX_DARK_RATIO = 0.22
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -175,6 +180,78 @@ def _build_image_payload(image, *, ctm: tuple[float, float, float, float, float,
     }
 
 
+def _clamp_ratio(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _ctm_layout_metadata(
+    ctm: tuple[float, float, float, float, float, float],
+    *,
+    page_width: float,
+    page_height: float,
+) -> dict[str, Any]:
+    if page_width <= 0 or page_height <= 0:
+        return {}
+
+    a, b, c, d, e, f = ctm
+    corners = (
+        (e, f),
+        (a + e, b + f),
+        (c + e, d + f),
+        (a + c + e, b + d + f),
+    )
+    xs = [point[0] for point in corners]
+    ys = [point[1] for point in corners]
+    left = min(xs)
+    right = max(xs)
+    bottom = min(ys)
+    top = max(ys)
+    center_x = (left + right) / 2.0
+    center_y = (bottom + top) / 2.0
+
+    return {
+        "layout_source": "pdf_placement",
+        "left_ratio": round(_clamp_ratio(left / page_width), 6),
+        "right_ratio": round(_clamp_ratio(right / page_width), 6),
+        "width_ratio": round(_clamp_ratio((right - left) / page_width), 6),
+        "top_ratio": round(_clamp_ratio(1.0 - (top / page_height)), 6),
+        "bottom_ratio": round(_clamp_ratio(1.0 - (bottom / page_height)), 6),
+        "height_ratio": round(_clamp_ratio((top - bottom) / page_height), 6),
+        "center_x_ratio": round(_clamp_ratio(center_x / page_width), 6),
+        "center_y_ratio": round(_clamp_ratio(1.0 - (center_y / page_height)), 6),
+    }
+
+
+def _crop_layout_metadata(
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+    *,
+    canvas_width: int,
+    canvas_height: int,
+    source: str,
+) -> dict[str, Any]:
+    if canvas_width <= 0 or canvas_height <= 0:
+        return {}
+
+    width = max(1, right - left)
+    height = max(1, bottom - top)
+    center_x = left + (width / 2.0)
+    center_y = top + (height / 2.0)
+    return {
+        "layout_source": source,
+        "left_ratio": round(_clamp_ratio(left / canvas_width), 6),
+        "right_ratio": round(_clamp_ratio(right / canvas_width), 6),
+        "width_ratio": round(_clamp_ratio(width / canvas_width), 6),
+        "top_ratio": round(_clamp_ratio(top / canvas_height), 6),
+        "bottom_ratio": round(_clamp_ratio(bottom / canvas_height), 6),
+        "height_ratio": round(_clamp_ratio(height / canvas_height), 6),
+        "center_x_ratio": round(_clamp_ratio(center_x / canvas_width), 6),
+        "center_y_ratio": round(_clamp_ratio(center_y / canvas_height), 6),
+    }
+
+
 def _component_bboxes(mask: Image.Image) -> list[tuple[int, int, int, int]]:
     width, height = mask.size
     if width <= 0 or height <= 0:
@@ -294,6 +371,134 @@ def _merge_adjacent_bboxes(boxes: list[tuple[int, int, int, int]]) -> list[tuple
     return merged
 
 
+def _row_bands_from_mask(mask: Image.Image, *, min_height: int) -> list[tuple[int, int]]:
+    px = mask.load()
+    width, height = mask.size
+    if width <= 0 or height <= 0:
+        return []
+
+    threshold = max(12, int(width * 0.04))
+    bands: list[tuple[int, int]] = []
+    active: list[int] | None = None
+    gap_run = 0
+    max_gap = 14
+
+    for y in range(height):
+        count = 0
+        for x in range(width):
+            if px[x, y] > 0:
+                count += 1
+        if count >= threshold:
+            gap_run = 0
+            if active is None:
+                active = [y, y]
+            else:
+                active[1] = y
+            continue
+        if active is None:
+            continue
+        gap_run += 1
+        if gap_run <= max_gap:
+            active[1] = y
+            continue
+        if active[1] - active[0] >= min_height:
+            bands.append((active[0], active[1] - gap_run))
+        active = None
+        gap_run = 0
+
+    if active is not None and active[1] - active[0] >= min_height:
+        bands.append((active[0], active[1]))
+    return bands
+
+
+def _percentile(values: list[int], ratio: float) -> int:
+    if not values:
+        return 0
+    ordered = sorted(values)
+    idx = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * ratio))))
+    return ordered[idx]
+
+
+def _extract_left_strip_sketch_boxes(rendered: Image.Image) -> list[tuple[int, int, int, int]]:
+    strip_top = int(rendered.height * LEFT_SKETCH_STRIP_TOP_RATIO)
+    strip_bottom = int(rendered.height * LEFT_SKETCH_STRIP_BOTTOM_RATIO)
+    strip_right = max(120, int(rendered.width * LEFT_SKETCH_STRIP_RIGHT_RATIO))
+    left_strip = rendered.crop((0, strip_top, strip_right, strip_bottom))
+
+    red, green, blue = left_strip.split()
+    whiteness = ImageChops.darker(ImageChops.darker(red, green), blue)
+    mask = whiteness.point(lambda px: 255 if px <= 244 else 0).filter(ImageFilter.MedianFilter(size=3))
+    bands = _row_bands_from_mask(mask, min_height=56)
+
+    boxes: list[tuple[int, int, int, int]] = []
+    px = mask.load()
+    width, _ = mask.size
+    for top, bottom in bands:
+        xs: list[int] = []
+        for y in range(top, bottom + 1):
+            for x in range(width):
+                if px[x, y] > 0:
+                    xs.append(x)
+        if not xs:
+            continue
+
+        left = _percentile(xs, 0.03)
+        right = _percentile(xs, 0.97)
+        if right - left < 140:
+            continue
+
+        pad_x = 14
+        pad_y = 16
+        crop_left = max(0, left - pad_x)
+        crop_right = min(strip_right, max(120, int(rendered.width * 0.30)), right + pad_x)
+        crop_top = max(0, top - pad_y) + strip_top
+        crop_bottom = min(rendered.height, bottom + pad_y + strip_top)
+        if crop_right - crop_left < 150 or crop_bottom - crop_top < 140:
+            continue
+        boxes.append((crop_left, crop_top, crop_right, crop_bottom))
+
+    return boxes
+
+
+def _trim_and_pad_crop(crop: Image.Image) -> tuple[Image.Image, tuple[int, int, int, int]]:
+    red, green, blue = crop.split()
+    whiteness = ImageChops.darker(ImageChops.darker(red, green), blue)
+    mask = whiteness.point(lambda px: 255 if px <= 248 else 0).filter(ImageFilter.MedianFilter(size=3))
+    bbox = mask.getbbox()
+    if bbox is None:
+        bbox = (0, 0, crop.width, crop.height)
+    trimmed = crop.crop(bbox)
+    pad = max(10, int(max(trimmed.width, trimmed.height) * 0.05))
+    canvas = Image.new("RGB", (trimmed.width + (pad * 2), trimmed.height + (pad * 2)), "white")
+    canvas.paste(trimmed, (pad, pad))
+    return canvas, bbox
+
+
+def _crop_content_metrics(crop: Image.Image) -> dict[str, float]:
+    pixels = crop.load()
+    width, height = crop.size
+    total = max(1, width * height)
+    nonwhite = 0
+    colorful = 0
+    dark = 0
+    for y in range(height):
+        for x in range(width):
+            red, green, blue = pixels[x, y]
+            max_channel = max(red, green, blue)
+            min_channel = min(red, green, blue)
+            if min_channel < 248:
+                nonwhite += 1
+            if max_channel < 248 and (max_channel - min_channel) >= 24:
+                colorful += 1
+            if max_channel < 180:
+                dark += 1
+    return {
+        "content_nonwhite_ratio": round(nonwhite / total, 6),
+        "content_colorful_ratio": round(colorful / total, 6),
+        "content_dark_ratio": round(dark / total, 6),
+    }
+
+
 def _extract_blue_vector_crop_rows(
     pdf_path: Path,
     output_dir: Path,
@@ -323,45 +528,23 @@ def _extract_blue_vector_crop_rows(
             matrix = fitz.Matrix(VECTOR_RENDER_SCALE, VECTOR_RENDER_SCALE)
             pix = page.get_pixmap(matrix=matrix, alpha=False)
             rendered = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            red, green, blue = rendered.split()
-            blue_over_red = ImageChops.subtract(blue, red).point(lambda px: 255 if px >= 40 else 0)
-            blue_over_green = ImageChops.subtract(blue, green).point(lambda px: 255 if px >= 30 else 0)
-            mask = ImageChops.multiply(blue_over_red, blue_over_green).filter(ImageFilter.MedianFilter(size=3))
-            bboxes = _merge_adjacent_bboxes(_component_bboxes(mask))
-
-            if not bboxes:
-                strip_top = int(rendered.height * 0.14)
-                strip_bottom = int(rendered.height * 0.95)
-                strip_right = max(120, int(rendered.width * 0.33))
-                left_strip = rendered.crop((0, strip_top, strip_right, strip_bottom))
-                ink_mask = left_strip.convert("L").point(lambda px: 255 if px <= 185 else 0).filter(
-                    ImageFilter.MedianFilter(size=3)
-                )
-                fallback_boxes = _merge_adjacent_bboxes(_component_bboxes(ink_mask))
-                bboxes = [
-                    (box[0], box[1] + strip_top, box[2], box[3] + strip_top)
-                    for box in fallback_boxes
-                ]
+            bboxes = _extract_left_strip_sketch_boxes(rendered)
 
             if not bboxes:
                 continue
 
             for left, top, right, bottom in bboxes:
-                box_w = right - left
-                box_h = bottom - top
-                pad_left = max(16, int(box_w * 0.45))
-                # Keep more context on the right side where frame parts and dimensions often sit.
-                pad_right = max(42, int(box_w * 1.35))
-                pad_y = max(16, int(box_h * 0.40))
-                crop = rendered.crop(
-                    (
-                        max(0, left - pad_left),
-                        max(0, top - pad_y),
-                        min(rendered.width, right + pad_right),
-                        min(rendered.height, bottom + pad_y),
-                    )
-                )
+                crop = rendered.crop((left, top, right, bottom))
+                crop, trim_bbox = _trim_and_pad_crop(crop)
                 if crop.width < 48 or crop.height < 64:
+                    continue
+                crop_metrics = _crop_content_metrics(crop)
+                if crop_metrics["content_nonwhite_ratio"] < VECTOR_STRIP_MIN_NONWHITE_RATIO:
+                    continue
+                if (
+                    crop_metrics["content_dark_ratio"] > VECTOR_STRIP_MAX_DARK_RATIO
+                    and crop_metrics["content_colorful_ratio"] < 0.01
+                ):
                     continue
 
                 buffer = BytesIO()
@@ -370,6 +553,12 @@ def _extract_blue_vector_crop_rows(
                 digest = sha256(data).hexdigest()
                 if digest in hashes_by_page.get(page_ref, set()):
                     continue
+
+                trim_left, trim_top, trim_right, trim_bottom = trim_bbox
+                content_left = left + trim_left
+                content_top = top + trim_top
+                content_right = left + trim_right
+                content_bottom = top + trim_bottom
 
                 next_index = next_index_by_page.get(page_ref, 0) + 1
                 next_index_by_page[page_ref] = next_index
@@ -388,6 +577,16 @@ def _extract_blue_vector_crop_rows(
                         "width": crop.width,
                         "height": crop.height,
                         "bytes_size": len(data),
+                        "metadata_json": _crop_layout_metadata(
+                            content_left,
+                            content_top,
+                            content_right,
+                            content_bottom,
+                            canvas_width=rendered.width,
+                            canvas_height=rendered.height,
+                            source="vector_strip_band",
+                        )
+                        | crop_metrics,
                     }
                 )
     finally:
@@ -407,6 +606,8 @@ def extract_pdf_images(pdf_path: Path, output_dir: Path) -> list[dict[str, Any]]
     rows: list[dict[str, Any]] = []
 
     for page_idx, page in enumerate(reader.pages, start=1):
+        page_width = float(getattr(page.mediabox, "width", 0) or 0)
+        page_height = float(getattr(page.mediabox, "height", 0) or 0)
         image_objects = list(getattr(page, "images", None) or [])
         image_by_name: dict[str, Any] = {}
         for image in image_objects:
@@ -437,6 +638,11 @@ def extract_pdf_images(pdf_path: Path, output_dir: Path) -> list[dict[str, Any]]
                     "width": payload["width"],
                     "height": payload["height"],
                     "bytes_size": len(data),
+                    "metadata_json": _ctm_layout_metadata(
+                        placement["ctm"],
+                        page_width=page_width,
+                        page_height=page_height,
+                    ),
                 }
             )
 
@@ -458,6 +664,7 @@ def extract_pdf_images(pdf_path: Path, output_dir: Path) -> list[dict[str, Any]]
                         "width": payload["width"],
                         "height": payload["height"],
                         "bytes_size": len(data),
+                        "metadata_json": {"layout_source": "fallback_page_images"},
                     }
                 )
 

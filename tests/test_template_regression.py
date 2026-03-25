@@ -34,6 +34,7 @@ def test_rieder_regression() -> None:
     items = extract_line_items(text, parsed["template"])
 
     assert parsed["template"] == "rieder"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Rieder"
     assert parsed["document_number"] == "20252082"
     assert parsed["project_ref"] == "Achhorner"
@@ -49,6 +50,7 @@ def test_entholzer_regression() -> None:
     items = extract_line_items(text, parsed["template"])
 
     assert parsed["template"] == "entholzer"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Entholzer"
     assert parsed["document_number"] == "12502888.00"
     assert parsed["project_ref"] == "Hotel Explorer, Bayrischzell"
@@ -64,6 +66,7 @@ def test_newo_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "newo"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "NeWo"
     assert parsed["document_number"] == "25002995"
     assert parsed["project_ref"] == "BVH Projekt 353 Achhorner"
@@ -81,6 +84,7 @@ def test_sr_schauraum_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "sr_schauraum"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Lupre AI Solutions"
     assert parsed["document_number"] == "AN-2025-113"
     assert parsed["document_date"] == "08.12.2025"
@@ -100,6 +104,7 @@ def test_rekord_vomp_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "rekord_vomp"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Rekord Vomp GmbH"
     assert parsed["document_number"] == "VAX60326"
     assert parsed["document_date"] == "02.02.2026"
@@ -138,6 +143,7 @@ Gesamt EUR 5.520,00 €
     items = extract_line_items(text, parsed["template"])
 
     assert parsed["template"] == "sr_schauraum"
+    assert parsed["document_type"] == "angebot"
     assert parsed["document_number"] == "AN-2025-113"
     _assert_totals(parsed, ("4.600,00", "920,00", "5.520,00"))
     assert len(items) == 3
@@ -164,6 +170,7 @@ Summe der Positionen 43.343,19Händlerrabatt -39,00 %-16.903,84Zusatzrabatt -15,
     items = extract_line_items(text, parsed["template"])
 
     assert parsed["template"] == "rekord_vomp"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Rekord Vomp GmbH"
     assert parsed["document_number"] == "VAX60326"
     assert parsed["document_date"] == "02.02.2026"
@@ -183,6 +190,7 @@ def test_alu_one_a2602224mc_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "alu_one"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "alu-one Metallbaupartner GmbH"
     assert parsed["document_number"] == "A2602224MC"
     assert parsed["document_date"] == "06.03.2026"
@@ -204,6 +212,7 @@ def test_alu_one_c2509283tb_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "alu_one"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "alu-one Metallbaupartner GmbH"
     assert parsed["document_number"] == "C2509283TB"
     assert parsed["document_date"] == "10.11.2025"
@@ -245,6 +254,7 @@ Bruttobetrag € 20.381,15
     items = extract_line_items(text, parsed["template"])
 
     assert parsed["template"] == "alu_one"
+    assert parsed["document_type"] == "angebot"
     assert parsed["document_number"] == "C2509283TB"
     assert parsed["document_date"] == "10.11.2025"
     assert parsed["project_ref"] == "Kinderhotel Felben"
@@ -260,6 +270,7 @@ def test_koch_regression() -> None:
     items = extract_line_items(text, parsed["template"])
 
     assert parsed["template"] == "koch"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Koch Türen GmbH"
     assert parsed["document_number"] == "1050685"
     assert parsed["document_date"] == "21.01.2026"
@@ -280,6 +291,7 @@ def test_muigg_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "muigg"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Muigg"
     assert parsed["document_number"] == "251409"
     assert parsed["document_date"] == "15.12.2025"
@@ -304,6 +316,7 @@ def test_schachermayer_regression() -> None:
     amount_lines = extract_amount_lines(text)
 
     assert parsed["template"] == "schachermayer"
+    assert parsed["document_type"] == "angebot"
     assert parsed["supplier_name"] == "Schachermayer GmbH"
     assert parsed["document_number"] == "225217709"
     assert parsed["document_date"] == "11.03.2024"
@@ -315,3 +328,52 @@ def test_schachermayer_regression() -> None:
     assert items[2]["lv_pos"] == "02 ZARGE BIS MST 295"
     assert items[3]["description_short"] == "Rosettenlochbohrung (Önorm, 7,5 mm)"
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
+def test_rieder_ab_reference_regression() -> None:
+    pdf_path = ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/rieder/131584_Sevignani, zu 130629_3.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "rieder"
+    assert parsed["document_type"] == "auftragsbestaetigung"
+    assert parsed["supplier_name"] == "Rieder"
+    assert parsed["document_number"] == "131584-2"
+    assert parsed["document_date"] == "11.06.2025"
+    assert parsed["project_ref"] == "Sevignani, zu 130629"
+    assert parsed["offer_reference"] == "130629"
+    assert len(items) >= 1
+    assert items[0]["position_no"] == "1"
+
+
+def test_rieder_ab_multiline_header_regression() -> None:
+    text = """
+Firma
+SR.Schauraum GmbH
+www.rieder-zillertal.at
+11.06.2025
+Technisch: Wechselberger Claudia
+Kaufmännisch: Löffler Simone
+Ried, am
+Kommission:
+Ihre UID-Nr.:
+Kontaktperson:
+Sevignani, zu 130629
+ATU73878137
+Mario Fuchs
+Auftragsbestätigung: 131584-2
+Position: 1
+1 Stück B/H: 2125,0 x 2302,0
+HS Schema A nach links € 5.965,00 € 5.965,00
+""".strip()
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "rieder"
+    assert parsed["document_type"] == "auftragsbestaetigung"
+    assert parsed["document_number"] == "131584-2"
+    assert parsed["document_date"] == "11.06.2025"
+    assert parsed["project_ref"] == "Sevignani, zu 130629"
+    assert parsed["offer_reference"] == "130629"
+    assert len(items) == 1

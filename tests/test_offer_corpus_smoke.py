@@ -277,6 +277,7 @@ def test_green_offer_corpus(case: dict[str, object]) -> None:
     totals = parsed.get("totals") or {}
 
     assert parsed["template"] == case["template"]
+    assert parsed["document_type"] == case.get("document_type", "angebot")
     assert parsed["supplier_name"] == case["supplier_name"]
     assert parsed["document_date"] == case["document_date"]
     assert parsed["project_ref"]

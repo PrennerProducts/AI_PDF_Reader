@@ -12,6 +12,7 @@ def test_sr_schauraum_optional_item_counts_towards_component_sum() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "Lupre AI Solutions",
+            "document_type": "angebot",
             "document_number": "AN-2025-113",
             "document_date": "2025-12-08",
             "project_ref": "KI-PDF-Reader",
@@ -40,6 +41,7 @@ def test_alu_one_provider_policy_excludes_az_and_vorbemerkungen() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "alu-one Metallbaupartner GmbH",
+            "document_type": "angebot",
             "document_number": "C2509283TB",
             "document_date": "2025-11-10",
             "project_ref": "Kinderhotel Felben",
@@ -68,6 +70,7 @@ def test_entholzer_system_header_is_informational() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "Entholzer",
+            "document_type": "angebot",
             "document_number": "12600422.00",
             "document_date": "2026-02-03",
             "project_ref": "Bernsteiner",
@@ -95,6 +98,7 @@ def test_newo_zero_value_note_positions_are_informational() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "NeWo",
+            "document_type": "angebot",
             "document_number": "25002995",
             "document_date": "2025-09-04",
             "project_ref": "BVH Projekt 353 Achhorner",
@@ -121,6 +125,7 @@ def test_complex_pricing_providers_use_heuristic_component_check() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "Rekord Vomp GmbH",
+            "document_type": "angebot",
             "document_number": "VAX60326",
             "document_date": "2026-02-02",
             "project_ref": "Kom. Hagsteiner L. - Daniela Feldes",
@@ -146,3 +151,123 @@ def test_complex_pricing_providers_use_heuristic_component_check() -> None:
     assert validation["status"] == "auto_accept"
     assert validation["totals"]["component_check_mode"] == "heuristic"
     assert validation["line_item_summary"]["warning_count"] == 0
+
+
+def test_ab_requires_offer_reference() -> None:
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Rieder",
+            "document_type": "auftragsbestaetigung",
+            "document_number": "131584-2",
+            "document_date": "2025-06-11",
+            "project_ref": "Sevignani",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+            "offer_reference": None,
+        },
+        amount_lines=[],
+        line_items=[
+            {
+                "position_no": "1",
+                "description_short": "Fenster",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+            },
+        ],
+        images=[],
+    )
+
+    assert validation["status"] == "reject"
+    assert any(issue.get("field") == "offer_reference" for issue in validation["document_issues"])
+
+
+def test_manual_review_resolves_warning_but_keeps_item_marked() -> None:
+    line_items = [
+        {
+            "position_no": "001",
+            "description_short": "Türelement",
+            "quantity": "1",
+            "unit_price": "100.00",
+            "line_total": "100.00",
+            "page_ref": 1,
+            "is_alternative": False,
+            "image_ids": [],
+            "metadata_json": {
+                "review_checked": True,
+                "review_checked_at": "2026-03-25T13:22:09Z",
+                "review_checked_reason": "ui_manual_review",
+            },
+        },
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "alu-one Metallbaupartner GmbH",
+            "document_type": "angebot",
+            "document_number": "C2509283TB",
+            "document_date": "2025-11-10",
+            "project_ref": "Kinderhotel Felben",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[{"id": 7, "page_ref": 1}],
+    )
+
+    assert validation["status"] == "manual_checked"
+    assert validation["warning_count"] == 0
+    assert validation["line_item_summary"]["resolved_warning_count"] == 1
+    assert line_items[0]["validation_status"] == "manual_checked"
+
+
+def test_manual_review_does_not_resolve_errors() -> None:
+    line_items = [
+        {
+            "position_no": "001",
+            "description_short": "Türelement",
+            "quantity": "1",
+            "unit_price": "100.00",
+            "line_total": None,
+            "page_ref": 1,
+            "is_alternative": False,
+            "image_ids": [],
+            "metadata_json": {
+                "review_checked": True,
+                "review_checked_at": "2026-03-25T13:22:09Z",
+                "review_checked_reason": "ui_manual_review",
+            },
+        },
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "alu-one Metallbaupartner GmbH",
+            "document_type": "angebot",
+            "document_number": "C2509283TB",
+            "document_date": "2025-11-10",
+            "project_ref": "Kinderhotel Felben",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[{"id": 7, "page_ref": 1}],
+    )
+
+    assert validation["status"] == "reject"
+    assert validation["error_count"] > 0
+    assert line_items[0]["validation_status"] == "reject"

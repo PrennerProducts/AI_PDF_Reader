@@ -5,6 +5,7 @@ from template_common import extract_amount_tokens, extract_dimensions, extract_f
 from template_headers import (
     collect_multiline_label_value,
     extract_order_confirmation_number,
+    find_nearby_label_value,
     looks_like_document_number,
     looks_like_project_ref,
     normalized_non_empty_lines,
@@ -31,7 +32,16 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
         document_number = extract_order_confirmation_number(normalized_text)
 
     if not looks_like_project_ref(project_ref) or (project_ref and project_ref.endswith("+")):
-        multiline_project_ref = collect_multiline_label_value(normalized_non_empty_lines(normalized_text, normalize_line), "Kommission")
+        lines = normalized_non_empty_lines(normalized_text, normalize_line)
+        multiline_project_ref = collect_multiline_label_value(lines, "Kommission")
+        if not multiline_project_ref:
+            multiline_project_ref = find_nearby_label_value(
+                lines,
+                "Kommission:",
+                looks_like_project_ref,
+                search_after=6,
+                search_before=2,
+            )
         if multiline_project_ref:
             project_ref = multiline_project_ref
 

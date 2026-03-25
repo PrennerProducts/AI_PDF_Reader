@@ -2,6 +2,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from image_assignment import is_non_visual_line_item, metadata_review_state
+
 SUM_TOLERANCE = Decimal("0.02")
 CONFIDENCE_AUTO_ACCEPT = Decimal("0.85")
 CONFIDENCE_REVIEW = Decimal("0.60")
@@ -199,19 +201,33 @@ def _confidence_policy(parse_confidence: Any) -> dict[str, Any]:
 
 
 def _build_required_field_summary(document: dict[str, Any]) -> tuple[dict[str, bool], dict[str, bool]]:
+    document_type = _normalized_text(document.get("document_type"))
     required_fields = {
         "supplier_name": _has_text(document.get("supplier_name")),
+        "document_type": document_type in {"angebot", "auftragsbestaetigung"},
         "document_number": _has_text(document.get("document_number")),
         "document_date": document.get("document_date") is not None,
         "currency": _has_text(document.get("currency")),
         "gross_total": _to_decimal(document.get("gross_total")) is not None,
     }
+    if document_type == "auftragsbestaetigung":
+        required_fields["offer_reference"] = _has_text(document.get("offer_reference"))
     recommended_fields = {
         "project_ref": _has_text(document.get("project_ref")),
         "net_total": _to_decimal(document.get("net_total")) is not None,
         "vat_total": _to_decimal(document.get("vat_total")) is not None,
     }
     return required_fields, recommended_fields
+
+
+def _item_status_from_issue_sets(
+    open_issues: list[dict[str, Any]],
+    resolved_issues: list[dict[str, Any]],
+) -> str:
+    status = _validation_status_from_issues(open_issues)
+    if status == "auto_accept" and resolved_issues:
+        return "manual_checked"
+    return status
 
 
 def build_document_validation(
@@ -224,6 +240,18 @@ def build_document_validation(
     document_issues: list[dict[str, Any]] = []
     required_fields, recommended_fields = _build_required_field_summary(document)
     provider_key = _provider_key(document)
+    document_type = _normalized_text(document.get("document_type"))
+
+    if document_type not in {"angebot", "auftragsbestaetigung"}:
+        document_issues.append(
+            _make_issue(
+                code="invalid_document_type",
+                severity="error",
+                field="document_type",
+                message="Dokumenttyp ist unbekannt oder fehlt.",
+                actual=document.get("document_type"),
+            )
+        )
 
     for field_name, present in required_fields.items():
         if not present:
@@ -284,6 +312,14 @@ def build_document_validation(
     component_item_sum = Decimal("0.00")
     discount_sum = Decimal("0.00")
     surcharge_sum = Decimal("0.00")
+    image_page_by_id: dict[int, int] = {}
+    for image in images:
+        try:
+            image_id = int(image.get("id"))
+            image_page = int(image.get("page_ref"))
+        except (TypeError, ValueError):
+            continue
+        image_page_by_id[image_id] = image_page
 
     line_item_issue_count = 0
     line_item_error_count = 0
@@ -299,6 +335,7 @@ def build_document_validation(
         page_ref = item.get("page_ref")
         is_informational_item = _is_informational_item(provider_key, item)
         counts_towards_component_sum = _counts_towards_component_sum(provider_key, item)
+        is_visual_item = not is_non_visual_line_item(item) and not is_informational_item
 
         if not _has_text(item.get("position_no")):
             issues.append(
@@ -386,6 +423,42 @@ def build_document_validation(
                 )
             )
 
+        assigned_image_ids: list[int] = []
+        raw_image_ids = item.get("image_ids")
+        if isinstance(raw_image_ids, list):
+            for value in raw_image_ids:
+                try:
+                    assigned_image_ids.append(int(value))
+                except (TypeError, ValueError):
+                    continue
+        assigned_image_ids = list(dict.fromkeys(assigned_image_ids))
+        if is_visual_item and images and not assigned_image_ids:
+            issues.append(
+                _make_issue(
+                    code="missing_image_assignment",
+                    severity="warning",
+                    field="image_ids",
+                    message="Für diese Position ist noch kein finales Bild zugeordnet.",
+                )
+            )
+        if isinstance(page_ref, int):
+            preceding_pages = [
+                image_page
+                for image_page in (image_page_by_id.get(image_id) for image_id in assigned_image_ids)
+                if image_page is not None and image_page < page_ref
+            ]
+            if preceding_pages:
+                issues.append(
+                    _make_issue(
+                        code="image_before_item_page",
+                        severity="warning",
+                        field="image_ids",
+                        message="Ein zugeordnetes Bild liegt auf einer frueheren Seite als die Position.",
+                        expected=page_ref,
+                        actual=min(preceding_pages),
+                    )
+                )
+
         if quantity is not None and unit_price is not None and line_total is not None and not is_informational_item:
             expected_line_total = (quantity * unit_price).quantize(SUM_TOLERANCE)
             if abs(line_total - expected_line_total) > SUM_TOLERANCE:
@@ -401,19 +474,135 @@ def build_document_validation(
                 )
 
         item["validation_issues"] = issues
-        item["validation_issue_count"] = len(issues)
-        item["validation_status"] = _validation_status_from_issues(issues)
-
-        if issues:
-            line_items_with_issues += 1
-            line_item_issue_count += len(issues)
-            line_item_error_count += len([issue for issue in issues if issue.get("severity") == "error"])
-            line_item_warning_count += len([issue for issue in issues if issue.get("severity") == "warning"])
+        item["validation_total_issue_count"] = len(issues)
 
         if line_total is not None and not is_alternative:
             non_alternative_item_sum += line_total
         if line_total is not None and counts_towards_component_sum:
             component_item_sum += line_total
+
+    image_to_positions: dict[int, list[str]] = {}
+    for item in line_items:
+        position_no = str(item.get("position_no") or "").strip()
+        raw_image_ids = item.get("image_ids")
+        if not position_no or not isinstance(raw_image_ids, list):
+            continue
+        for value in raw_image_ids:
+            try:
+                image_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            image_to_positions.setdefault(image_id, [])
+            if position_no not in image_to_positions[image_id]:
+                image_to_positions[image_id].append(position_no)
+
+    duplicate_image_assignments = {
+        image_id: position_nos for image_id, position_nos in image_to_positions.items() if len(position_nos) > 1
+    }
+    if duplicate_image_assignments:
+        duplicate_summary = ", ".join(
+            f"#{image_id} -> Pos. {', '.join(position_nos[:3])}{' +' + str(len(position_nos) - 3) if len(position_nos) > 3 else ''}"
+            for image_id, position_nos in list(duplicate_image_assignments.items())[:4]
+        )
+        document_issues.append(
+            _make_issue(
+                code="duplicate_image_assignments",
+                severity="warning",
+                field="image_ids",
+                message=f"Mindestens ein finales Bild ist mehrfach zugeordnet ({duplicate_summary}).",
+            )
+        )
+        for item in line_items:
+            raw_image_ids = item.get("image_ids")
+            if not isinstance(raw_image_ids, list):
+                continue
+            duplicate_ids_for_item: list[int] = []
+            for value in raw_image_ids:
+                try:
+                    image_id = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if image_id in duplicate_image_assignments:
+                    duplicate_ids_for_item.append(image_id)
+            duplicate_ids_for_item = list(dict.fromkeys(duplicate_ids_for_item))
+            if not duplicate_ids_for_item:
+                continue
+            item_issues = item.get("validation_issues")
+            if not isinstance(item_issues, list):
+                item_issues = []
+                item["validation_issues"] = item_issues
+            duplicate_descriptions = ", ".join(
+                f"#{image_id} (Pos. {', '.join(duplicate_image_assignments[image_id][:3])}{' +' + str(len(duplicate_image_assignments[image_id]) - 3) if len(duplicate_image_assignments[image_id]) > 3 else ''})"
+                for image_id in duplicate_ids_for_item
+            )
+            item_issues.append(
+                _make_issue(
+                    code="duplicate_image_assignment",
+                    severity="warning",
+                    field="image_ids",
+                    message=f"Bild mehrfach zugeordnet: {duplicate_descriptions}.",
+                )
+            )
+            item["validation_issue_count"] = len(item_issues)
+            item["validation_status"] = _validation_status_from_issues(item_issues)
+
+    line_item_issue_count = 0
+    line_item_error_count = 0
+    line_item_warning_count = 0
+    line_items_with_issues = 0
+    line_items_with_resolved_issues = 0
+    line_items_manually_checked = 0
+    resolved_warning_count = 0
+    for item in line_items:
+        issues = item.get("validation_issues")
+        if not isinstance(issues, list):
+            issues = []
+            item["validation_issues"] = issues
+        review_state = metadata_review_state(item)
+        review_checked = bool(item.get("review_checked") is True or review_state.get("checked"))
+        review_checked_at = item.get("review_checked_at") or review_state.get("checked_at")
+        review_checked_reason = item.get("review_checked_reason") or review_state.get("reason")
+
+        annotated_issues: list[dict[str, Any]] = []
+        open_issues: list[dict[str, Any]] = []
+        resolved_issues: list[dict[str, Any]] = []
+        for issue in issues:
+            annotated_issue = dict(issue)
+            if review_checked and annotated_issue.get("severity") == "warning":
+                annotated_issue["resolved_by_review"] = True
+                annotated_issue["resolved_at"] = review_checked_at
+                annotated_issue["resolved_reason"] = review_checked_reason or "manual_review"
+                resolved_issues.append(annotated_issue)
+            else:
+                open_issues.append(annotated_issue)
+            annotated_issues.append(annotated_issue)
+
+        item["review_checked"] = review_checked
+        item["review_checked_at"] = review_checked_at
+        item["review_checked_reason"] = review_checked_reason
+        item["validation_issues"] = annotated_issues
+        item["validation_open_issues"] = open_issues
+        item["validation_resolved_issues"] = resolved_issues
+        item["validation_total_issue_count"] = len(annotated_issues)
+        item["validation_issue_count"] = len(open_issues)
+        item["validation_open_issue_count"] = len(open_issues)
+        item["validation_resolved_issue_count"] = len(resolved_issues)
+        item["validation_status"] = _item_status_from_issue_sets(open_issues, resolved_issues)
+
+        if resolved_issues:
+            line_items_with_resolved_issues += 1
+        if review_checked:
+            line_items_manually_checked += 1
+        resolved_warning_count += len(
+            [issue for issue in resolved_issues if issue.get("severity") == "warning"]
+        )
+
+        if not open_issues:
+            continue
+        line_items_with_issues += 1
+        line_item_issue_count += len(open_issues)
+        line_item_error_count += len([issue for issue in open_issues if issue.get("severity") == "error"])
+        line_item_warning_count += len([issue for issue in open_issues if issue.get("severity") == "warning"])
 
     for amount_line in amount_lines:
         amount = _to_decimal(amount_line.get("amount"))
@@ -484,6 +673,8 @@ def build_document_validation(
         status = "reject"
     elif warning_count > 0:
         status = "review"
+    elif resolved_warning_count > 0:
+        status = "manual_checked"
     else:
         status = "auto_accept"
 
@@ -502,13 +693,18 @@ def build_document_validation(
         "line_item_summary": {
             "total": len(line_items),
             "with_issues": line_items_with_issues,
+            "with_resolved_issues": line_items_with_resolved_issues,
+            "manual_checked_count": line_items_manually_checked,
             "issue_count": line_item_issue_count,
             "error_count": line_item_error_count,
             "warning_count": line_item_warning_count,
+            "resolved_warning_count": resolved_warning_count,
             "non_alternative_total_sum": non_alternative_item_sum.quantize(SUM_TOLERANCE),
             "component_included_total_sum": component_item_sum.quantize(SUM_TOLERANCE),
         },
         "image_summary": {
             "total": len(images),
+            "assigned_duplicate_count": len(duplicate_image_assignments),
+            "assigned_duplicate_images": sorted(duplicate_image_assignments.keys()),
         },
     }

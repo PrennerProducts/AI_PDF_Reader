@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SR.SCHAURAUM PDF Workbench</title>
+  <title>SR.SCHAURAUM Dokumentenprüfung</title>
   <style>
     :root {
       --bg: #f3efeb;
@@ -29,31 +29,40 @@
       box-sizing: border-box;
     }
 
+    html,
+    body {
+      height: 100%;
+    }
+
     body {
       margin: 0;
       font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
       background:
-        radial-gradient(circle at 0% 0%, rgba(213, 26, 15, 0.12), transparent 30%),
-        radial-gradient(circle at 100% 6%, rgba(92, 92, 91, 0.14), transparent 18%),
-        linear-gradient(180deg, #f7f7f8, var(--bg));
+        radial-gradient(circle at 0% 0%, rgba(213, 26, 15, 0.12), transparent 22%),
+        radial-gradient(circle at 100% 8%, rgba(213, 26, 15, 0.1), transparent 18%),
+        linear-gradient(180deg, #666665, #565655 38%, #4d4d4c 100%);
       color: var(--ink);
-      min-height: 100vh;
+      overflow: hidden;
     }
 
     .app {
-      max-width: 1720px;
+      max-width: 1880px;
       margin: 0 auto;
-      padding: 26px;
+      padding: 14px;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 14px;
+      overflow: hidden;
     }
 
     .topbar {
       position: relative;
       color: #ffffff;
       border-radius: 30px;
-      padding: 28px;
+      padding: 14px 18px 16px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow: var(--shadow-strong);
-      margin-bottom: 22px;
       overflow: hidden;
       background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 40%),
@@ -100,80 +109,66 @@
 
     .hero-head {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
-      gap: 26px;
-      margin-bottom: 22px;
+      gap: 16px;
+      margin-bottom: 8px;
+      max-height: 160px;
+      overflow: hidden;
+      transition:
+        max-height 0.24s ease,
+        opacity 0.2s ease,
+        margin-bottom 0.2s ease,
+        transform 0.2s ease;
     }
 
     .hero-copy {
-      max-width: 920px;
+      max-width: 960px;
+      min-width: 0;
     }
 
     .hero-aside {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 12px;
-      min-width: 320px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border-radius: 999px;
-      padding: 8px 12px;
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      color: #f4f0ee;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 14px;
-      box-shadow: 0 10px 24px rgba(8, 8, 10, 0.16);
-    }
-
-    .eyebrow::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--brand);
-      box-shadow: 0 0 0 5px rgba(213, 26, 15, 0.12);
+      gap: 6px;
+      min-width: 240px;
     }
 
     .topbar h1 {
       margin: 0;
-      font-size: clamp(38px, 5vw, 64px);
-      line-height: 0.98;
+      font-size: clamp(18px, 1.9vw, 30px);
+      line-height: 1.02;
       letter-spacing: -0.03em;
-      max-width: 11ch;
+      max-width: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       color: #ffffff;
     }
 
     .topbar p {
-      margin: 16px 0 0;
+      margin: 4px 0 0;
       color: rgba(255, 255, 255, 0.82);
-      font-size: 16px;
-      line-height: 1.7;
-      max-width: 68ch;
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 72ch;
+      display: none;
     }
 
     .hero-pills {
-      display: flex;
+      display: none;
       flex-wrap: wrap;
       justify-content: flex-end;
-      gap: 8px;
-      max-width: 420px;
+      gap: 6px;
+      max-width: 380px;
     }
 
     .customer-brand {
-      width: min(100%, 360px);
+      width: min(100%, 258px);
       position: relative;
-      padding: 18px 20px;
-      border-radius: 24px;
+      padding: 10px 12px;
+      border-radius: 16px;
       background: linear-gradient(180deg, #ffffff, #f6f2ef);
       border: 1px solid rgba(35, 32, 32, 0.08);
       box-shadow: 0 22px 48px rgba(28, 19, 17, 0.12);
@@ -190,20 +185,10 @@
       background: linear-gradient(90deg, var(--brand), #f04a3d 58%, rgba(240, 74, 61, 0));
     }
 
-    .customer-brand-label {
-      display: block;
-      margin-bottom: 10px;
-      color: var(--brand);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
     .customer-logo {
       display: block;
       width: 100%;
-      max-width: 300px;
+      max-width: 208px;
       color: #4b4a49;
     }
 
@@ -217,11 +202,11 @@
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      padding: 9px 13px;
+      padding: 6px 10px;
       background: rgba(255, 255, 255, 0.1);
       color: #f7f4f2;
       border: 1px solid rgba(255, 255, 255, 0.14);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
       box-shadow: 0 12px 28px rgba(8, 8, 10, 0.12);
     }
@@ -235,21 +220,26 @@
     .controls {
       display: grid;
       grid-template-columns: 1.2fr 0.95fr 0.95fr;
-      gap: 14px;
+      gap: 12px;
       align-items: stretch;
+      transition: gap 0.2s ease;
     }
 
     .control-card {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       position: relative;
-      padding: 16px;
-      border-radius: 22px;
+      padding: 12px 14px;
+      border-radius: 18px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
       border: 1px solid rgba(255, 255, 255, 0.14);
       box-shadow: 0 14px 34px rgba(8, 8, 10, 0.14);
       backdrop-filter: blur(12px);
+      transition:
+        padding 0.2s ease,
+        border-radius 0.2s ease,
+        box-shadow 0.2s ease;
     }
 
     .control-card-wide {
@@ -260,15 +250,15 @@
       content: "";
       position: absolute;
       top: 0;
-      left: 16px;
-      right: 16px;
+      left: 14px;
+      right: 14px;
       height: 4px;
       border-radius: 0 0 10px 10px;
       background: linear-gradient(90deg, var(--brand), rgba(213, 26, 15, 0));
     }
 
     .control-label {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
@@ -280,9 +270,9 @@
       width: 100%;
       border-radius: 16px;
       border: 1px solid var(--line);
-      padding: 12px 14px;
+      padding: 10px 12px;
       font-size: 14px;
-      min-height: 48px;
+      min-height: 44px;
       background: #ffffff;
       color: #1a1a1d;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -304,7 +294,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 16px;
-      margin-top: 18px;
+      margin-top: 12px;
       flex-wrap: wrap;
     }
 
@@ -320,8 +310,8 @@
       justify-content: center;
       border-radius: 999px;
       border: 1px solid transparent;
-      padding: 12px 18px;
-      min-height: 48px;
+      padding: 10px 16px;
+      min-height: 42px;
       font-size: 14px;
       font-weight: 700;
       letter-spacing: 0.01em;
@@ -371,19 +361,20 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 12px;
-      margin-top: 18px;
+      margin-top: 12px;
       align-items: stretch;
+      transition: margin-top 0.2s ease, gap 0.2s ease;
     }
 
     .statusbar {
-      padding: 14px 16px;
-      border-radius: 18px;
+      padding: 11px 14px;
+      border-radius: 16px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.1));
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-left: 5px solid var(--brand);
       font-size: 13px;
       color: #ffffff;
-      min-height: 52px;
+      min-height: 46px;
       display: flex;
       align-items: center;
       box-shadow: 0 14px 30px rgba(8, 8, 10, 0.12);
@@ -405,11 +396,11 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 14px;
-      border-radius: 18px;
+      padding: 9px 12px;
+      border-radius: 16px;
       background: linear-gradient(135deg, #6b6b6a, var(--accent));
       border: 1px solid rgba(35, 32, 32, 0.14);
-      min-height: 52px;
+      min-height: 46px;
       box-shadow: 0 16px 30px rgba(20, 19, 22, 0.18);
     }
 
@@ -422,18 +413,129 @@
     }
 
     .advanced-tools {
-      margin-top: 14px;
-      border-radius: 22px;
+      margin-top: 10px;
+      border-radius: 18px;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
       box-shadow: 0 16px 32px rgba(8, 8, 10, 0.14);
       overflow: hidden;
+      transition: margin-top 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .topbar {
+      transition:
+        padding 0.22s ease,
+        border-radius 0.22s ease,
+        box-shadow 0.22s ease;
+    }
+
+    .topbar.is-collapsed {
+      padding: 10px 14px 12px;
+      border-radius: 24px;
+      box-shadow: 0 20px 52px rgba(28, 19, 17, 0.14);
+    }
+
+    .topbar.is-collapsed .hero-head {
+      max-height: 0;
+      opacity: 0;
+      margin-bottom: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+    }
+
+    .topbar.is-collapsed .controls {
+      gap: 8px;
+    }
+
+    .topbar.is-collapsed .control-card {
+      padding: 9px 11px;
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(8, 8, 10, 0.12);
+    }
+
+    .topbar.is-collapsed .control-label {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.68);
+    }
+
+    .topbar.is-collapsed .controls select,
+    .topbar.is-collapsed .controls input[type="file"] {
+      min-height: 38px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    .topbar.is-collapsed .action-bar {
+      margin-top: 6px;
+      gap: 10px;
+    }
+
+    .topbar.is-collapsed .action-group {
+      gap: 8px;
+    }
+
+    .topbar.is-collapsed .btn {
+      min-height: 36px;
+      padding: 7px 12px;
+      font-size: 12px;
+      box-shadow: 0 10px 22px rgba(28, 19, 17, 0.12);
+    }
+
+    .topbar.is-collapsed .status-strip {
+      margin-top: 6px;
+      gap: 8px;
+    }
+
+    .topbar.is-collapsed .statusbar,
+    .topbar.is-collapsed .live-state-wrap {
+      min-height: 36px;
+      padding: 7px 10px;
+      border-radius: 14px;
+    }
+
+    .topbar.is-collapsed .statusbar {
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar.is-collapsed .live-label {
+      display: none;
+    }
+
+    .topbar.is-collapsed .debug-state {
+      font-size: 10px;
+      padding: 2px 8px;
+      margin-left: 0;
+    }
+
+    .topbar.is-collapsed .advanced-tools {
+      margin-top: 8px;
+      opacity: 0.94;
+    }
+
+    .topbar.is-collapsed .advanced-tools:not([open]) {
+      margin-top: 0;
+      max-height: 0;
+      opacity: 0;
+      border-width: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+    }
+
+    .topbar.is-collapsed .advanced-tools summary {
+      padding: 10px 14px;
+      font-size: 12px;
     }
 
     .advanced-tools summary {
       list-style: none;
       cursor: pointer;
-      padding: 16px 18px;
+      padding: 13px 16px;
       font-size: 13px;
       font-weight: 700;
       letter-spacing: 0.03em;
@@ -448,11 +550,11 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      padding: 0 18px 18px;
+      padding: 0 16px 16px;
     }
 
     .debug-panel {
-      margin: 0 18px 18px;
+      margin: 0 16px 16px;
       border: 1px solid rgba(35, 32, 32, 0.08);
       border-radius: 20px;
       background: linear-gradient(180deg, #6a6a69, var(--accent));
@@ -546,13 +648,16 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: minmax(420px, 0.92fr) minmax(520px, 1.08fr);
-      gap: 22px;
-      min-height: 78vh;
-      align-items: start;
+      grid-template-columns: minmax(320px, 0.78fr) minmax(760px, 1.72fr);
+      gap: 14px;
+      min-height: 0;
+      height: 100%;
+      align-items: stretch;
     }
 
     .panel {
+      display: flex;
+      flex-direction: column;
       background: var(--card);
       border: 1px solid rgba(35, 32, 32, 0.08);
       border-radius: 28px;
@@ -560,20 +665,30 @@
       box-shadow: var(--shadow-strong);
       backdrop-filter: blur(12px);
       animation: fadeUp 0.6s ease both;
+      min-width: 0;
+      min-height: 0;
     }
 
     .panel:nth-child(2) {
       animation-delay: 0.08s;
+      background:
+        linear-gradient(180deg, rgba(232, 234, 236, 0.96), rgba(214, 217, 220, 0.94)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06));
+    }
+
+    .panel:nth-child(2) .panel-head {
+      background:
+        linear-gradient(180deg, rgba(236, 238, 240, 0.94), rgba(224, 227, 230, 0.92)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04));
     }
 
     .panel-head {
-      position: sticky;
-      top: 0;
+      position: relative;
       z-index: 2;
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 18px 20px;
+      padding: 16px 18px;
       border-bottom: 1px solid rgba(35, 32, 32, 0.08);
       font-weight: 700;
       font-size: 14px;
@@ -596,25 +711,40 @@
 
     #pdfFrame {
       width: 100%;
-      height: calc(78vh - 42px);
+      flex: 1 1 auto;
+      min-height: 0;
+      height: auto;
       border: 0;
       background: #f0edeb;
     }
 
     .panel-body {
-      padding: 18px;
-      height: calc(78vh - 42px);
+      padding: 14px;
+      flex: 1 1 auto;
+      min-height: 0;
+      height: auto;
       overflow: auto;
       background:
         radial-gradient(circle at 100% 0%, rgba(213, 26, 15, 0.05), transparent 20%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 241, 238, 0.98));
     }
 
+    .panel:nth-child(2) .panel-body {
+      background-color: #c9cdd2;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.2), transparent 22%),
+        linear-gradient(90deg, rgba(92, 92, 91, 0.12) 1px, transparent 1px),
+        linear-gradient(rgba(92, 92, 91, 0.12) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(204, 208, 213, 0.99), rgba(190, 194, 199, 0.99));
+      background-size: auto, 26px 26px, 26px 26px, auto;
+      background-position: 0 0, 0 0, 0 0, 0 0;
+    }
+
     .summary {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
     .summary .card {
@@ -622,10 +752,14 @@
       overflow: hidden;
       border: 1px solid rgba(35, 32, 32, 0.08);
       border-radius: 22px;
-      padding: 14px;
-      background: linear-gradient(180deg, #ffffff, #f6f2ef);
-      min-height: 92px;
-      box-shadow: 0 16px 30px rgba(28, 19, 17, 0.07);
+      padding: 12px;
+      background:
+        linear-gradient(180deg, rgba(238, 239, 241, 0.92), rgba(224, 226, 229, 0.84)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
+      min-height: 84px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        0 16px 30px rgba(28, 19, 17, 0.06);
       animation: fadeUp 0.55s ease both;
     }
 
@@ -647,6 +781,15 @@
       letter-spacing: 0.05em;
     }
 
+    .required-marker {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 4px;
+      color: var(--brand);
+      font-weight: 800;
+    }
+
     .summary .value {
       font-size: 16px;
       font-weight: 700;
@@ -659,11 +802,1097 @@
 
     .summary .card.source-llm {
       border-color: rgba(213, 26, 15, 0.18);
-      background: linear-gradient(180deg, #fff6f5, #fdf0ee);
+      background:
+        linear-gradient(180deg, rgba(242, 236, 236, 0.94), rgba(230, 223, 223, 0.86)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
     }
 
     .summary .card.source-parser {
       border-color: rgba(92, 92, 91, 0.12);
+    }
+
+    .review-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .extract-overview-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .review-hero {
+      display: grid;
+      grid-template-columns: minmax(240px, 1.2fr) minmax(0, 2fr);
+      gap: 12px;
+      margin-bottom: 0;
+      padding: 12px;
+      border-radius: 26px;
+      border: 1px solid rgba(255, 255, 255, 0.56);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(244, 239, 235, 0.72)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.08));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.84),
+        0 28px 48px rgba(28, 19, 17, 0.1),
+        0 2px 0 rgba(255, 255, 255, 0.18);
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      backdrop-filter: blur(14px);
+    }
+
+    .review-hero::after {
+      content: "";
+      position: absolute;
+      inset: -18% -10% auto auto;
+      width: 42%;
+      height: 78%;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(213, 26, 15, 0.14) 0%, rgba(213, 26, 15, 0.05) 34%, rgba(213, 26, 15, 0) 74%);
+      filter: blur(30px);
+      opacity: 0.46;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .review-main,
+    .review-metrics {
+      border: 1px solid rgba(255, 255, 255, 0.58);
+      border-radius: 24px;
+      background:
+        linear-gradient(180deg, rgba(238, 239, 241, 0.9), rgba(223, 225, 228, 0.82)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.76),
+        0 18px 30px rgba(28, 19, 17, 0.08);
+      position: relative;
+      z-index: 1;
+    }
+
+    .review-main {
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      min-height: 148px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .review-main::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: linear-gradient(180deg, rgba(255, 84, 73, 0.92), rgba(213, 26, 15, 0.2));
+      box-shadow: 0 0 14px rgba(255, 84, 73, 0.26);
+    }
+
+    .review-status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .review-status-badge.auto-accept {
+      color: #146647;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(236, 255, 247, 0.86));
+      border-color: rgba(61, 255, 178, 0.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 0 0 1px rgba(61, 255, 178, 0.12),
+        0 0 16px rgba(61, 255, 178, 0.16),
+        0 0 36px rgba(61, 255, 178, 0.1);
+    }
+
+    .review-status-badge.review {
+      color: #8a5a00;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 248, 228, 0.86));
+      border-color: rgba(255, 191, 0, 0.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 0 0 1px rgba(255, 191, 0, 0.12),
+        0 0 16px rgba(255, 191, 0, 0.16),
+        0 0 36px rgba(255, 191, 0, 0.1);
+    }
+
+    .review-status-badge.reject {
+      color: #a3314b;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 238, 242, 0.86));
+      border-color: rgba(255, 71, 111, 0.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 0 0 1px rgba(255, 71, 111, 0.12),
+        0 0 16px rgba(255, 71, 111, 0.16),
+        0 0 36px rgba(255, 71, 111, 0.1);
+    }
+
+    .review-status-badge.unknown {
+      color: #4f5b67;
+      background: #eef1f6;
+      border-color: #d8dde6;
+      box-shadow: 0 0 0 1px rgba(79, 91, 103, 0.06), 0 0 16px rgba(79, 91, 103, 0.1);
+    }
+
+    .review-hero:has(.review-status-badge.auto-accept) {
+      border-color: rgba(61, 255, 178, 0.22);
+      background:
+        radial-gradient(circle at 78% 18%, rgba(61, 255, 178, 0.14), rgba(61, 255, 178, 0) 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(242, 252, 247, 0.74));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 0 0 1px rgba(61, 255, 178, 0.08),
+        0 0 36px rgba(61, 255, 178, 0.1),
+        0 28px 48px rgba(28, 19, 17, 0.1);
+    }
+
+    .review-hero:has(.review-status-badge.auto-accept)::after {
+      background: radial-gradient(circle, rgba(61, 255, 178, 0.18) 0%, rgba(61, 255, 178, 0.06) 34%, rgba(61, 255, 178, 0) 74%);
+      opacity: 1;
+      filter: blur(34px);
+    }
+
+    .review-hero:has(.review-status-badge.auto-accept) .review-main,
+    .review-hero:has(.review-status-badge.auto-accept) .review-metrics {
+      border-color: rgba(61, 255, 178, 0.18);
+      background:
+        linear-gradient(180deg, rgba(238, 243, 241, 0.94), rgba(225, 234, 230, 0.84)),
+        radial-gradient(circle at 12% 12%, rgba(61, 255, 178, 0.08), rgba(61, 255, 178, 0) 40%);
+      box-shadow:
+        0 0 0 1px rgba(61, 255, 178, 0.06),
+        0 18px 38px rgba(28, 19, 17, 0.08),
+        0 0 32px rgba(61, 255, 178, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    }
+
+    .review-hero:has(.review-status-badge.auto-accept) .review-main::before {
+      background: linear-gradient(180deg, #52ffc0, rgba(61, 255, 178, 0.12));
+    }
+
+    .review-hero:has(.review-status-badge.review) {
+      border-color: rgba(255, 191, 0, 0.22);
+      background:
+        radial-gradient(circle at 78% 18%, rgba(255, 191, 0, 0.16), rgba(255, 191, 0, 0) 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 249, 237, 0.74));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 0 0 1px rgba(255, 191, 0, 0.08),
+        0 0 36px rgba(255, 191, 0, 0.1),
+        0 28px 48px rgba(28, 19, 17, 0.1);
+    }
+
+    .review-hero:has(.review-status-badge.review)::after {
+      background: radial-gradient(circle, rgba(255, 191, 0, 0.18) 0%, rgba(255, 191, 0, 0.06) 34%, rgba(255, 191, 0, 0) 74%);
+      opacity: 1;
+      filter: blur(34px);
+    }
+
+    .review-hero:has(.review-status-badge.review) .review-main,
+    .review-hero:has(.review-status-badge.review) .review-metrics {
+      border-color: rgba(255, 191, 0, 0.18);
+      background:
+        linear-gradient(180deg, rgba(243, 241, 234, 0.94), rgba(233, 228, 214, 0.84)),
+        radial-gradient(circle at 12% 12%, rgba(255, 191, 0, 0.08), rgba(255, 191, 0, 0) 40%);
+      box-shadow:
+        0 0 0 1px rgba(255, 191, 0, 0.06),
+        0 18px 38px rgba(28, 19, 17, 0.08),
+        0 0 32px rgba(255, 191, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    }
+
+    .review-hero:has(.review-status-badge.review) .review-main::before {
+      background: linear-gradient(180deg, #ffd85c, rgba(255, 191, 0, 0.12));
+    }
+
+    .review-hero:has(.review-status-badge.reject) {
+      border-color: rgba(255, 71, 111, 0.22);
+      background:
+        radial-gradient(circle at 78% 18%, rgba(255, 71, 111, 0.16), rgba(255, 71, 111, 0) 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 242, 246, 0.74));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 0 0 1px rgba(255, 71, 111, 0.08),
+        0 0 36px rgba(255, 71, 111, 0.1),
+        0 28px 48px rgba(28, 19, 17, 0.1);
+    }
+
+    .review-hero:has(.review-status-badge.reject)::after {
+      background: radial-gradient(circle, rgba(255, 71, 111, 0.18) 0%, rgba(255, 71, 111, 0.06) 34%, rgba(255, 71, 111, 0) 74%);
+      opacity: 1;
+      filter: blur(34px);
+    }
+
+    .review-hero:has(.review-status-badge.reject) .review-main,
+    .review-hero:has(.review-status-badge.reject) .review-metrics {
+      border-color: rgba(255, 71, 111, 0.18);
+      background:
+        linear-gradient(180deg, rgba(243, 238, 240, 0.94), rgba(232, 223, 227, 0.84)),
+        radial-gradient(circle at 12% 12%, rgba(255, 71, 111, 0.08), rgba(255, 71, 111, 0) 40%);
+      box-shadow:
+        0 0 0 1px rgba(255, 71, 111, 0.06),
+        0 18px 38px rgba(28, 19, 17, 0.08),
+        0 0 32px rgba(255, 71, 111, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    }
+
+    .review-hero:has(.review-status-badge.reject) .review-main::before {
+      background: linear-gradient(180deg, #ff8ca4, rgba(255, 71, 111, 0.12));
+    }
+
+    .review-main h2 {
+      margin: 10px 0 6px;
+      font-size: 24px;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: #2c2c31;
+    }
+
+    .review-main p {
+      margin: 0;
+      color: #66605c;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .review-metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.16);
+      align-items: stretch;
+    }
+
+    .review-metric {
+      background: linear-gradient(180deg, #fffefe, #f3eeea);
+      padding: 14px 16px;
+      min-height: 112px;
+      display: grid;
+      grid-template-rows: minmax(28px, auto) minmax(40px, auto) minmax(38px, auto);
+      align-content: start;
+      gap: 6px;
+      border-left: 1px solid rgba(35, 32, 32, 0.06);
+      border-top: 1px solid rgba(255, 255, 255, 0.55);
+      position: relative;
+      transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease, background 180ms ease;
+      overflow: hidden;
+      text-align: left;
+      font: inherit;
+      appearance: none;
+    }
+
+    .review-metric.is-actionable {
+      cursor: pointer;
+    }
+
+    .review-metric.is-actionable:hover {
+      transform: translateY(-2px);
+    }
+
+    .review-metric::after {
+      content: "";
+      position: absolute;
+      inset: auto -12% -38% auto;
+      width: 78%;
+      height: 78%;
+      border-radius: 999px;
+      filter: blur(18px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, filter 180ms ease, background 180ms ease;
+    }
+
+    .review-metric.metric-ok {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(241, 255, 248, 0.82)),
+        radial-gradient(circle at 18% 22%, rgba(61, 255, 178, 0.08), rgba(61, 255, 178, 0) 54%);
+      border-color: rgba(61, 255, 178, 0.24);
+      box-shadow:
+        inset 0 2px 0 rgba(82, 255, 192, 0.58),
+        inset 0 1px 0 rgba(255, 255, 255, 0.88),
+        0 0 0 1px rgba(61, 255, 178, 0.12),
+        0 0 24px rgba(61, 255, 178, 0.12),
+        0 12px 24px rgba(28, 19, 17, 0.08);
+    }
+
+    .review-metric.metric-ok::after {
+      background: radial-gradient(circle, rgba(61, 255, 178, 0.18) 0%, rgba(61, 255, 178, 0.08) 34%, rgba(61, 255, 178, 0) 74%);
+      opacity: 0.85;
+    }
+
+    .review-metric.metric-ok .review-metric-value {
+      color: #146647;
+    }
+
+    .review-metric.metric-ok .review-metric-note {
+      color: #4f6e61;
+    }
+
+    .review-metric.metric-review {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 251, 240, 0.82)),
+        radial-gradient(circle at 18% 22%, rgba(255, 191, 0, 0.08), rgba(255, 191, 0, 0) 54%);
+      border-color: rgba(255, 191, 0, 0.24);
+      box-shadow:
+        inset 0 2px 0 rgba(255, 216, 92, 0.58),
+        inset 0 1px 0 rgba(255, 255, 255, 0.88),
+        0 0 0 1px rgba(255, 191, 0, 0.12),
+        0 0 24px rgba(255, 191, 0, 0.12),
+        0 12px 24px rgba(28, 19, 17, 0.08);
+    }
+
+    .review-metric.metric-review::after {
+      background: radial-gradient(circle, rgba(255, 191, 0, 0.18) 0%, rgba(255, 191, 0, 0.08) 34%, rgba(255, 191, 0, 0) 74%);
+      opacity: 0.85;
+    }
+
+    .review-metric.metric-review .review-metric-value {
+      color: #8a5a00;
+    }
+
+    .review-metric.metric-review .review-metric-note {
+      color: #7b6941;
+    }
+
+    .review-metric.metric-err {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 244, 247, 0.82)),
+        radial-gradient(circle at 18% 22%, rgba(255, 71, 111, 0.08), rgba(255, 71, 111, 0) 54%);
+      border-color: rgba(255, 71, 111, 0.24);
+      box-shadow:
+        inset 0 2px 0 rgba(255, 140, 164, 0.58),
+        inset 0 1px 0 rgba(255, 255, 255, 0.88),
+        0 0 0 1px rgba(255, 71, 111, 0.12),
+        0 0 24px rgba(255, 71, 111, 0.12),
+        0 12px 24px rgba(28, 19, 17, 0.08);
+    }
+
+    .review-metric.metric-err::after {
+      background: radial-gradient(circle, rgba(255, 71, 111, 0.18) 0%, rgba(255, 71, 111, 0.08) 34%, rgba(255, 71, 111, 0) 74%);
+      opacity: 0.85;
+    }
+
+    .review-metric.metric-err .review-metric-value {
+      color: #a3314b;
+    }
+
+    .review-metric.metric-err .review-metric-note {
+      color: #825461;
+    }
+
+    .review-metric:first-child {
+      border-left: 0;
+    }
+
+    .review-metric-label {
+      display: flex;
+      align-items: flex-start;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #7a726e;
+      min-height: 28px;
+    }
+
+    .review-metric-value {
+      display: flex;
+      align-items: center;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: #262222;
+      font-weight: 700;
+      min-height: 40px;
+      font-variant-numeric: tabular-nums lining-nums;
+      font-feature-settings: "tnum" 1, "lnum" 1;
+    }
+
+    .review-metric-note {
+      font-size: 12px;
+      color: #655d59;
+      line-height: 1.45;
+      min-height: 36px;
+      align-self: start;
+      word-break: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .review-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .cockpit-detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+      gap: 14px;
+    }
+
+    .review-card {
+      border: 1px solid rgba(35, 32, 32, 0.1);
+      border-radius: 22px;
+      background:
+        linear-gradient(180deg, rgba(237, 239, 241, 0.9), rgba(224, 226, 229, 0.84)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        0 16px 32px rgba(28, 19, 17, 0.06);
+      padding: 16px;
+      min-height: 100%;
+    }
+
+    .review-card h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #292526;
+      letter-spacing: -0.01em;
+    }
+
+    .review-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .review-workbench {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.72fr);
+      gap: 14px;
+    }
+
+    .review-workbench-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .review-workbench-main {
+      min-width: 0;
+    }
+
+    .review-filter-tools {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .review-filter-tools .filter-select {
+      width: 100%;
+    }
+
+    .review-task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .review-task-card {
+      position: relative;
+      overflow: hidden;
+      padding: 15px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      background:
+        linear-gradient(180deg, rgba(239, 241, 244, 0.92), rgba(226, 229, 233, 0.86)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        0 14px 28px rgba(28, 19, 17, 0.06);
+    }
+
+    .review-task-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      border-radius: 20px 0 0 20px;
+      background: rgba(92, 92, 91, 0.26);
+    }
+
+    .review-task-card.severity-error::before {
+      background: linear-gradient(180deg, #ff6d8d, #e33b5f);
+      box-shadow: 0 0 16px rgba(227, 59, 95, 0.22);
+    }
+
+    .review-task-card.severity-warning::before {
+      background: linear-gradient(180deg, #ffd86d, #f0ab00);
+      box-shadow: 0 0 16px rgba(240, 171, 0, 0.18);
+    }
+
+    .review-task-card.severity-info::before {
+      background: linear-gradient(180deg, #6ff2ca, #27c68f);
+      box-shadow: 0 0 16px rgba(39, 198, 143, 0.16);
+    }
+
+    .review-task-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .review-task-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .review-task-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .review-task-badge.error {
+      color: #9f2646;
+      background: #ffe8ee;
+      border-color: #ffbfd0;
+    }
+
+    .review-task-badge.warning {
+      color: #8a5a00;
+      background: #fff3d6;
+      border-color: #f4d28d;
+    }
+
+    .review-task-badge.info {
+      color: #136646;
+      background: #e8faf2;
+      border-color: #b7ebd3;
+    }
+
+    .review-task-badge.scope {
+      color: #4f5b67;
+      background: #eef1f6;
+      border-color: #d8dde6;
+    }
+
+    .review-task-meta {
+      font-size: 12px;
+      color: #6a625e;
+      line-height: 1.45;
+      text-align: right;
+      flex: 0 0 auto;
+    }
+
+    .review-task-title {
+      margin: 0 0 4px;
+      font-size: 15px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: #292526;
+    }
+
+    .review-task-text {
+      margin: 0;
+      font-size: 13px;
+      color: #655d59;
+      line-height: 1.55;
+      word-break: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .review-task-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .review-task-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(35, 32, 32, 0.1);
+      background: rgba(255, 255, 255, 0.9);
+      color: #302b2b;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+      box-shadow: 0 10px 20px rgba(18, 14, 13, 0.08);
+    }
+
+    .review-task-action:hover {
+      transform: translateY(-1px);
+      border-color: rgba(213, 26, 15, 0.24);
+    }
+
+    .review-task-action.primary {
+      background: linear-gradient(135deg, #ea2a1f, var(--brand));
+      color: #fff;
+      border-color: rgba(149, 18, 10, 0.36);
+      box-shadow: 0 16px 30px rgba(213, 26, 15, 0.18);
+    }
+
+    .review-task-action.subtle {
+      background: linear-gradient(180deg, rgba(244, 245, 247, 0.92), rgba(230, 233, 236, 0.9));
+      border-color: rgba(35, 32, 32, 0.12);
+      color: #3a3434;
+      box-shadow: 0 10px 20px rgba(18, 14, 13, 0.06);
+    }
+
+    .review-task-action.warning {
+      background: linear-gradient(135deg, rgba(255, 250, 233, 0.96), rgba(255, 236, 183, 0.94));
+      border-color: rgba(240, 171, 0, 0.28);
+      color: #775000;
+      box-shadow: 0 12px 24px rgba(240, 171, 0, 0.12);
+    }
+
+    .review-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: stretch;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(242, 243, 245, 0.9), rgba(229, 231, 234, 0.86)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
+      border: 1px solid rgba(35, 32, 32, 0.08);
+    }
+
+    .review-row-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .review-row-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #292526;
+      margin-bottom: 3px;
+      word-break: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .review-row-sub {
+      font-size: 12px;
+      color: #655d59;
+      line-height: 1.45;
+      word-break: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .review-row-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-start;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .review-flag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+
+    .review-flag.ok {
+      color: #0f6c3f;
+      background: #e8f8ef;
+      border-color: #bde4ce;
+    }
+
+    .review-flag.review {
+      color: #8a5a00;
+      background: #fff4dd;
+      border-color: #f3d8a3;
+    }
+
+    .review-flag.err {
+      color: #9c2a3f;
+      background: #fdecee;
+      border-color: #f2c2cb;
+    }
+
+    .review-flag.neutral {
+      color: #4f5b67;
+      background: #eef1f6;
+      border-color: #d8dde6;
+    }
+
+    .review-empty {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px dashed rgba(35, 32, 32, 0.14);
+      color: #655d59;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .extract-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 14px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      padding: 8px 10px 14px;
+      border-radius: 24px;
+      border: 1px solid rgba(58, 55, 54, 0.18);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
+        linear-gradient(180deg, rgba(92, 92, 91, 0.92), rgba(72, 72, 71, 0.96));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 28px rgba(28, 19, 17, 0.1);
+      backdrop-filter: blur(8px);
+    }
+
+    .extract-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 240, 236, 0.98));
+      color: #342f2f;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(18, 14, 13, 0.12);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    }
+
+    .extract-tab:hover {
+      transform: translateY(-1px);
+      border-color: rgba(213, 26, 15, 0.18);
+    }
+
+    .extract-tab.is-active {
+      background: linear-gradient(135deg, #ea2a1f, var(--brand));
+      color: #ffffff;
+      border-color: rgba(149, 18, 10, 0.36);
+      box-shadow: 0 16px 30px rgba(213, 26, 15, 0.24);
+    }
+
+    .extract-pane {
+      display: block;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .extract-pane[hidden] {
+      display: none !important;
+    }
+
+    .position-toggle {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid rgba(35, 32, 32, 0.12);
+      background: #ffffff;
+      color: #3a3434;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(28, 19, 17, 0.06);
+    }
+
+    .position-row.is-expanded td {
+      background: rgba(213, 26, 15, 0.05);
+    }
+
+    .position-detail-row td {
+      padding: 0;
+      border-top: 0;
+      background: transparent !important;
+    }
+
+    .position-detail-card {
+      padding: 14px;
+      margin: 0 10px 10px;
+      border-radius: 18px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      background: linear-gradient(180deg, #fcfbfa, #f5f1ee);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .position-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .position-detail-block {
+      min-width: 0;
+    }
+
+    .position-detail-block.wide {
+      grid-column: 1 / -1;
+    }
+
+    .position-detail-block h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #2f2a2a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .position-detail-block p {
+      margin: 0;
+      font-size: 12px;
+      color: #655d59;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .detail-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-list-item {
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(35, 32, 32, 0.06);
+      font-size: 12px;
+      color: #4c4543;
+      line-height: 1.45;
+    }
+
+    .detail-list-item strong {
+      color: #262223;
+    }
+
+    .detail-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .detail-meta-cell {
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(35, 32, 32, 0.06);
+    }
+
+    .detail-meta-label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: #786f6b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .detail-meta-value {
+      font-size: 12px;
+      color: #302a2a;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .position-image-section {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .position-image-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .position-image-group-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b615d;
+    }
+
+    .position-image-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
+      gap: 10px;
+    }
+
+    .position-image-card {
+      display: block;
+      padding: 10px;
+      border-radius: 16px;
+      text-decoration: none;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      box-shadow: 0 12px 24px rgba(28, 19, 17, 0.07);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    .position-image-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(213, 26, 15, 0.22);
+      box-shadow: 0 16px 30px rgba(28, 19, 17, 0.1);
+    }
+
+    .position-image-card img {
+      width: 100%;
+      height: 156px;
+      object-fit: contain;
+      display: block;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #faf8f7, #f0ebe8);
+      border: 1px solid rgba(35, 32, 32, 0.06);
+    }
+
+    .position-image-card-meta {
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #5c5551;
+    }
+
+    .position-image-empty {
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px dashed rgba(35, 32, 32, 0.12);
+      font-size: 12px;
+      color: #6b615d;
+    }
+
+    .position-detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .detail-list-item.resolved {
+      border-color: rgba(39, 198, 143, 0.16);
+      background: linear-gradient(180deg, rgba(237, 255, 247, 0.94), rgba(223, 243, 234, 0.9));
+    }
+
+    .position-review-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      background: rgba(233, 248, 240, 0.86);
+      border: 1px solid rgba(39, 198, 143, 0.16);
+      font-size: 12px;
+      color: #1d6a4b;
+      font-weight: 700;
+    }
+
+    .section-tools {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-tools {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 1px solid rgba(35, 32, 32, 0.1);
+      font-size: 12px;
+      color: #373232;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .filter-toggle input {
+      margin: 0;
+      accent-color: var(--brand);
+    }
+
+    .filter-select {
+      border-radius: 999px;
+      border: 1px solid rgba(35, 32, 32, 0.1);
+      background: #ffffff;
+      min-height: 40px;
+      padding: 0 14px;
+      font-size: 12px;
+      color: #302b2b;
+      font-weight: 600;
+    }
+
+    .item-validation {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 180px;
+    }
+
+    .item-validation-notes {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .item-note {
+      font-size: 11px;
+      color: #645d5a;
+      line-height: 1.4;
     }
 
     .src-tag {
@@ -699,8 +1928,8 @@
     }
 
     .section {
-      margin-top: 16px;
-      padding: 16px;
+      margin-top: 12px;
+      padding: 14px;
       border: 1px solid rgba(35, 32, 32, 0.08);
       border-radius: 22px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 241, 238, 0.98));
@@ -708,7 +1937,7 @@
     }
 
     .section h2 {
-      margin: 0 0 12px;
+      margin: 0 0 10px;
       padding-left: 12px;
       border-left: 4px solid var(--brand);
       font-size: 15px;
@@ -757,18 +1986,167 @@
       color: #3b3534;
     }
 
+    .image-chip-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .image-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .image-chip-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #7b726e;
+      min-width: 64px;
+    }
+
+    .image-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+      white-space: nowrap;
+    }
+
+    .image-chip:hover {
+      transform: translateY(-1px);
+    }
+
+    .image-chip.assigned {
+      color: #0f6c3f;
+      background: #e8f8ef;
+      border-color: #bde4ce;
+      box-shadow: 0 10px 22px rgba(18, 108, 63, 0.12);
+    }
+
+    .image-chip.candidate {
+      color: #214a9a;
+      background: #edf3ff;
+      border-color: #c7d6f3;
+      box-shadow: 0 10px 20px rgba(33, 74, 154, 0.1);
+    }
+
+    .image-chip.empty {
+      color: #6f6763;
+      background: #f1edeb;
+      border-color: rgba(35, 32, 32, 0.08);
+      cursor: default;
+      box-shadow: none;
+    }
+
+    .image-chip:disabled {
+      opacity: 0.62;
+      cursor: wait;
+      transform: none;
+    }
+
+    .image-hover-preview {
+      position: fixed;
+      z-index: 10000;
+      width: 190px;
+      padding: 10px;
+      border-radius: 16px;
+      background: rgba(24, 22, 23, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 40px rgba(10, 10, 12, 0.28);
+      pointer-events: none;
+      color: #f5f0ee;
+    }
+
+    .image-hover-preview[hidden] {
+      display: none !important;
+    }
+
+    .image-hover-preview img {
+      width: 100%;
+      height: 126px;
+      object-fit: contain;
+      display: block;
+      border-radius: 10px;
+      background: #f4efec;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .image-hover-preview-meta {
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: rgba(245, 240, 238, 0.9);
+    }
+
     .img-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .image-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0 14px;
+    }
+
+    .image-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 38px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+      font-size: 12px;
+      color: #524a47;
+    }
+
+    .image-legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      box-shadow: 0 0 0 1px rgba(35, 32, 32, 0.08), 0 0 14px rgba(35, 32, 32, 0.08);
+    }
+
+    .image-legend-item.conflict .image-legend-swatch {
+      background: linear-gradient(135deg, #ff8c5a, #ff476f);
+      box-shadow: 0 0 0 1px rgba(255, 71, 111, 0.14), 0 0 16px rgba(255, 71, 111, 0.18);
+    }
+
+    .image-legend-item.assigned .image-legend-swatch {
+      background: linear-gradient(135deg, #7effc7, #2fda89);
+      box-shadow: 0 0 0 1px rgba(47, 218, 137, 0.14), 0 0 16px rgba(47, 218, 137, 0.18);
+    }
+
+    .image-legend-item.open .image-legend-swatch {
+      background: linear-gradient(135deg, #ffe77b, #ffbf00);
+      box-shadow: 0 0 0 1px rgba(255, 191, 0, 0.14), 0 0 16px rgba(255, 191, 0, 0.18);
     }
 
     .img-card {
       border: 1px solid rgba(35, 32, 32, 0.08);
-      border-radius: 18px;
-      padding: 10px;
+      border-radius: 20px;
+      padding: 12px;
       background: #ffffff;
-      box-shadow: 0 14px 28px rgba(28, 19, 17, 0.06);
+      box-shadow: 0 16px 30px rgba(28, 19, 17, 0.06);
       transition: transform 0.16s ease, box-shadow 0.16s ease;
     }
 
@@ -778,6 +2156,18 @@
       background: #f4fcf8;
     }
 
+    .img-card.conflict-assigned {
+      border-color: #f0b35e;
+      box-shadow: inset 0 0 0 1px rgba(184, 98, 16, 0.18);
+      background: linear-gradient(180deg, #fff8ef, #fff1dd);
+    }
+
+    .img-card.unassigned {
+      border-color: #f0d28a;
+      box-shadow: inset 0 0 0 1px rgba(176, 129, 22, 0.14);
+      background: linear-gradient(180deg, #fffdf5, #fff7e6);
+    }
+
     .img-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 18px 34px rgba(28, 19, 17, 0.1);
@@ -785,18 +2175,21 @@
 
     .img-card img {
       width: 100%;
-      height: 120px;
+      height: 180px;
       object-fit: contain;
-      background: #f3efec;
-      border-radius: 10px;
+      background: linear-gradient(180deg, #faf8f7, #f0ebe8);
+      border-radius: 14px;
+      border: 1px solid rgba(35, 32, 32, 0.06);
+      padding: 10px;
+      box-sizing: border-box;
       display: block;
     }
 
     .img-meta {
-      margin-top: 8px;
-      font-size: 11px;
+      margin-top: 10px;
+      font-size: 12px;
       color: #56514f;
-      line-height: 1.35;
+      line-height: 1.45;
       word-break: break-word;
     }
 
@@ -814,6 +2207,18 @@
       background: #e8f8ef;
       color: #14653f;
       vertical-align: middle;
+    }
+
+    .img-badge.conflict {
+      border-color: #f0c07a;
+      background: #fff1db;
+      color: #9a5710;
+    }
+
+    .img-badge.warning {
+      border-color: #ecd48b;
+      background: #fff7de;
+      color: #8a6610;
     }
 
     .fallback {
@@ -1000,6 +2405,17 @@
     }
 
     @media (max-width: 1100px) {
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        height: auto;
+        min-height: 100vh;
+        grid-template-rows: none;
+        overflow: visible;
+      }
+
       .hero-head {
         flex-direction: column;
       }
@@ -1010,16 +2426,28 @@
         justify-content: flex-start;
       }
 
+      .topbar p {
+        display: block;
+      }
+
+      .hero-pills {
+        display: flex;
+      }
+
       .customer-brand {
         width: min(100%, 420px);
       }
 
       .topbar h1 {
         max-width: none;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
       }
 
       .workspace {
         grid-template-columns: 1fr;
+        height: auto;
       }
 
       .controls {
@@ -1041,6 +2469,10 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .review-metrics {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
       #pdfFrame {
         min-height: 460px;
         height: 58vh;
@@ -1057,9 +2489,48 @@
       .panel-body {
         overflow: visible;
       }
+
+      #pdfFrame {
+        flex: initial;
+      }
+
+      .review-hero,
+      .review-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .review-workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .cockpit-detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .position-detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .position-image-section {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 900px) {
+      .review-hero,
+      .review-grid,
+      .review-workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .review-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .cockpit-detail-grid {
+        grid-template-columns: 1fr;
+      }
+
       .section table {
         display: block;
         width: 100%;
@@ -1075,6 +2546,16 @@
       .img-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
+      .extract-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .extract-tab {
+        flex: 0 0 auto;
+      }
     }
 
     @media (max-width: 720px) {
@@ -1083,7 +2564,7 @@
       }
 
       .topbar {
-        padding: 18px 16px 16px;
+        padding: 14px 14px 16px;
         border-radius: 22px;
       }
 
@@ -1111,12 +2592,12 @@
       }
 
       .topbar h1 {
-        font-size: clamp(30px, 11vw, 46px);
+        font-size: clamp(24px, 9.5vw, 36px);
       }
 
       .topbar p {
-        font-size: 14px;
-        line-height: 1.58;
+        font-size: 13px;
+        line-height: 1.5;
       }
 
       .controls {
@@ -1193,6 +2674,59 @@
         font-size: 14px;
       }
 
+      .review-metrics {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .review-main,
+      .review-card {
+        border-radius: 18px;
+      }
+
+      .position-detail-card {
+        margin: 0 6px 8px;
+        padding: 12px;
+      }
+
+      .detail-meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .position-image-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .review-main h2 {
+        font-size: 20px;
+      }
+
+      .review-metric {
+        min-height: 92px;
+        padding: 12px;
+      }
+
+      .review-metric-value {
+        font-size: 24px;
+      }
+
+      .section-tools {
+        flex-direction: column;
+      }
+
+      .filter-tools {
+        width: 100%;
+      }
+
+      .filter-toggle,
+      .filter-select {
+        width: 100%;
+      }
+
+      .extract-tabs {
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+      }
+
       .small {
         font-size: 11px;
       }
@@ -1204,6 +2738,10 @@
     }
 
     @media (max-width: 560px) {
+      .review-metrics {
+        grid-template-columns: 1fr;
+      }
+
       .action-group {
         grid-template-columns: 1fr;
       }
@@ -1232,13 +2770,11 @@
     <div class="topbar">
       <div class="hero-head">
         <div class="hero-copy">
-          <div class="eyebrow">SR.SCHAURAUM</div>
-          <h1>Angebote und ABs. Schnell geprüft. Klar entschieden.</h1>
-          <p>Upload, strukturierte Extraktion, Summencheck, Bildzuordnung und Review in einer Oberfläche, die wie ein modernes Schauraum-Tool wirkt statt wie ein internes Backend.</p>
+          <h1>Angebote und Auftragsbestätigungen strukturiert prüfen</h1>
+          <p>Upload, Extraktion, Summenprüfung, Bildzuordnung und Ergebnisvalidierung in einer Oberfläche für die interne Bearbeitung und Freigabe.</p>
         </div>
         <div class="hero-aside">
           <div class="customer-brand">
-            <span class="customer-brand-label">SR.SCHAURAUM</span>
             <div class="customer-logo" role="img" aria-label="Kundenlogo">
               <svg width="142" height="47" viewBox="0 0 142 47" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clip-path="url(#clip0_339_2452)">
@@ -1300,7 +2836,7 @@
           <div class="hero-pills">
             <span class="hero-pill">Angebote</span>
             <span class="hero-pill">Auftragsbestätigungen</span>
-            <span class="hero-pill">Validierung + Export</span>
+            <span class="hero-pill">Prüfung und Export</span>
           </div>
         </div>
       </div>
@@ -1372,82 +2908,175 @@
       <section class="panel">
         <div class="panel-head">Extraktion</div>
         <div class="panel-body">
-          <div class="summary" id="summary"></div>
-
-          <div class="section">
-            <h2>LLM Run</h2>
-            <div class="small" id="llmRunInfo">Kein Lauf geladen.</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Feld</th>
-                  <th>Parser</th>
-                  <th>LLM</th>
-                  <th>Angewendet</th>
-                </tr>
-              </thead>
-              <tbody id="llmChangeRows"></tbody>
-            </table>
+          <div class="extract-tabs" id="extractTabs" role="tablist" aria-label="Extraktionsansichten">
+            <button class="extract-tab is-active" id="tabBtnOverview" type="button" role="tab" aria-selected="true" aria-controls="tabPaneOverview" data-extract-tab="overview">Cockpit</button>
+            <button class="extract-tab" id="tabBtnReview" type="button" role="tab" aria-selected="false" aria-controls="tabPaneReview" data-extract-tab="review">Review</button>
+            <button class="extract-tab" id="tabBtnItems" type="button" role="tab" aria-selected="false" aria-controls="tabPaneItems" data-extract-tab="items">Positionen</button>
+            <button class="extract-tab" id="tabBtnAudit" type="button" role="tab" aria-selected="false" aria-controls="tabPaneAudit" data-extract-tab="audit">Bilder</button>
+            <button class="extract-tab" id="tabBtnSources" type="button" role="tab" aria-selected="false" aria-controls="tabPaneSources" data-extract-tab="sources">Quellen</button>
           </div>
 
-          <div class="section">
-            <h2>Parser vs LLM Vergleich</h2>
-            <div class="small" id="compareInfo">Noch kein Vergleich geladen. Klick auf "Parser vs LLM aktualisieren".</div>
-            <div class="small compare-summary" id="compareSummary"></div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Feld</th>
-                  <th>Parser</th>
-                  <th>LLM</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="compareRows"></tbody>
-            </table>
+          <div class="extract-pane" id="tabPaneOverview" role="tabpanel" aria-labelledby="tabBtnOverview" data-extract-pane="overview">
+            <div class="extract-overview-shell">
+              <div class="review-shell">
+                <div class="review-hero">
+                  <div class="review-main" id="reviewHero"></div>
+                  <div class="review-metrics" id="reviewMetrics"></div>
+                </div>
+                <div class="summary" id="summary"></div>
+                <div class="review-grid">
+                  <div class="review-card">
+                    <h2>Arbeitsliste</h2>
+                    <div class="review-list" id="reviewHighlights"></div>
+                  </div>
+                  <div class="review-card">
+                    <h2>Pflicht- und Prüffelder</h2>
+                    <div class="review-list" id="fieldChecklist"></div>
+                  </div>
+                  <div class="review-card">
+                    <h2>Summenprüfung</h2>
+                    <div class="review-list" id="totalsAudit"></div>
+                  </div>
+                  <div class="review-card">
+                    <h2>Quellenlage</h2>
+                    <div class="review-list" id="sourceBreakdown"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="cockpit-detail-grid">
+                <div class="section">
+                  <h2>Dokumenthinweise</h2>
+                  <div class="review-list" id="documentIssueList"></div>
+                </div>
+                <div class="section">
+                  <h2>Betragszeilen</h2>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Typ</th>
+                        <th>Label</th>
+                        <th>Prozent</th>
+                        <th>Betrag</th>
+                        <th>Quelle</th>
+                      </tr>
+                    </thead>
+                    <tbody id="amountRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="section">
-            <h2>Betragszeilen</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Typ</th>
-                  <th>Label</th>
-                  <th>Prozent</th>
-                  <th>Betrag</th>
-                  <th>Quelle</th>
-                </tr>
-              </thead>
-              <tbody id="amountRows"></tbody>
-            </table>
+          <div class="extract-pane" id="tabPaneAudit" role="tabpanel" aria-labelledby="tabBtnAudit" data-extract-pane="audit" hidden>
+            <div class="section">
+              <h2>Bilder</h2>
+              <div class="small" id="imageHint">Konfliktbilder werden zuerst angezeigt. Rot/Orange = mehrfach final zugeordnet, Gelb = noch ohne finale Zuordnung, Grün = eindeutig zugeordnet. Nicht browserfähige Formate wie JP2/JPX werden serverseitig als PNG-Vorschau ausgeliefert.</div>
+              <div class="img-grid" id="imageGrid"></div>
+            </div>
           </div>
 
-          <div class="section">
-            <h2>Positionen</h2>
-            <div class="small">Aktuell sind Positionen parserbasiert; die Quellenanzeige ist fuer kuenftige LLM-Positionen vorbereitet.</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Pos</th>
-                  <th>LV</th>
-                  <th>Menge</th>
-                  <th>Text</th>
-                  <th>Einzel</th>
-                  <th>Gesamt</th>
-                  <th>Seite</th>
-                  <th>Bilder</th>
-                  <th>Quelle</th>
-                </tr>
-              </thead>
-              <tbody id="itemRows"></tbody>
-            </table>
+          <div class="extract-pane" id="tabPaneReview" role="tabpanel" aria-labelledby="tabBtnReview" data-extract-pane="review" hidden>
+            <div class="review-workbench">
+              <div class="review-workbench-sidebar">
+                <div class="review-card">
+                  <h2>Review-Status</h2>
+                  <div class="review-list" id="reviewTaskSummary"></div>
+                </div>
+                <div class="review-card">
+                  <h2>Filter</h2>
+                  <div class="review-filter-tools">
+                    <select id="reviewTaskFilter" class="filter-select" aria-label="Review-Aufgaben filtern">
+                      <option value="all">Alle Punkte</option>
+                      <option value="error">Nur Fehler</option>
+                      <option value="warning">Nur Warnungen</option>
+                      <option value="image">Nur Bilder</option>
+                      <option value="document">Nur Dokument</option>
+                      <option value="item">Nur Positionen</option>
+                    </select>
+                    <div class="small" id="reviewTaskMeta">Noch keine Review-Aufgaben.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="review-workbench-main">
+                <div class="section">
+                  <h2>Offene Punkte</h2>
+                  <div class="review-task-list" id="reviewTaskList"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="section">
-            <h2>Bilder</h2>
-            <div class="small" id="imageHint">Thumbnails nach Seite gruppiert. Gruener Rahmen + Badge "LLM Match" = vom LLM den Positionen zugeordnet. Bei JP2 kann der Browser evtl. keine Vorschau anzeigen.</div>
-            <div class="img-grid" id="imageGrid"></div>
+          <div class="extract-pane" id="tabPaneItems" role="tabpanel" aria-labelledby="tabBtnItems" data-extract-pane="items" hidden>
+            <div class="section">
+              <h2>Positionen</h2>
+              <div class="section-tools">
+                <div class="small" id="itemFilterInfo">Alle Positionen werden angezeigt.</div>
+                <div class="filter-tools">
+                  <label class="filter-toggle" for="itemIssuesOnly">
+                    <input id="itemIssuesOnly" type="checkbox">
+                    Nur Auffällige
+                  </label>
+                  <select id="itemSourceFilter" class="filter-select" aria-label="Positionsquelle filtern">
+                    <option value="all">Alle Quellen</option>
+                    <option value="parser">Nur Parser</option>
+                    <option value="llm">Nur LLM</option>
+                  </select>
+                </div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Pos</th>
+                    <th>LV</th>
+                    <th>Menge</th>
+                    <th>Text</th>
+                    <th>Einzel</th>
+                    <th>Gesamt</th>
+                    <th>Seite</th>
+                    <th>Bilder</th>
+                    <th>Prüfung</th>
+                    <th>Quelle</th>
+                  </tr>
+                </thead>
+                <tbody id="itemRows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="extract-pane" id="tabPaneSources" role="tabpanel" aria-labelledby="tabBtnSources" data-extract-pane="sources" hidden>
+            <div class="section">
+              <h2>LLM Run</h2>
+              <div class="small" id="llmRunInfo">Kein Lauf geladen.</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Feld</th>
+                    <th>Parser</th>
+                    <th>LLM</th>
+                    <th>Angewendet</th>
+                  </tr>
+                </thead>
+                <tbody id="llmChangeRows"></tbody>
+              </table>
+            </div>
+
+            <div class="section">
+              <h2>Parser vs LLM Vergleich</h2>
+              <div class="small" id="compareInfo">Noch kein Vergleich geladen. Klick auf "Parser vs LLM aktualisieren".</div>
+              <div class="small compare-summary" id="compareSummary"></div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Feld</th>
+                    <th>Parser</th>
+                    <th>LLM</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="compareRows"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -1468,6 +3097,11 @@
     </div>
   </div>
 
+  <div class="image-hover-preview" id="imageHoverPreview" hidden>
+    <img id="imageHoverPreviewImg" alt="Bildvorschau">
+    <div class="image-hover-preview-meta" id="imageHoverPreviewMeta"></div>
+  </div>
+
   <script>
     const state = {
       documentId: null,
@@ -1486,9 +3120,19 @@
       processingHeartbeatAtMs: 0,
       processingMode: null,
       processingLastProgressKey: null,
+      itemFilters: {
+        issuesOnly: false,
+        source: "all",
+      },
+      reviewFilter: "all",
+      activeExtractTab: "overview",
+      expandedItemKeys: new Set(),
+      topbarCollapsed: false,
     };
 
     const ui = {
+      app: document.querySelector(".app"),
+      topbar: document.querySelector(".topbar"),
       docSelect: document.getElementById("docSelect"),
       uploadInput: document.getElementById("uploadInput"),
       uploadBtn: document.getElementById("uploadBtn"),
@@ -1510,6 +3154,20 @@
       clearDebugBtn: document.getElementById("clearDebugBtn"),
       debugLog: document.getElementById("debugLog"),
       pdfFrame: document.getElementById("pdfFrame"),
+      reviewHero: document.getElementById("reviewHero"),
+      reviewMetrics: document.getElementById("reviewMetrics"),
+      reviewHighlights: document.getElementById("reviewHighlights"),
+      fieldChecklist: document.getElementById("fieldChecklist"),
+      totalsAudit: document.getElementById("totalsAudit"),
+      sourceBreakdown: document.getElementById("sourceBreakdown"),
+      documentIssueList: document.getElementById("documentIssueList"),
+      reviewTaskSummary: document.getElementById("reviewTaskSummary"),
+      reviewTaskFilter: document.getElementById("reviewTaskFilter"),
+      reviewTaskMeta: document.getElementById("reviewTaskMeta"),
+      reviewTaskList: document.getElementById("reviewTaskList"),
+      extractTabs: Array.from(document.querySelectorAll("[data-extract-tab]")),
+      extractPanes: Array.from(document.querySelectorAll("[data-extract-pane]")),
+      extractPanelBody: document.querySelector(".panel-body"),
       summary: document.getElementById("summary"),
       llmRunInfo: document.getElementById("llmRunInfo"),
       llmChangeRows: document.getElementById("llmChangeRows"),
@@ -1518,7 +3176,13 @@
       compareRows: document.getElementById("compareRows"),
       amountRows: document.getElementById("amountRows"),
       itemRows: document.getElementById("itemRows"),
+      itemIssuesOnly: document.getElementById("itemIssuesOnly"),
+      itemSourceFilter: document.getElementById("itemSourceFilter"),
+      itemFilterInfo: document.getElementById("itemFilterInfo"),
       imageGrid: document.getElementById("imageGrid"),
+      imageHoverPreview: document.getElementById("imageHoverPreview"),
+      imageHoverPreviewImg: document.getElementById("imageHoverPreviewImg"),
+      imageHoverPreviewMeta: document.getElementById("imageHoverPreviewMeta"),
       previewModal: document.getElementById("previewModal"),
       previewTitle: document.getElementById("previewTitle"),
       previewContent: document.getElementById("previewContent"),
@@ -1532,6 +3196,35 @@
       llm_override: "LLM override",
       llm_only: "LLM only",
     };
+    const REVIEW_FIELD_LABELS = {
+      supplier_name: "Lieferant",
+      document_type: "Dokumenttyp",
+      offer_reference: "AB-Referenz",
+      document_number: "Dokumentnummer",
+      document_date: "Datum",
+      currency: "Währung",
+      gross_total: "Brutto",
+      project_ref: "Projekt",
+      net_total: "Netto",
+      vat_total: "MwSt",
+    };
+    const REVIEW_SCOPE_LABELS = {
+      document: "Dokument",
+      item: "Position",
+      image: "Bild",
+    };
+    const REVIEW_FIELD_SOURCE_KEYS = {
+      supplier_name: "supplier_name",
+      document_type: "document_type",
+      offer_reference: "offer_reference",
+      document_number: "document_number",
+      document_date: "document_date",
+      project_ref: "project_ref",
+      currency: "currency",
+      gross_total: "totals.gross_total",
+      net_total: "totals.net_total",
+      vat_total: "totals.vat_total",
+    };
 
     function setStatus(text, level = "info") {
       ui.statusBar.textContent = text;
@@ -1544,6 +3237,45 @@
 
     function fmt(value, fallback = "-") {
       if (value === null || value === undefined || value === "") return fallback;
+      return String(value);
+    }
+
+    function formatQuantity(value, fallback = "-") {
+      if (value === null || value === undefined || value === "") return fallback;
+      const raw = String(value).trim();
+      if (!raw) return fallback;
+      if (!/^-?\d+(?:[.,]\d+)?$/.test(raw)) return raw;
+      const normalized = raw.replace(",", ".");
+      const negative = normalized.startsWith("-") ? "-" : "";
+      const unsigned = negative ? normalized.slice(1) : normalized;
+      const [whole, fractionRaw = ""] = unsigned.split(".");
+      const fraction = fractionRaw.replace(/0+$/, "");
+      if (!fraction) return `${negative}${whole}`;
+      return `${negative}${whole},${fraction}`;
+    }
+
+    function formatDate(value, fallback = "-") {
+      if (value === null || value === undefined || value === "") return fallback;
+      const raw = String(value).trim();
+      if (!raw) return fallback;
+      const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoMatch) {
+        return `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
+      }
+      const dotMatch = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dotMatch) {
+        const day = dotMatch[1].padStart(2, "0");
+        const month = dotMatch[2].padStart(2, "0");
+        return `${day}.${month}.${dotMatch[3]}`;
+      }
+      return raw;
+    }
+
+    function formatDocumentType(value, fallback = "-") {
+      const raw = String(value || "").trim().toLowerCase();
+      if (!raw) return fallback;
+      if (raw === "angebot") return "Angebot";
+      if (raw === "auftragsbestaetigung") return "Auftragsbestätigung";
       return String(value);
     }
 
@@ -1776,6 +3508,8 @@
     function deriveFieldSources(llmRun) {
       const keys = [
         "supplier_name",
+        "document_type",
+        "offer_reference",
         "document_number",
         "document_date",
         "project_ref",
@@ -1824,17 +3558,25 @@
     function syncFieldSources() {
       state.fieldSources = deriveFieldSources(state.llmRun);
       if (state.result) {
+        renderReview(state.result);
+        renderDocumentIssues(state.result);
+        renderReviewWorkbench(state.result);
         renderSummary(state.result);
         renderAmountLines(state.result.amount_lines || []);
+        renderLineItems(state.result.line_items || []);
       }
     }
 
-    function createSummaryCard(label, value, sourceKey = null) {
+    function requiredLabelHtml(label) {
+      return `${escapeHtml(label)}<span class="required-marker" aria-hidden="true">*</span>`;
+    }
+
+    function createSummaryCard(label, value, sourceKey = null, options = {}) {
       const card = document.createElement("div");
       card.className = "card";
       const labelEl = document.createElement("div");
       labelEl.className = "label";
-      labelEl.textContent = label;
+      labelEl.innerHTML = options.required ? requiredLabelHtml(label) : escapeHtml(label);
       const valueEl = document.createElement("div");
       valueEl.className = "value";
       const valueText = document.createElement("span");
@@ -1849,6 +3591,729 @@
       card.appendChild(labelEl);
       card.appendChild(valueEl);
       return card;
+    }
+
+    function setExtractTab(nextTab) {
+      state.activeExtractTab = nextTab || "overview";
+      for (const button of ui.extractTabs) {
+        const tab = String(button.dataset.extractTab || "");
+        const active = tab === state.activeExtractTab;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      }
+      for (const pane of ui.extractPanes) {
+        const tab = String(pane.dataset.extractPane || "");
+        pane.hidden = tab !== state.activeExtractTab;
+      }
+    }
+
+    function desktopShellActive() {
+      return window.innerWidth > 1100;
+    }
+
+    function setTopbarCollapsed(nextCollapsed) {
+      const active = desktopShellActive() && !!nextCollapsed;
+      state.topbarCollapsed = active;
+      if (ui.topbar) {
+        ui.topbar.classList.toggle("is-collapsed", active);
+      }
+    }
+
+    function syncTopbarCollapse() {
+      if (!desktopShellActive()) {
+        setTopbarCollapsed(false);
+        return;
+      }
+      const scrollTop = ui.extractPanelBody ? ui.extractPanelBody.scrollTop : 0;
+      setTopbarCollapsed(scrollTop > 18);
+    }
+
+    function wheelDeltaToPixels(event) {
+      if (!(event instanceof WheelEvent)) return 0;
+      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 18;
+      if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * window.innerHeight * 0.85;
+      return event.deltaY;
+    }
+
+    function forwardTopbarWheel(event) {
+      if (!desktopShellActive() || !ui.extractPanelBody) return;
+      const topbar = ui.topbar;
+      if (!(topbar instanceof Element) || !topbar.contains(event.target)) return;
+      const wheelTarget = event.target instanceof Element ? event.target : null;
+      if (wheelTarget && wheelTarget.closest(".debug-log")) return;
+      const deltaY = wheelDeltaToPixels(event);
+      if (!deltaY) return;
+      event.preventDefault();
+      ui.extractPanelBody.scrollTop += deltaY;
+      syncTopbarCollapse();
+    }
+
+    function positionItemKey(item, index = 0) {
+      const parts = [
+        fmt(item && item.position_no, ""),
+        fmt(item && item.lv_pos, ""),
+        fmt(item && item.page_ref, ""),
+        fmt(item && item.description_short, ""),
+      ].map((value) => String(value || "").trim());
+      const joined = parts.filter(Boolean).join("|");
+      return joined || `row:${index}`;
+    }
+
+    function detailMetaCellHtml(label, value) {
+      return `
+        <div class="detail-meta-cell">
+          <span class="detail-meta-label">${escapeHtml(label)}</span>
+          <div class="detail-meta-value">${escapeHtml(fmt(value))}</div>
+        </div>
+      `;
+    }
+
+    function renderDocumentIssues(result) {
+      clearNode(ui.documentIssueList);
+      if (!result || typeof result !== "object") {
+        ui.documentIssueList.innerHTML = `<div class="review-empty">Noch keine Dokumenthinweise verfügbar.</div>`;
+        return;
+      }
+
+      const validation = (result.validation && typeof result.validation === "object") ? result.validation : {};
+      const issues = Array.isArray(validation.document_issues) ? validation.document_issues : [];
+      const confidence = validation.confidence_policy || {};
+
+      const rows = [];
+      if (confidence && confidence.status) {
+        const confidenceKind = confidence.status === "auto_accept"
+          ? "ok"
+          : (confidence.status === "review" ? "review" : (confidence.status === "reject" ? "err" : "neutral"));
+        rows.push(
+          reviewRowHtml(
+            "Confidence-Einstufung",
+            confidence.value !== undefined && confidence.value !== null
+              ? `Parse-Confidence ${fmt(confidence.value)}`
+              : "Keine Confidence verfügbar",
+            reviewFlagHtml(fmt(confidence.status), confidenceKind)
+          )
+        );
+      }
+
+      for (const issue of issues) {
+        const severity = String(issue && issue.severity || "");
+        const kind = severity === "error" ? "err" : (severity === "warning" ? "review" : "neutral");
+        const fieldLabel = issue && issue.field ? (REVIEW_FIELD_LABELS[issue.field] || issue.field) : "Dokument";
+        rows.push(
+          reviewRowHtml(
+            `${fieldLabel}`,
+            fmt(issue && issue.message),
+            reviewFlagHtml(severity || "hinweis", kind)
+          )
+        );
+      }
+
+      if (!rows.length) {
+        ui.documentIssueList.innerHTML = `<div class="review-empty">Keine zusätzlichen Dokumenthinweise.</div>`;
+        return;
+      }
+      ui.documentIssueList.innerHTML = rows.join("");
+    }
+
+    function reviewStatusMeta(status) {
+      if (status === "auto_accept") {
+        return {
+          label: "Freigabe möglich",
+          css: "auto-accept",
+          note: "Keine fachlichen Prüfhinweise aus der aktuellen Validierung.",
+        };
+      }
+      if (status === "manual_checked") {
+        return {
+          label: "Manuell geprüft",
+          css: "auto-accept",
+          note: "Offene Warnungen wurden manuell geprüft und bestätigt.",
+        };
+      }
+      if (status === "review") {
+        return {
+          label: "Prüfung erforderlich",
+          css: "review",
+          note: "Es liegen Hinweise vor, die vor der Freigabe geprüft werden sollten.",
+        };
+      }
+      if (status === "reject") {
+        return {
+          label: "Nicht freigabefähig",
+          css: "reject",
+          note: "Es liegen Fehler vor, die vor einer Freigabe korrigiert werden müssen.",
+        };
+      }
+      return {
+        label: "Noch nicht bewertet",
+        css: "unknown",
+        note: "Für dieses Dokument liegt noch keine verwertbare Validierung vor.",
+      };
+    }
+
+    function reviewFlagHtml(label, kind = "neutral") {
+      return `<span class="review-flag ${escapeHtml(kind)}">${escapeHtml(label)}</span>`;
+    }
+
+    function countPresent(fields) {
+      return Object.values(fields || {}).filter(Boolean).length;
+    }
+
+    function reviewFieldValue(document, fieldName) {
+      if (!document || typeof document !== "object") return "-";
+      if (fieldName === "document_type") return formatDocumentType(document.document_type);
+      if (fieldName === "offer_reference") return fmt(document.offer_reference);
+      if (fieldName === "document_date") return formatDate(document.document_date);
+      if (fieldName === "gross_total") return euro(document.gross_total);
+      if (fieldName === "net_total") return euro(document.net_total);
+      if (fieldName === "vat_total") return euro(document.vat_total);
+      return fmt(document[fieldName]);
+    }
+
+    function validationBooleanFlag(value) {
+      if (value === true) return { label: "ok", kind: "ok" };
+      if (value === false) return { label: "abweichung", kind: "err" };
+      return { label: "offen", kind: "neutral" };
+    }
+
+    function buildSourceBreakdown(result) {
+      const document = (result && result.document) || {};
+      const headKeys = [
+        "supplier_name",
+        "document_type",
+        ...(String(document.document_type || "").toLowerCase() === "auftragsbestaetigung" ? ["offer_reference"] : []),
+        "document_number",
+        "document_date",
+        "project_ref",
+        "currency",
+      ];
+      const totalKeys = ["totals.net_total", "totals.vat_total", "totals.gross_total"];
+      const headCounts = { parser: 0, llm: 0, unknown: 0 };
+      const totalCounts = { parser: 0, llm: 0, unknown: 0 };
+      const itemCounts = { parser: 0, llm: 0, unknown: 0 };
+
+      for (const key of headKeys) {
+        const source = state.fieldSources[key] || "unknown";
+        headCounts[source] = (headCounts[source] || 0) + 1;
+      }
+      for (const key of totalKeys) {
+        const source = state.fieldSources[key] || "unknown";
+        totalCounts[source] = (totalCounts[source] || 0) + 1;
+      }
+      for (const item of (result.line_items || [])) {
+        const source = lineItemSource(item);
+        itemCounts[source] = (itemCounts[source] || 0) + 1;
+      }
+
+      const llmChanges = Array.isArray(state.llmRun && state.llmRun.changes)
+        ? state.llmRun.changes.filter((item) => item && item.applied).length
+        : 0;
+      return {
+        documentNumber: fmt(document.document_number),
+        headCounts,
+        totalCounts,
+        itemCounts,
+        llmChanges,
+      };
+    }
+
+    function itemOpenIssues(item) {
+      if (Array.isArray(item && item.validation_open_issues)) return item.validation_open_issues;
+      if (Array.isArray(item && item.validation_issues)) return item.validation_issues;
+      return [];
+    }
+
+    function itemResolvedIssues(item) {
+      if (Array.isArray(item && item.validation_resolved_issues)) return item.validation_resolved_issues;
+      return [];
+    }
+
+    function itemHasOpenErrors(item) {
+      return itemOpenIssues(item).some((issue) => String(issue && issue.severity || "") === "error");
+    }
+
+    function itemHasOpenWarnings(item) {
+      return itemOpenIssues(item).some((issue) => String(issue && issue.severity || "") === "warning");
+    }
+
+    function itemCanBeManuallyChecked(item) {
+      return itemHasOpenWarnings(item) && !itemHasOpenErrors(item);
+    }
+
+    function reviewRowHtml(title, sub, metaHtml = "", options = {}) {
+      const titleHtml = options.required ? requiredLabelHtml(title) : escapeHtml(title);
+      return `
+        <div class="review-row">
+          <div class="review-row-main">
+            <div class="review-row-title">${titleHtml}</div>
+            <div class="review-row-sub">${escapeHtml(sub)}</div>
+          </div>
+          <div class="review-row-meta">${metaHtml}</div>
+        </div>
+      `;
+    }
+
+    function reviewTaskSeverityMeta(severity) {
+      if (severity === "error") return { label: "Fehler", css: "error" };
+      if (severity === "warning") return { label: "Warnung", css: "warning" };
+      return { label: "Info", css: "info" };
+    }
+
+    function reviewTaskActionHtml(label, action, extra = {}) {
+      const attrs = Object.entries(extra)
+        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .map(([key, value]) => `data-${key}="${escapeHtml(String(value))}"`)
+        .join(" ");
+      const classNames = ["review-task-action"];
+      if (extra.primary) classNames.push("primary");
+      if (extra.subtle) classNames.push("subtle");
+      if (extra.warning) classNames.push("warning");
+      return `<button type="button" class="${classNames.join(" ")}" data-review-action="${escapeHtml(action)}" ${attrs}>${escapeHtml(label)}</button>`;
+    }
+
+    function buildReviewTasks(result) {
+      const tasks = [];
+      if (!result || typeof result !== "object") return tasks;
+
+      const document = result.document || {};
+      const validation = (result.validation && typeof result.validation === "object") ? result.validation : {};
+      const documentIssues = Array.isArray(validation.document_issues) ? validation.document_issues : [];
+      const lineItems = Array.isArray(result.line_items) ? result.line_items : [];
+
+      documentIssues.forEach((issue, index) => {
+        const fieldLabel = issue && issue.field ? (REVIEW_FIELD_LABELS[issue.field] || issue.field) : "Dokument";
+        tasks.push({
+          id: `doc-${index}-${String(issue && issue.code || "issue")}`,
+          severity: String(issue && issue.severity || "warning"),
+          category: "document",
+          title: fieldLabel,
+          description: fmt(issue && issue.message),
+          meta: document.document_number ? `Dokument ${fmt(document.document_number)}` : "Dokumenthinweis",
+          actions: [
+            reviewTaskActionHtml("Zum Cockpit", "open-overview", { target: "documentIssueList", primary: true }),
+          ],
+        });
+      });
+
+      lineItems.forEach((item, index) => {
+        const itemKey = positionItemKey(item, index);
+        const lineItemId = Number(item && item.id);
+        const issues = itemOpenIssues(item);
+        const positionLabel = fmt(item.position_no, `#${fmt(item.id)}`);
+        const pageLabel = item.page_ref ? `Seite ${fmt(item.page_ref)}` : "Seite -";
+        const descriptionLabel = fmt(item.description_short, "-");
+        const canBeChecked = itemCanBeManuallyChecked(item);
+
+        issues.forEach((issue, issueIndex) => {
+          const fieldLabel = issue && issue.field ? (REVIEW_FIELD_LABELS[issue.field] || issue.field) : "Position";
+          const code = String(issue && issue.code || "");
+          const imageRelated = code.includes("image") || String(issue && issue.field || "") === "image_ids";
+          const actions = [
+            reviewTaskActionHtml("Zur Position", "open-item", { item_key: itemKey, primary: true }),
+            imageRelated ? reviewTaskActionHtml("Bilder", "open-audit", { item_key: itemKey }) : "",
+            imageRelated && Number.isFinite(lineItemId)
+              ? reviewTaskActionHtml("Kein Bild", "clear-image", { line_item_id: lineItemId, warning: true })
+              : "",
+            canBeChecked && Number.isFinite(lineItemId)
+              ? reviewTaskActionHtml("Als geprüft markieren", "mark-reviewed", { line_item_id: lineItemId, subtle: true })
+              : "",
+            item.review_checked && Number.isFinite(lineItemId)
+              ? reviewTaskActionHtml("Prüfung zurücksetzen", "clear-reviewed", { line_item_id: lineItemId })
+              : "",
+          ].filter(Boolean);
+          tasks.push({
+            id: `item-${itemKey}-${issueIndex}`,
+            severity: String(issue && issue.severity || "warning"),
+            category: imageRelated ? "image" : "item",
+            title: `Pos. ${positionLabel} · ${fieldLabel}`,
+            description: fmt(issue && issue.message),
+            meta: `${pageLabel} · ${descriptionLabel}`,
+            actions,
+          });
+        });
+      });
+
+      const severityRank = { error: 0, warning: 1, info: 2 };
+      const categoryRank = { document: 0, image: 1, item: 2 };
+      tasks.sort((left, right) => {
+        const severityDiff = (severityRank[left.severity] ?? 9) - (severityRank[right.severity] ?? 9);
+        if (severityDiff) return severityDiff;
+        const categoryDiff = (categoryRank[left.category] ?? 9) - (categoryRank[right.category] ?? 9);
+        if (categoryDiff) return categoryDiff;
+        return String(left.title || "").localeCompare(String(right.title || ""), "de");
+      });
+
+      return tasks;
+    }
+
+    function renderReviewWorkbench(result) {
+      clearNode(ui.reviewTaskSummary);
+      clearNode(ui.reviewTaskList);
+
+      if (!result || typeof result !== "object") {
+        ui.reviewTaskSummary.innerHTML = `<div class="review-empty">Noch keine Review-Daten verfügbar.</div>`;
+        ui.reviewTaskList.innerHTML = `<div class="review-empty">Noch keine offenen Punkte vorhanden.</div>`;
+        if (ui.reviewTaskMeta) ui.reviewTaskMeta.textContent = "Noch keine Review-Aufgaben.";
+        return;
+      }
+
+      const tasks = buildReviewTasks(result);
+      const filter = ui.reviewTaskFilter ? String(ui.reviewTaskFilter.value || state.reviewFilter || "all") : "all";
+      state.reviewFilter = filter;
+      const filteredTasks = tasks.filter((task) => {
+        if (filter === "all") return true;
+        if (filter === "error") return task.severity === "error";
+        if (filter === "warning") return task.severity === "warning";
+        if (filter === "image") return task.category === "image";
+        if (filter === "document") return task.category === "document";
+        if (filter === "item") return task.category === "item";
+        return true;
+      });
+
+      const errorCount = tasks.filter((task) => task.severity === "error").length;
+      const warningCount = tasks.filter((task) => task.severity === "warning").length;
+      const imageCount = tasks.filter((task) => task.category === "image").length;
+      const documentCount = tasks.filter((task) => task.category === "document").length;
+
+      ui.reviewTaskSummary.innerHTML = [
+        reviewRowHtml("Fehler", `${errorCount} blockierende Punkte`, reviewFlagHtml(String(errorCount), errorCount ? "err" : "ok")),
+        reviewRowHtml("Warnungen", `${warningCount} offene Prüfpunkte`, reviewFlagHtml(String(warningCount), warningCount ? "review" : "ok")),
+        reviewRowHtml("Bildthemen", `${imageCount} Aufgaben zur Bildprüfung`, reviewFlagHtml(String(imageCount), imageCount ? "review" : "ok")),
+        reviewRowHtml("Dokumentthemen", `${documentCount} Aufgaben auf Dokumentebene`, reviewFlagHtml(String(documentCount), documentCount ? "review" : "ok")),
+      ].join("");
+
+      if (ui.reviewTaskMeta) {
+        ui.reviewTaskMeta.textContent = `${filteredTasks.length}/${tasks.length} Aufgaben sichtbar`;
+      }
+
+      if (!filteredTasks.length) {
+        ui.reviewTaskList.innerHTML = `<div class="review-empty">Keine offenen Punkte für den aktuellen Filter.</div>`;
+        return;
+      }
+
+      ui.reviewTaskList.innerHTML = filteredTasks.map((task) => {
+        const severityMeta = reviewTaskSeverityMeta(task.severity);
+        const scopeLabel = REVIEW_SCOPE_LABELS[task.category] || "Hinweis";
+        return `
+          <article class="review-task-card severity-${escapeHtml(task.severity)}">
+            <div class="review-task-head">
+              <div class="review-task-badges">
+                <span class="review-task-badge ${escapeHtml(severityMeta.css)}">${escapeHtml(severityMeta.label)}</span>
+                <span class="review-task-badge scope">${escapeHtml(scopeLabel)}</span>
+              </div>
+              <div class="review-task-meta">${escapeHtml(fmt(task.meta, ""))}</div>
+            </div>
+            <div class="review-task-title">${escapeHtml(task.title)}</div>
+            <p class="review-task-text">${escapeHtml(task.description)}</p>
+            <div class="review-task-actions">${(task.actions || []).join("")}</div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function scrollIntoViewSoon(node) {
+      if (!(node instanceof Element)) return;
+      window.requestAnimationFrame(() => {
+        node.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+
+    function openOverviewTarget(targetId) {
+      setExtractTab("overview");
+      const target = document.getElementById(String(targetId || ""));
+      if (target) scrollIntoViewSoon(target);
+    }
+
+    function openItemTarget(itemKey) {
+      if (!state.result || !itemKey) return;
+      setExtractTab("items");
+      if (ui.itemIssuesOnly) ui.itemIssuesOnly.checked = false;
+      if (ui.itemSourceFilter) ui.itemSourceFilter.value = "all";
+      state.expandedItemKeys.add(String(itemKey));
+      renderLineItems(state.result.line_items || []);
+      const rows = Array.from(ui.itemRows.querySelectorAll("tr.position-row"));
+      const target = rows.find((row) => row.dataset.itemKey === String(itemKey));
+      if (target) scrollIntoViewSoon(target);
+    }
+
+    function openAuditTarget(itemKey) {
+      setExtractTab("audit");
+      const firstAssigned = (Array.isArray(state.result && state.result.line_items) ? state.result.line_items : [])
+        .find((item, index) => positionItemKey(item, index) === String(itemKey));
+      if (!firstAssigned) {
+        scrollIntoViewSoon(ui.imageGrid);
+        return;
+      }
+      const imageIds = uniqueImageIds(firstAssigned.image_ids).concat(candidateOnlyImageIds(firstAssigned));
+      const cards = Array.from(ui.imageGrid.querySelectorAll("[data-image-id]"));
+      const target = cards.find((card) => imageIds.includes(Number(card.getAttribute("data-image-id"))));
+      scrollIntoViewSoon(target || ui.imageGrid);
+    }
+
+    function renderReview(result) {
+      clearNode(ui.reviewHero);
+      clearNode(ui.reviewMetrics);
+      clearNode(ui.reviewHighlights);
+      clearNode(ui.fieldChecklist);
+      clearNode(ui.totalsAudit);
+      clearNode(ui.sourceBreakdown);
+      renderReviewWorkbench(result);
+
+      if (!result || typeof result !== "object") {
+        ui.reviewHero.innerHTML = `
+          <span class="review-status-badge unknown">Keine Daten</span>
+          <h2>Keine Extraktion geladen</h2>
+          <p>Nach der Auswahl oder Verarbeitung eines Dokuments erscheinen hier Status, Prüfhinweise und Quellenlage.</p>
+        `;
+        ui.reviewMetrics.innerHTML = `
+          <div class="review-metric"><div class="review-metric-label">Pflichtfelder</div><div class="review-metric-value">-</div><div class="review-metric-note">Noch kein Dokument geladen</div></div>
+          <div class="review-metric"><div class="review-metric-label">Fehler</div><div class="review-metric-value">-</div><div class="review-metric-note">Noch kein Dokument geladen</div></div>
+          <div class="review-metric"><div class="review-metric-label">Warnungen</div><div class="review-metric-value">-</div><div class="review-metric-note">Noch kein Dokument geladen</div></div>
+          <div class="review-metric"><div class="review-metric-label">Offene Positionen</div><div class="review-metric-value">-</div><div class="review-metric-note">Noch kein Dokument geladen</div></div>
+          <div class="review-metric"><div class="review-metric-label">Bildabdeckung</div><div class="review-metric-value">-</div><div class="review-metric-note">Noch kein Dokument geladen</div></div>
+          <div class="review-metric"><div class="review-metric-label">Bildkonflikte</div><div class="review-metric-value">-</div><div class="review-metric-note">Noch kein Dokument geladen</div></div>
+        `;
+        ui.reviewHighlights.innerHTML = `<div class="review-empty">Noch keine Prüfhinweise.</div>`;
+        ui.fieldChecklist.innerHTML = `<div class="review-empty">Noch keine Feldbewertung verfügbar.</div>`;
+        ui.totalsAudit.innerHTML = `<div class="review-empty">Noch keine Summenprüfung verfügbar.</div>`;
+        ui.sourceBreakdown.innerHTML = `<div class="review-empty">Noch keine Quellenübersicht verfügbar.</div>`;
+        return;
+      }
+
+      const document = result.document || {};
+      const validation = (result.validation && typeof result.validation === "object") ? result.validation : {};
+      const required = validation.required_fields || {};
+      const recommended = validation.recommended_fields || {};
+      const totals = validation.totals || {};
+      const lineSummary = validation.line_item_summary || {};
+      const imageSummary = validation.image_summary || {};
+      const statusMeta = reviewStatusMeta(validation.status);
+      const sourceSummary = buildSourceBreakdown(result);
+
+      const requiredPresent = countPresent(required);
+      const requiredTotal = Object.keys(required).length;
+      const lineTotal = Number(lineSummary.total || (result.line_items || []).length || 0);
+      const lineWithIssues = Number(lineSummary.with_issues || 0);
+      const resolvedWarningCount = Number(lineSummary.resolved_warning_count || 0);
+      const manualCheckedCount = Number(lineSummary.manual_checked_count || 0);
+      const imageTotal = Number(imageSummary.total || (result.images || []).length || 0);
+      const duplicateImageAssignments = Number(imageSummary.assigned_duplicate_count || 0);
+      const lineItems = Array.isArray(result.line_items) ? result.line_items : [];
+      const itemsWithImages = lineItems.filter((item) => Number(item.image_count || 0) > 0).length;
+      const docErrorCount = Number(validation.error_count || 0);
+      const docWarningCount = Number(validation.warning_count || 0);
+      const requiredMetricClass = validation.missing_required_fields && validation.missing_required_fields.length
+        ? "metric-err"
+        : requiredTotal
+          ? "metric-ok"
+          : "";
+      const errorMetricClass = docErrorCount > 0 ? "metric-err" : "metric-ok";
+      const warningMetricClass = docWarningCount > 0 ? "metric-review" : "metric-ok";
+      const openMetricClass = lineWithIssues > 0 ? "metric-review" : "metric-ok";
+      const coverageMetricClass = lineTotal > 0
+        ? (itemsWithImages < lineTotal ? "metric-review" : "metric-ok")
+        : "";
+      const duplicateMetricClass = lineTotal > 0
+        ? (duplicateImageAssignments > 0 ? "metric-err" : "metric-ok")
+        : "";
+
+      ui.reviewHero.innerHTML = `
+        <span class="review-status-badge ${escapeHtml(statusMeta.css)}">${escapeHtml(statusMeta.label)}</span>
+        <h2>Dokument #${escapeHtml(fmt(document.id))}${document.document_number ? ` · ${escapeHtml(fmt(document.document_number))}` : ""}</h2>
+        <p>${escapeHtml(statusMeta.note)}</p>
+      `;
+
+      ui.reviewMetrics.innerHTML = `
+        <div class="review-metric is-actionable ${requiredMetricClass}" data-review-jump="review" data-review-filter="all">
+          <div class="review-metric-label">Pflichtfelder</div>
+          <div class="review-metric-value">${requiredPresent}/${requiredTotal || 0}</div>
+          <div class="review-metric-note">${validation.missing_required_fields && validation.missing_required_fields.length ? `Fehlend: ${validation.missing_required_fields.map((field) => REVIEW_FIELD_LABELS[field] || field).join(", ")}` : "Vollständig"}</div>
+        </div>
+        <div class="review-metric is-actionable ${errorMetricClass}" data-review-jump="review" data-review-filter="error">
+          <div class="review-metric-label">Fehler</div>
+          <div class="review-metric-value">${docErrorCount}</div>
+          <div class="review-metric-note">Blockierende fachliche Abweichungen</div>
+        </div>
+        <div class="review-metric is-actionable ${warningMetricClass}" data-review-jump="review" data-review-filter="warning">
+          <div class="review-metric-label">Warnungen</div>
+          <div class="review-metric-value">${docWarningCount}</div>
+          <div class="review-metric-note">${docWarningCount ? "Manuell prüfen vor Freigabe" : (resolvedWarningCount ? `${resolvedWarningCount} bereits bestätigt` : "Keine offenen Warnungen")}</div>
+        </div>
+        <div class="review-metric is-actionable ${openMetricClass}" data-review-jump="items">
+          <div class="review-metric-label">Offene Positionen</div>
+          <div class="review-metric-value">${lineWithIssues}</div>
+          <div class="review-metric-note">${lineTotal ? `${lineTotal - lineWithIssues}/${lineTotal} ohne Auffälligkeit` : "Noch keine Positionen"}</div>
+        </div>
+        <div class="review-metric is-actionable ${coverageMetricClass}" data-review-jump="review" data-review-filter="image">
+          <div class="review-metric-label">Bildabdeckung</div>
+          <div class="review-metric-value">${itemsWithImages}/${lineTotal || 0}</div>
+          <div class="review-metric-note">${lineTotal ? `${lineTotal - itemsWithImages} Position(en) ohne Bild` : `${imageTotal} Bilder im Dokument`}</div>
+        </div>
+        <div class="review-metric is-actionable ${duplicateMetricClass}" data-review-jump="review" data-review-filter="image">
+          <div class="review-metric-label">Bildkonflikte</div>
+          <div class="review-metric-value">${duplicateImageAssignments}</div>
+          <div class="review-metric-note">${duplicateImageAssignments ? `${duplicateImageAssignments} Bild(er) mehrfach final zugeordnet` : "Alle finalen Bilder eindeutig"}</div>
+        </div>
+      `;
+
+      const highlights = [];
+      const missingRequired = Array.isArray(validation.missing_required_fields) ? validation.missing_required_fields : [];
+      const missingRecommended = Array.isArray(validation.missing_recommended_fields) ? validation.missing_recommended_fields : [];
+      if (missingRequired.length) {
+        highlights.push(
+          reviewRowHtml(
+            "Pflichtfelder fehlen",
+            missingRequired.map((field) => REVIEW_FIELD_LABELS[field] || field).join(", "),
+            reviewFlagHtml(`${missingRequired.length} offen`, "err")
+          )
+        );
+      }
+      if (missingRecommended.length) {
+        highlights.push(
+          reviewRowHtml(
+            "Empfohlene Felder fehlen",
+            missingRecommended.map((field) => REVIEW_FIELD_LABELS[field] || field).join(", "),
+            reviewFlagHtml(`${missingRecommended.length} prüfen`, "review")
+          )
+        );
+      }
+      if (totals.net_plus_vat_matches_gross === false) {
+        highlights.push(
+          reviewRowHtml(
+            "Bruttosumme abweichend",
+            "Netto + MwSt stimmt nicht mit Brutto überein.",
+            reviewFlagHtml("kritisch", "err")
+          )
+        );
+      }
+      if (Number(lineSummary.with_issues || 0) > 0) {
+        highlights.push(
+          reviewRowHtml(
+            "Positionen mit Prüfhinweisen",
+            `${lineSummary.with_issues} von ${lineTotal} Positionen enthalten Fehler oder Warnungen.`,
+            reviewFlagHtml(`${lineSummary.issue_count || 0} Hinweise`, "review")
+          )
+        );
+      }
+      if (lineTotal > 0 && itemsWithImages < lineTotal) {
+        highlights.push(
+          reviewRowHtml(
+            "Bildzuordnung unvollständig",
+            `${lineTotal - itemsWithImages} von ${lineTotal} Positionen haben aktuell kein finales Bild.`,
+            reviewFlagHtml(`${itemsWithImages}/${lineTotal}`, "review")
+          )
+        );
+      }
+      if (duplicateImageAssignments > 0) {
+        highlights.push(
+          reviewRowHtml(
+            "Bild mehrfach zugeordnet",
+            `${duplicateImageAssignments} finales Bild wird aktuell mehreren Positionen zugewiesen.`,
+            reviewFlagHtml(`${duplicateImageAssignments} Konflikte`, "review")
+          )
+        );
+      }
+      if (resolvedWarningCount > 0) {
+        highlights.push(
+          reviewRowHtml(
+            "Manuell geprüft",
+            `${resolvedWarningCount} Warnung(en) wurden bereits bestätigt${manualCheckedCount ? ` · ${manualCheckedCount} Position(en) markiert` : ""}.`,
+            reviewFlagHtml("bestätigt", "ok")
+          )
+        );
+      }
+      if (!highlights.length) {
+        ui.reviewHighlights.innerHTML = `<div class="review-empty">Keine offenen Prüfhinweise aus der aktuellen Validierung.</div>`;
+      } else {
+        ui.reviewHighlights.innerHTML = highlights.join("");
+      }
+
+      const fieldRows = [];
+      for (const fieldName of ["supplier_name", "document_type", "document_number", "document_date", "currency", "gross_total"]) {
+        const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
+        const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
+        fieldRows.push(
+          reviewRowHtml(
+            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · Pflicht`,
+            reviewFieldValue(document, fieldName),
+            `${reviewFlagHtml(required[fieldName] ? "vorhanden" : "fehlt", required[fieldName] ? "ok" : "err")}${sourceKey ? sourceTagHtml(source) : ""}`,
+            { required: true }
+          )
+        );
+      }
+      if (String(document.document_type || "").toLowerCase() === "auftragsbestaetigung") {
+        const fieldName = "offer_reference";
+        const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
+        const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
+        fieldRows.push(
+          reviewRowHtml(
+            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · Pflicht`,
+            reviewFieldValue(document, fieldName),
+            `${reviewFlagHtml(required[fieldName] ? "vorhanden" : "fehlt", required[fieldName] ? "ok" : "err")}${sourceKey ? sourceTagHtml(source) : ""}`,
+            { required: true }
+          )
+        );
+      }
+      for (const fieldName of ["project_ref", "net_total", "vat_total"]) {
+        const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
+        const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
+        fieldRows.push(
+          reviewRowHtml(
+            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · empfohlen`,
+            reviewFieldValue(document, fieldName),
+            `${reviewFlagHtml(recommended[fieldName] ? "vorhanden" : "offen", recommended[fieldName] ? "ok" : "review")}${sourceKey ? sourceTagHtml(source) : ""}`
+          )
+        );
+      }
+      ui.fieldChecklist.innerHTML = fieldRows.join("");
+
+      const grossFlag = validationBooleanFlag(totals.net_plus_vat_matches_gross);
+      const componentFlag = validationBooleanFlag(totals.component_sum_matches_net);
+      ui.totalsAudit.innerHTML = [
+        reviewRowHtml(
+          "Netto + MwSt = Brutto",
+          `${euro(totals.computed_gross_from_net_vat)} erwartet · Delta ${euro(totals.gross_delta)}`,
+          reviewFlagHtml(grossFlag.label, grossFlag.kind)
+        ),
+        reviewRowHtml(
+          "Positionen und Zu-/Abschläge = Netto",
+          `${euro(totals.computed_net_from_components)} erwartet · Delta ${euro(totals.net_delta_from_components)}`,
+          `${reviewFlagHtml(componentFlag.label, componentFlag.kind)}${reviewFlagHtml(totals.component_check_mode || "-", "neutral")}`
+        ),
+        reviewRowHtml(
+          "Betragsbasis",
+          `${lineTotal} Positionen · ${lineWithIssues} mit Auffälligkeiten`,
+          reviewFlagHtml(`${validation.issue_count || 0} Gesamt`, validation.issue_count ? "review" : "ok")
+        ),
+        reviewRowHtml(
+          "Dokumentseiten",
+          totals.page_count ? `${totals.page_count} Seiten erkannt` : "Keine Seitenzahl aus Rohtext abgeleitet",
+          reviewFlagHtml(imageTotal ? `${imageTotal} Bilder` : "ohne Bilder", imageTotal ? "ok" : "neutral")
+        ),
+      ].join("");
+
+      ui.sourceBreakdown.innerHTML = [
+        reviewRowHtml(
+          "Kopfdaten",
+          `${sourceSummary.headCounts.parser || 0} Parser · ${sourceSummary.headCounts.llm || 0} LLM`,
+          reviewFlagHtml(`${sourceSummary.headCounts.unknown || 0} offen`, sourceSummary.headCounts.unknown ? "review" : "ok")
+        ),
+        reviewRowHtml(
+          "Summenfelder",
+          `${sourceSummary.totalCounts.parser || 0} Parser · ${sourceSummary.totalCounts.llm || 0} LLM`,
+          reviewFlagHtml(`${sourceSummary.totalCounts.unknown || 0} offen`, sourceSummary.totalCounts.unknown ? "review" : "ok")
+        ),
+        reviewRowHtml(
+          "Positionen",
+          `${sourceSummary.itemCounts.parser || 0} Parser · ${sourceSummary.itemCounts.llm || 0} LLM`,
+          reviewFlagHtml(`${sourceSummary.itemCounts.unknown || 0} offen`, sourceSummary.itemCounts.unknown ? "review" : "ok")
+        ),
+        reviewRowHtml(
+          "LLM-Änderungen",
+          sourceSummary.llmChanges ? `${sourceSummary.llmChanges} Feldänderungen wurden angewendet.` : "Keine angewendeten Feldänderungen.",
+          reviewFlagHtml(sourceSummary.llmChanges ? "aktiv" : "keine", sourceSummary.llmChanges ? "review" : "neutral")
+        ),
+      ].join("");
     }
 
     async function apiJson(path, options) {
@@ -1956,26 +4421,33 @@
       const amountLines = result.amount_lines || [];
       const lineItems = result.line_items || [];
       const images = result.images || [];
+      const documentNumberLabel = String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
+        ? "AB-Nr"
+        : "Angebot-Nr";
 
       const cards = [
-        ["Dokument-ID", document.id, null],
-        ["Status", document.status, null],
-        ["Lieferant", document.supplier_name, "supplier_name"],
-        ["Angebot-Nr", document.document_number, "document_number"],
-        ["Datum", document.document_date, "document_date"],
-        ["Projekt", document.project_ref, "project_ref"],
-        ["Waehrung", document.currency, "currency"],
-        ["Netto", euro(document.net_total), "totals.net_total"],
-        ["MwSt", euro(document.vat_total), "totals.vat_total"],
-        ["Gesamt", euro(document.gross_total), "totals.gross_total"],
-        ["Positionen", lineItems.length, null],
-        ["Bilder", images.length, null],
-        ["Betragszeilen", amountLines.length, null],
-        ["Confidence", document.parse_confidence, null],
+        ["Dokument-ID", document.id, null, false],
+        ["Status", document.status, null, false],
+        ["Dokumenttyp", formatDocumentType(document.document_type), "document_type", true],
+        ["Lieferant", document.supplier_name, "supplier_name", true],
+        ...(String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
+          ? [["AB-Referenz", document.offer_reference, "offer_reference", true]]
+          : []),
+        [documentNumberLabel, document.document_number, "document_number", true],
+        ["Datum", formatDate(document.document_date), "document_date", true],
+        ["Projekt", document.project_ref, "project_ref", false],
+        ["Waehrung", document.currency, "currency", true],
+        ["Netto", euro(document.net_total), "totals.net_total", false],
+        ["MwSt", euro(document.vat_total), "totals.vat_total", false],
+        ["Gesamt", euro(document.gross_total), "totals.gross_total", true],
+        ["Positionen", lineItems.length, null, false],
+        ["Bilder", images.length, null, false],
+        ["Betragszeilen", amountLines.length, null, false],
+        ["Confidence", document.parse_confidence, null, false],
       ];
 
-      for (const [label, value, sourceKey] of cards) {
-        ui.summary.appendChild(createSummaryCard(label, value, sourceKey));
+      for (const [label, value, sourceKey, required] of cards) {
+        ui.summary.appendChild(createSummaryCard(label, value, sourceKey, { required }));
       }
     }
 
@@ -2126,14 +4598,229 @@
         .join(", ");
     }
 
+    function uniqueImageIds(imageIds) {
+      if (!Array.isArray(imageIds)) return [];
+      const seen = new Set();
+      const unique = [];
+      for (const value of imageIds) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || seen.has(parsed)) continue;
+        seen.add(parsed);
+        unique.push(parsed);
+      }
+      return unique;
+    }
+
+    function imageRecordById(imageId) {
+      const images = Array.isArray(state.result && state.result.images) ? state.result.images : [];
+      return images.find((image) => Number(image.id) === Number(imageId)) || null;
+    }
+
+    function imageUrl(documentId, imageId) {
+      return `/document/${documentId}/image/${imageId}`;
+    }
+
+    function imageAssignmentChipsHtml(documentId, item) {
+      const lineItemId = Number(item && item.id);
+      const assignedIds = uniqueImageIds(item && item.image_ids);
+      const candidateIds = candidateOnlyImageIds(item);
+      const assignedHtml = assignedIds.length
+        ? assignedIds.map((imageId) => `
+            <a
+              class="image-chip assigned"
+              href="${imageUrl(documentId, imageId)}"
+              target="_blank"
+              rel="noopener"
+              data-image-preview-id="${escapeHtml(fmt(imageId))}"
+              data-image-role="assigned"
+              title="Zugeordnetes Bild öffnen"
+            >#${escapeHtml(fmt(imageId))}</a>
+          `).join("")
+        : `<span class="image-chip empty">keine</span>`;
+      const candidateHtml = candidateIds.length
+        ? candidateIds.map((imageId) => `
+            <button
+              type="button"
+              class="image-chip candidate"
+              data-image-assign="1"
+              data-line-item-id="${escapeHtml(fmt(lineItemId))}"
+              data-image-id="${escapeHtml(fmt(imageId))}"
+              data-image-preview-id="${escapeHtml(fmt(imageId))}"
+              data-image-role="candidate"
+              title="Dieses Bild der Position zuordnen"
+            >#${escapeHtml(fmt(imageId))}</button>
+          `).join("")
+        : `<span class="image-chip empty">keine</span>`;
+      return `
+        <div class="image-chip-wrap">
+          <div class="image-chip-row">
+            <span class="image-chip-label">Zugeordnet</span>
+            ${assignedHtml}
+          </div>
+          <div class="image-chip-row">
+            <span class="image-chip-label">Kandidaten</span>
+            ${candidateHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function imagePreviewStripHtml(documentId, imageIds, emptyLabel = "Kein Bild zugeordnet") {
+      const ids = uniqueImageIds(imageIds);
+      if (!ids.length) {
+        return `<div class="position-image-empty">${escapeHtml(emptyLabel)}</div>`;
+      }
+      return `
+        <div class="position-image-strip">
+          ${ids.map((imageId) => {
+            const image = imageRecordById(imageId);
+            const pageLabel = image ? `Seite ${fmt(image.page_ref)}` : "Seite -";
+            return `
+              <a class="position-image-card" href="/document/${documentId}/image/${imageId}" target="_blank" rel="noopener">
+                <img src="/document/${documentId}/image/${imageId}" alt="Bild ${escapeHtml(fmt(imageId))}" loading="lazy">
+                <div class="position-image-card-meta">
+                  <strong>#${escapeHtml(fmt(imageId))}</strong><br>
+                  ${escapeHtml(pageLabel)}
+                </div>
+              </a>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function candidateOnlyImageIds(item) {
+      const assignedIds = new Set(uniqueImageIds(item && item.image_ids));
+      return uniqueImageIds(item && item.image_candidate_ids).filter((imageId) => !assignedIds.has(imageId));
+    }
+
+    function hideImageHoverPreview() {
+      if (!ui.imageHoverPreview) return;
+      ui.imageHoverPreview.setAttribute("hidden", "");
+      if (ui.imageHoverPreviewImg) ui.imageHoverPreviewImg.removeAttribute("src");
+      if (ui.imageHoverPreviewMeta) ui.imageHoverPreviewMeta.textContent = "";
+    }
+
+    function moveImageHoverPreview(clientX, clientY) {
+      if (!ui.imageHoverPreview || ui.imageHoverPreview.hidden) return;
+      const offsetX = 18;
+      const offsetY = 18;
+      const previewWidth = 190;
+      const previewHeight = 176;
+      const maxLeft = window.innerWidth - previewWidth - 12;
+      const maxTop = window.innerHeight - previewHeight - 12;
+      const left = Math.max(12, Math.min(maxLeft, clientX + offsetX));
+      const top = Math.max(12, Math.min(maxTop, clientY + offsetY));
+      ui.imageHoverPreview.style.left = `${left}px`;
+      ui.imageHoverPreview.style.top = `${top}px`;
+    }
+
+    function showImageHoverPreview(imageId, event) {
+      if (!state.documentId || !ui.imageHoverPreview || !ui.imageHoverPreviewImg || !ui.imageHoverPreviewMeta) return;
+      const image = imageRecordById(imageId);
+      ui.imageHoverPreviewImg.src = imageUrl(state.documentId, imageId);
+      ui.imageHoverPreviewMeta.textContent = image
+        ? `#${fmt(imageId)} · Seite ${fmt(image.page_ref)} · ${fmt(image.width)}x${fmt(image.height)}`
+        : `#${fmt(imageId)}`;
+      ui.imageHoverPreview.removeAttribute("hidden");
+      moveImageHoverPreview(event.clientX, event.clientY);
+    }
+
+    async function assignImageToLineItem(lineItemId, imageId, button) {
+      if (!state.documentId) return;
+      const targetButton = button instanceof HTMLElement ? button : null;
+      if (targetButton) targetButton.disabled = true;
+      setStatus(`Bild #${imageId} wird Position ${lineItemId} zugeordnet ...`);
+      try {
+        await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/assign-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_id: imageId }),
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(`Bild #${imageId} wurde Position ${lineItemId} zugeordnet.`, "ok");
+      } catch (error) {
+        setStatus(`Bildzuordnung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        if (targetButton) targetButton.disabled = false;
+      }
+    }
+
+    async function clearImageAssignment(lineItemId, button) {
+      if (!state.documentId) return;
+      const targetButton = button instanceof HTMLElement ? button : null;
+      if (targetButton) targetButton.disabled = true;
+      setStatus(`Bildzuordnung für Position ${lineItemId} wird aufgehoben ...`);
+      try {
+        await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/assign-image`, {
+          method: "DELETE",
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(`Für Position ${lineItemId} ist jetzt bewusst kein finales Bild gesetzt.`, "ok");
+      } catch (error) {
+        setStatus(`Bildzuordnung konnte nicht aufgehoben werden: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        if (targetButton) targetButton.disabled = false;
+      }
+    }
+
+    async function setLineItemReviewChecked(lineItemId, checked, button) {
+      if (!state.documentId) return;
+      const targetButton = button instanceof HTMLElement ? button : null;
+      if (targetButton) targetButton.disabled = true;
+      setStatus(checked
+        ? `Position ${lineItemId} wird als manuell geprüft markiert ...`
+        : `Manuelle Prüfung für Position ${lineItemId} wird zurückgesetzt ...`);
+      try {
+        await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/review-check`, {
+          method: checked ? "POST" : "DELETE",
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(
+          checked
+            ? `Position ${lineItemId} wurde als manuell geprüft markiert.`
+            : `Manuelle Prüfung für Position ${lineItemId} wurde zurückgesetzt.`,
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Review-Status konnte nicht aktualisiert werden: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        if (targetButton) targetButton.disabled = false;
+      }
+    }
+
     function mappedImageLabel(item) {
       const mapped = Number(item.image_count || 0);
-      const allPage = Number(item.image_count_page_all || 0);
-      if (mapped <= 0) return "0 Bilder";
-      if (allPage > 0 && mapped <= allPage) {
-        return `${mapped}/${allPage} Seitenbilder`;
+      const candidates = Number(item.image_candidate_count || 0);
+      if (mapped <= 0) {
+        return candidates > 0 ? `0 zugeordnet / ${candidates} Kandidaten` : "0 Bilder";
       }
-      return `${mapped} Kandidaten`;
+      if (candidates > mapped) {
+        return `${mapped} zugeordnet / ${candidates} Kandidaten`;
+      }
+      return `${mapped} zugeordnet`;
+    }
+
+    function imageAssignmentSourceLabel(source) {
+      const value = String(source || "").trim().toLowerCase();
+      if (!value) return "-";
+      if (value === "manual") return "Manuell";
+      if (value === "heuristic") return "Heuristik";
+      if (value === "page_layout") return "Seitenlayout";
+      if (value === "page_neighbor_fallback") return "Nachbarseite";
+      if (value === "page_fallback") return "Seitenfallback";
+      if (value === "persisted_assignment") return "Persistiert";
+      if (value === "unmatched") return "Keine Zuordnung";
+      return value.replaceAll("_", " ");
     }
 
     function lineItemSource(item) {
@@ -2158,29 +4845,164 @@
 
     function renderLineItems(items) {
       clearNode(ui.itemRows);
-      if (!items.length) {
+      const sourceFilter = ui.itemSourceFilter ? String(ui.itemSourceFilter.value || "all") : "all";
+      const issuesOnly = !!(ui.itemIssuesOnly && ui.itemIssuesOnly.checked);
+      state.itemFilters.issuesOnly = issuesOnly;
+      state.itemFilters.source = sourceFilter;
+
+      const itemsWithIssues = items.filter((item) => Number(item.validation_issue_count || 0) > 0);
+      const filteredItems = items.filter((item) => {
+        const source = lineItemSource(item);
+        const hasIssues = Number(item.validation_issue_count || 0) > 0;
+        if (issuesOnly && !hasIssues) return false;
+        if (sourceFilter !== "all" && source !== sourceFilter) return false;
+        return true;
+      });
+
+      if (ui.itemFilterInfo) {
+        ui.itemFilterInfo.textContent =
+          `${filteredItems.length}/${items.length} Positionen sichtbar · ${itemsWithIssues.length} mit Auffälligkeiten`;
+      }
+
+      if (!filteredItems.length) {
         const row = document.createElement("tr");
-        row.innerHTML = "<td colspan=\"9\" class=\"small\">Keine Positionen extrahiert.</td>";
+        row.innerHTML = `<td colspan="11" class="small">${items.length ? "Keine Positionen passen zum aktuellen Filter." : "Keine Positionen extrahiert."}</td>`;
         ui.itemRows.appendChild(row);
         return;
       }
 
-      for (const item of items) {
+      filteredItems.forEach((item, index) => {
         const source = lineItemSource(item);
+        const itemKey = positionItemKey(item, index);
+        const lineItemId = Number(item && item.id);
+        const isExpanded = state.expandedItemKeys.has(itemKey);
+        const openIssues = itemOpenIssues(item);
+        const resolvedIssues = itemResolvedIssues(item);
+        const validationStatus = String(
+          item.validation_status || (Number(item.validation_issue_count || 0) > 0 ? "review" : "auto_accept")
+        );
+        const validationMeta = reviewStatusMeta(validationStatus);
+        const issueNotes = openIssues
+          .slice(0, 2)
+          .map((issue) => fmt(issue && issue.message))
+          .filter((text) => text && text !== "-");
+        const canBeChecked = itemCanBeManuallyChecked(item);
+        const isNonVisual = String(item.image_assignment_reason || "") === "non_visual_line_item";
+        const toggleLabel = isExpanded ? "−" : "+";
+        const reviewStateHtml = item.review_checked
+          ? `<div class="position-review-state">Manuell geprüft${item.review_checked_at ? ` · ${escapeHtml(fmt(item.review_checked_at))}` : ""}</div>`
+          : "";
+        const detailIssueHtml = [
+          ...openIssues.map((issue) => `
+            <div class="detail-list-item">
+              <strong>${escapeHtml(fmt(issue && issue.severity, "hinweis"))}</strong><br>
+              ${escapeHtml(fmt(issue && issue.message))}
+            </div>
+          `),
+          ...resolvedIssues.map((issue) => `
+            <div class="detail-list-item resolved">
+              <strong>geprüft</strong><br>
+              ${escapeHtml(fmt(issue && issue.message))}
+            </div>
+          `),
+        ].join("") || `<div class="detail-list-item">Keine zusätzlichen Prüfhinweise.</div>`;
+        const detailActionButtons = [
+          canBeChecked && Number.isFinite(lineItemId)
+            ? reviewTaskActionHtml("Als geprüft markieren", "mark-reviewed", { line_item_id: lineItemId, primary: true })
+            : "",
+          item.review_checked && Number.isFinite(lineItemId)
+            ? reviewTaskActionHtml("Prüfung zurücksetzen", "clear-reviewed", { line_item_id: lineItemId, subtle: true })
+            : "",
+          !isNonVisual && Number.isFinite(lineItemId)
+            ? reviewTaskActionHtml("Kein Bild setzen", "clear-image", { line_item_id: lineItemId, warning: true })
+            : "",
+        ].filter(Boolean).join("");
+
         const row = document.createElement("tr");
+        row.className = `position-row${isExpanded ? " is-expanded" : ""}`;
+        row.dataset.itemKey = itemKey;
         row.innerHTML = `
+          <td>
+            <button class="position-toggle" type="button" data-item-toggle="${escapeHtml(itemKey)}" aria-expanded="${isExpanded ? "true" : "false"}" aria-label="Positionsdetails ${isExpanded ? "schließen" : "öffnen"}">${toggleLabel}</button>
+          </td>
           <td>${escapeHtml(fmt(item.position_no))}</td>
           <td>${escapeHtml(fmt(item.lv_pos))}</td>
-          <td>${escapeHtml(fmt(item.quantity))} ${escapeHtml(fmt(item.unit, ""))}</td>
+          <td>${escapeHtml(formatQuantity(item.quantity))} ${escapeHtml(fmt(item.unit, ""))}</td>
           <td>${escapeHtml(fmt(item.description_short))}</td>
           <td>${escapeHtml(euro(item.unit_price))}</td>
           <td>${escapeHtml(euro(item.line_total))}</td>
           <td>${escapeHtml(fmt(item.page_ref))}</td>
-          <td><span class="chip">${escapeHtml(mappedImageLabel(item))}</span><br>${imageLinks(state.documentId, item.image_ids)}</td>
+          <td><span class="chip">${escapeHtml(mappedImageLabel(item))}</span>${imageAssignmentChipsHtml(state.documentId, item)}</td>
+          <td>
+            <div class="item-validation">
+              <span class="review-status-badge ${escapeHtml(validationMeta.css)}">${escapeHtml(validationMeta.label)}</span>
+              <div class="item-validation-notes">
+                <div class="item-note">${escapeHtml(fmt(item.validation_issue_count || 0))} offene Hinweis(e)</div>
+                ${issueNotes.map((text) => `<div class="item-note">${escapeHtml(text)}</div>`).join("") || (resolvedIssues.length ? "<div class=\"item-note\">Warnungen manuell bestätigt</div>" : "<div class=\"item-note\">Keine offenen Detailhinweise</div>")}
+              </div>
+            </div>
+          </td>
           <td>${sourceTagHtml(source)}</td>
         `;
         ui.itemRows.appendChild(row);
-      }
+
+        const detailRow = document.createElement("tr");
+        detailRow.className = "position-detail-row";
+        detailRow.dataset.itemKey = itemKey;
+        detailRow.hidden = !isExpanded;
+        detailRow.innerHTML = `
+          <td colspan="11">
+            <div class="position-detail-card">
+              <div class="position-detail-grid">
+                <div class="position-detail-block">
+                  <h3>Prüfhinweise</h3>
+                  <div class="detail-list">
+                    ${detailIssueHtml}
+                  </div>
+                  ${reviewStateHtml}
+                  ${detailActionButtons ? `<div class="position-detail-actions">${detailActionButtons}</div>` : ""}
+                </div>
+                <div class="position-detail-block">
+                  <h3>Referenzen</h3>
+                  <div class="detail-meta-grid">
+                    ${detailMetaCellHtml("Seite", fmt(item.page_ref))}
+                    ${detailMetaCellHtml("Quelltyp", source.toUpperCase())}
+                    ${detailMetaCellHtml("Bilder", mappedImageLabel(item))}
+                    ${detailMetaCellHtml("Bildquelle", imageAssignmentSourceLabel(item.image_assignment_source))}
+                    ${detailMetaCellHtml("Bild-IDs", Array.isArray(item.image_ids) && item.image_ids.length ? item.image_ids.join(", ") : "-")}
+                    ${detailMetaCellHtml("Kandidaten", Array.isArray(item.image_candidate_ids) && item.image_candidate_ids.length ? item.image_candidate_ids.join(", ") : "-")}
+                  </div>
+                  ${imageAssignmentChipsHtml(state.documentId, item)}
+                </div>
+                <div class="position-detail-block">
+                  <h3>Extraktionskontext</h3>
+                  <div class="detail-meta-grid">
+                    ${detailMetaCellHtml("Menge", `${formatQuantity(item.quantity)} ${fmt(item.unit, "")}`.trim())}
+                    ${detailMetaCellHtml("Einzelpreis", euro(item.unit_price))}
+                    ${detailMetaCellHtml("Gesamtpreis", euro(item.line_total))}
+                    ${detailMetaCellHtml("Status", validationMeta.label)}
+                    ${detailMetaCellHtml("Review", item.review_checked ? "manuell geprüft" : "offen / automatisch")}
+                  </div>
+                </div>
+                <div class="position-detail-block wide">
+                  <h3>Bildprüfung</h3>
+                  <div class="position-image-section">
+                    <div class="position-image-group">
+                      <div class="position-image-group-title">Final zugeordnet</div>
+                      ${imagePreviewStripHtml(state.documentId, item.image_ids, "Kein finales Bild zugeordnet")}
+                    </div>
+                    <div class="position-image-group">
+                      <div class="position-image-group-title">Weitere Kandidaten</div>
+                      ${imagePreviewStripHtml(state.documentId, candidateOnlyImageIds(item), "Keine weiteren Bildkandidaten")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        `;
+        ui.itemRows.appendChild(detailRow);
+      });
     }
 
     function renderImages(images) {
@@ -2193,14 +5015,40 @@
         return;
       }
 
-      for (const image of images) {
+      const orderedImages = [...images].sort((left, right) => {
+        const leftConflict = Number(left.assigned_match_count || 0) > 1 ? 1 : 0;
+        const rightConflict = Number(right.assigned_match_count || 0) > 1 ? 1 : 0;
+        const conflictDiff = rightConflict - leftConflict;
+        if (conflictDiff) return conflictDiff;
+        const assignedDiff = Number(!!right.is_assigned) - Number(!!left.is_assigned);
+        if (assignedDiff) return assignedDiff;
+        const pageDiff = Number(left.page_ref || 0) - Number(right.page_ref || 0);
+        if (pageDiff) return pageDiff;
+        return Number(left.image_index || 0) - Number(right.image_index || 0);
+      });
+
+      for (const image of orderedImages) {
         const card = document.createElement("div");
         card.className = "img-card";
-        const isLlmMatched = !!image.is_llm_matched;
-        if (isLlmMatched) card.classList.add("llm-assigned");
-        const llmMatchCount = Number(image.llm_match_count || 0);
-        const llmItemIds = Array.isArray(image.llm_matched_line_item_ids) ? image.llm_matched_line_item_ids : [];
-        const llmItemLabel = llmItemIds.length ? llmItemIds.join(", ") : "-";
+        card.dataset.imageId = String(image.id);
+        const isAssigned = !!image.is_assigned;
+        const assignedCount = Number(image.assigned_match_count || 0);
+        const hasConflict = assignedCount > 1;
+        if (hasConflict) {
+          card.classList.add("conflict-assigned");
+        } else if (isAssigned) {
+          card.classList.add("llm-assigned");
+        } else {
+          card.classList.add("unassigned");
+        }
+        const assignedItemIds = Array.isArray(image.assigned_line_item_ids) ? image.assigned_line_item_ids : [];
+        const assignedPositionNos = Array.isArray(image.assigned_position_nos) ? image.assigned_position_nos : [];
+        const assignedItemLabel = assignedPositionNos.length
+          ? assignedPositionNos.join(", ")
+          : (assignedItemIds.length ? assignedItemIds.join(", ") : "-");
+        const badgeHtml = hasConflict
+          ? "<span class=\"img-badge conflict\">Konflikt</span>"
+          : (isAssigned ? "<span class=\"img-badge\">Zugeordnet</span>" : "<span class=\"img-badge warning\">Offen</span>");
 
         const preview = document.createElement("img");
         preview.src = `/document/${state.documentId}/image/${image.id}`;
@@ -2216,9 +5064,13 @@
         const meta = document.createElement("div");
         meta.className = "img-meta";
         meta.innerHTML = `
-          <div><strong>#${escapeHtml(fmt(image.id))}</strong>${isLlmMatched ? "<span class=\"img-badge\">LLM Match</span>" : ""} | Seite ${escapeHtml(fmt(image.page_ref))} | Img ${escapeHtml(fmt(image.image_index))}</div>
+          <div><strong>#${escapeHtml(fmt(image.id))}</strong>${badgeHtml} | Seite ${escapeHtml(fmt(image.page_ref))} | Img ${escapeHtml(fmt(image.image_index))}</div>
           <div>${escapeHtml(fmt(image.mime_type))} | ${escapeHtml(fmt(image.width))}x${escapeHtml(fmt(image.height))} | ${escapeHtml(fmt(image.bytes_size))} bytes</div>
-          ${isLlmMatched ? `<div>LLM zugeordnet: ${escapeHtml(fmt(llmMatchCount))} Position(en) [${escapeHtml(llmItemLabel)}]</div>` : ""}
+          ${hasConflict
+            ? `<div>Mehrfach zugeordnet: ${escapeHtml(fmt(assignedCount))} Position(en) [${escapeHtml(assignedItemLabel)}]</div>`
+            : (isAssigned
+              ? `<div>Zugeordnet: ${escapeHtml(fmt(assignedCount))} Position(en) [${escapeHtml(assignedItemLabel)}]</div>`
+              : "<div>Rohkandidat ohne finale Zuordnung</div>")}
         `;
 
         card.appendChild(preview);
@@ -2246,6 +5098,9 @@
         state.result = result;
         state.compare = null;
         state.fieldSources = deriveFieldSources(null);
+        state.expandedItemKeys = new Set();
+        renderReview(result);
+        renderDocumentIssues(result);
         renderSummary(result);
         renderCompare(null);
         renderAmountLines(result.amount_lines || []);
@@ -2256,12 +5111,20 @@
         const itemCount = (result.line_items || []).length;
         setStatus(`Dokument #${documentId} geladen: ${itemCount} Positionen, ${imageCount} Bilder.`, "ok");
       } catch (error) {
+        clearNode(ui.reviewHero);
+        clearNode(ui.reviewMetrics);
+        clearNode(ui.reviewHighlights);
+        clearNode(ui.fieldChecklist);
+        clearNode(ui.totalsAudit);
+        clearNode(ui.sourceBreakdown);
+        clearNode(ui.documentIssueList);
         clearNode(ui.summary);
         clearNode(ui.llmChangeRows);
         clearNode(ui.compareRows);
         clearNode(ui.amountRows);
         clearNode(ui.itemRows);
         clearNode(ui.imageGrid);
+        if (ui.itemFilterInfo) ui.itemFilterInfo.textContent = "Keine Positionen geladen.";
         ui.llmRunInfo.textContent = "LLM Run konnte nicht geladen werden.";
         ui.compareInfo.textContent = "Vergleich konnte nicht geladen werden.";
         ui.compareSummary.textContent = "";
@@ -2269,6 +5132,9 @@
         state.llmRun = null;
         state.compare = null;
         state.fieldSources = {};
+        state.expandedItemKeys = new Set();
+        renderReview(null);
+        renderDocumentIssues(null);
         setStatus(`Result konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
       }
     }
@@ -2498,6 +5364,173 @@
       }
     });
 
+    ui.itemIssuesOnly.addEventListener("change", () => {
+      if (state.result) renderLineItems(state.result.line_items || []);
+    });
+
+    ui.itemSourceFilter.addEventListener("change", () => {
+      if (state.result) renderLineItems(state.result.line_items || []);
+    });
+
+    ui.reviewTaskFilter.addEventListener("change", () => {
+      state.reviewFilter = String(ui.reviewTaskFilter.value || "all");
+      if (state.result) renderReviewWorkbench(state.result);
+    });
+
+    for (const button of ui.extractTabs) {
+      button.addEventListener("click", () => {
+        const nextTab = String(button.dataset.extractTab || "overview");
+        setExtractTab(nextTab);
+      });
+    }
+
+    if (ui.extractPanelBody) {
+      ui.extractPanelBody.addEventListener("scroll", () => {
+        syncTopbarCollapse();
+      }, { passive: true });
+    }
+
+    if (ui.topbar) {
+      ui.topbar.addEventListener("wheel", (event) => {
+        forwardTopbarWheel(event);
+      }, { passive: false });
+    }
+
+    window.addEventListener("resize", () => {
+      syncTopbarCollapse();
+    }, { passive: true });
+
+    ui.reviewMetrics.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest("[data-review-jump]");
+      if (!trigger) return;
+      const jump = String(trigger.getAttribute("data-review-jump") || "");
+      if (jump === "items") {
+        setExtractTab("items");
+        if (ui.itemIssuesOnly) ui.itemIssuesOnly.checked = true;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        scrollIntoViewSoon(ui.itemRows);
+        return;
+      }
+      if (jump === "review") {
+        const filter = String(trigger.getAttribute("data-review-filter") || "all");
+        if (ui.reviewTaskFilter) ui.reviewTaskFilter.value = filter;
+        state.reviewFilter = filter;
+        setExtractTab("review");
+        if (state.result) renderReviewWorkbench(state.result);
+        scrollIntoViewSoon(ui.reviewTaskList);
+      }
+    });
+
+    ui.reviewTaskList.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const actionButton = target.closest("[data-review-action]");
+      if (!actionButton) return;
+      const action = String(actionButton.getAttribute("data-review-action") || "");
+      const itemKey = String(actionButton.getAttribute("data-item_key") || "");
+      const targetId = String(actionButton.getAttribute("data-target") || "");
+      const lineItemId = Number(actionButton.getAttribute("data-line_item_id"));
+      if (action === "open-overview") {
+        openOverviewTarget(targetId || "documentIssueList");
+        return;
+      }
+      if (action === "open-item") {
+        openItemTarget(itemKey);
+        return;
+      }
+      if (action === "open-audit") {
+        openAuditTarget(itemKey);
+        return;
+      }
+      if (action === "clear-image" && Number.isFinite(lineItemId)) {
+        void clearImageAssignment(lineItemId, actionButton);
+        return;
+      }
+      if (action === "mark-reviewed" && Number.isFinite(lineItemId)) {
+        void setLineItemReviewChecked(lineItemId, true, actionButton);
+        return;
+      }
+      if (action === "clear-reviewed" && Number.isFinite(lineItemId)) {
+        void setLineItemReviewChecked(lineItemId, false, actionButton);
+      }
+    });
+
+    ui.itemRows.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const assignButton = target.closest("[data-image-assign]");
+      if (assignButton) {
+        event.preventDefault();
+        const lineItemId = Number(assignButton.getAttribute("data-line-item-id"));
+        const imageId = Number(assignButton.getAttribute("data-image-id"));
+        if (Number.isFinite(lineItemId) && Number.isFinite(imageId)) {
+          void assignImageToLineItem(lineItemId, imageId, assignButton);
+        }
+        return;
+      }
+
+      const reviewAction = target.closest("[data-review-action]");
+      if (reviewAction) {
+        event.preventDefault();
+        const action = String(reviewAction.getAttribute("data-review-action") || "");
+        const lineItemId = Number(reviewAction.getAttribute("data-line_item_id"));
+        if (!Number.isFinite(lineItemId)) return;
+        if (action === "clear-image") {
+          void clearImageAssignment(lineItemId, reviewAction);
+          return;
+        }
+        if (action === "mark-reviewed") {
+          void setLineItemReviewChecked(lineItemId, true, reviewAction);
+          return;
+        }
+        if (action === "clear-reviewed") {
+          void setLineItemReviewChecked(lineItemId, false, reviewAction);
+          return;
+        }
+      }
+
+      const toggle = target.closest("[data-item-toggle]");
+      if (!toggle) return;
+      const itemKey = String(toggle.getAttribute("data-item-toggle") || "");
+      if (!itemKey) return;
+      if (state.expandedItemKeys.has(itemKey)) {
+        state.expandedItemKeys.delete(itemKey);
+      } else {
+        state.expandedItemKeys.add(itemKey);
+      }
+      if (state.result) renderLineItems(state.result.line_items || []);
+    });
+
+    ui.itemRows.addEventListener("mouseover", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest("[data-image-preview-id]");
+      if (!trigger) return;
+      const imageId = Number(trigger.getAttribute("data-image-preview-id"));
+      if (!Number.isFinite(imageId)) return;
+      showImageHoverPreview(imageId, event);
+    });
+
+    ui.itemRows.addEventListener("mousemove", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest("[data-image-preview-id]");
+      if (!trigger) return;
+      moveImageHoverPreview(event.clientX, event.clientY);
+    });
+
+    ui.itemRows.addEventListener("mouseout", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest("[data-image-preview-id]");
+      if (!trigger) return;
+      const related = event.relatedTarget;
+      if (related instanceof Element && related.closest("[data-image-preview-id]")) return;
+      hideImageHoverPreview();
+    });
+
     ui.processBtn.addEventListener("click", async () => {
       await processCurrent();
     });
@@ -2548,6 +5581,11 @@
     });
 
     closePreviewModal();
+    setExtractTab(state.activeExtractTab);
+    syncTopbarCollapse();
+    renderReview(null);
+    renderReviewWorkbench(null);
+    renderDocumentIssues(null);
     renderLlmRun(null);
     renderCompare(null);
     addDebug("UI initialisiert.");

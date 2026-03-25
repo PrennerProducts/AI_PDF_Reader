@@ -89,6 +89,73 @@ def _extract_amount_via_inline_pattern(text: str, patterns: tuple[str, ...]) -> 
     return None
 
 
+def _detect_document_type(normalized_text: str, template: str) -> str:
+    if template in {"schlotterer", "schuchter"}:
+        return "auftragsbestaetigung"
+
+    first_page = normalized_text.split("\f", 1)[0]
+    head_text = "\n".join(first_page.splitlines()[:80])
+    head_lower = head_text.lower()
+
+    if re.search(r"(?mi)^\s*auftragsbest[aä]tigung\b", head_text):
+        return "auftragsbestaetigung"
+    if re.search(r"(?mi)^\s*auftragsnummer\s*:", head_text):
+        return "auftragsbestaetigung"
+    if re.search(r"(?mi)^\s*auftrag\b(?:\s*:)?\s*[A-Za-z0-9.-]+\b", head_text):
+        return "auftragsbestaetigung"
+    if re.search(r"(?mi)^\s*angebot(?:\s*:|\b)", head_text) or "angebotsnummer" in head_lower:
+        return "angebot"
+
+    lower = normalized_text.lower()
+    if re.search(r"(?mi)\bauftragsbest[aä]tigung\s*:", normalized_text):
+        return "auftragsbestaetigung"
+    if re.search(r"(?mi)^\s*angebot(?:\s*:|\b)", normalized_text) or "angebotsnummer" in lower:
+        return "angebot"
+    return "angebot"
+
+
+def _clean_reference_value(value: str | None) -> str | None:
+    if value is None:
+        return None
+    collapsed = _collapse_header_value(value)
+    if collapsed is None:
+        return None
+    cleaned = collapsed.strip(" \t\r\n,;:.")
+    return cleaned or None
+
+
+def _extract_offer_reference(normalized_text: str, document_type: str) -> str | None:
+    if document_type != "auftragsbestaetigung":
+        return None
+    return _clean_reference_value(
+        _first_match(
+            [
+                r"(?mi)^\s*Kommission:\s*[^\n]*?\bzu\s+([A-Za-z0-9.+/\- ]+?)\s*$",
+                r"(?mi)^\s*Projekt:\s*[^\n]*?\bzu\s+([A-Za-z0-9.+/\- ]+?)\s*$",
+                r"(?mi)\bzu\s+Angebot(?:snummer)?\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
+                r"(?mi)\bAngebotsreferenz\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
+                r"(?mi)\bReferenzangebot\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
+                r"(?mi)\bbezugnehmend auf Angebot\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
+            ],
+            normalized_text,
+        )
+    )
+
+
+def _extract_offer_reference_from_project_ref(project_ref: str | None) -> str | None:
+    if not project_ref:
+        return None
+    return _clean_reference_value(
+        _first_match(
+            [
+                r"\bzu\s+([A-Za-z0-9.+/\-]+(?:\s*\+\s*[A-Za-z0-9.+/\-]+)*)\b",
+            ],
+            project_ref,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
 def detect_template(text: str) -> str:
     return _detect_template(text)
 
@@ -163,6 +230,7 @@ def _extract_totals(text: str) -> dict[str, str | None]:
 def parse_document_text(text: str) -> dict[str, Any]:
     normalized_text = _normalize_text(text)
     template = detect_template(text)
+    document_type = _detect_document_type(normalized_text, template)
     headers = refine_headers_for_template(
         template,
         normalized_text,
@@ -207,13 +275,18 @@ def parse_document_text(text: str) -> dict[str, Any]:
     document_number = headers.get("document_number")
     document_date = headers.get("document_date")
     project_ref = headers.get("project_ref")
+    offer_reference = _extract_offer_reference(normalized_text, document_type)
+    if offer_reference is None:
+        offer_reference = _extract_offer_reference_from_project_ref(project_ref)
     currency = "EUR" if ("\u20ac" in normalized_text or "EUR" in normalized_text.upper()) else None
     totals = _extract_totals(normalized_text)
 
     return {
         "template": template,
         "supplier_name": supplier_name_for_template(template),
+        "document_type": document_type,
         "document_number": document_number,
+        "offer_reference": offer_reference,
         "document_date": document_date,
         "project_ref": project_ref,
         "currency": currency,

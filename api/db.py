@@ -1,13 +1,21 @@
 import os
 import json
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from image_assignment import (
+    focused_image_ids,
+    image_layout_sort_key,
+    is_non_visual_line_item,
+    metadata_dict,
+    metadata_image_assignment,
+    metadata_review_state,
+)
 from validation import build_document_validation
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
@@ -110,6 +118,8 @@ def list_documents(limit: int = 20) -> list[dict[str, Any]]:
                 file_size_bytes,
                 content_type,
                 supplier_name,
+                document_type,
+                offer_reference,
                 document_number,
                 document_date,
                 status,
@@ -134,6 +144,8 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 file_size_bytes,
                 content_type,
                 supplier_name,
+                document_type,
+                offer_reference,
                 document_number,
                 document_date,
                 project_ref,
@@ -181,6 +193,8 @@ def update_document_parse_result(
     document_id: int,
     *,
     supplier_name: str | None,
+    document_type: str | None,
+    offer_reference: str | None,
     document_number: str | None,
     document_date: date | None,
     project_ref: str | None,
@@ -198,6 +212,8 @@ def update_document_parse_result(
             UPDATE documents
             SET
                 supplier_name = %s,
+                document_type = %s,
+                offer_reference = %s,
                 document_number = %s,
                 document_date = %s,
                 project_ref = %s,
@@ -214,6 +230,8 @@ def update_document_parse_result(
             RETURNING
                 id,
                 supplier_name,
+                document_type,
+                offer_reference,
                 document_number,
                 document_date,
                 project_ref,
@@ -228,6 +246,8 @@ def update_document_parse_result(
             """,
             (
                 supplier_name,
+                document_type or "angebot",
+                offer_reference,
                 document_number,
                 document_date,
                 project_ref,
@@ -347,9 +367,10 @@ def replace_document_images(document_id: int, rows: list[dict[str, Any]]) -> int
                     sha256,
                     width,
                     height,
-                    bytes_size
+                    bytes_size,
+                    metadata_json
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb);
                 """,
                 [
                     (
@@ -362,6 +383,7 @@ def replace_document_images(document_id: int, rows: list[dict[str, Any]]) -> int
                         row.get("width"),
                         row.get("height"),
                         row.get("bytes_size"),
+                        json.dumps(row.get("metadata_json", {}), ensure_ascii=True),
                     )
                     for row in rows
                 ],
@@ -369,14 +391,18 @@ def replace_document_images(document_id: int, rows: list[dict[str, Any]]) -> int
     return len(rows)
 
 
-def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list[int]]) -> int:
+def update_line_item_image_assignments(document_id: int, assignments: dict[int, dict[str, Any]]) -> int:
     if not assignments:
         return 0
 
     updated_rows = 0
     with get_db() as conn:
         with conn.cursor() as cur:
-            for line_item_id, image_ids in assignments.items():
+            for line_item_id, assignment in assignments.items():
+                image_ids = assignment.get("image_ids") if isinstance(assignment, dict) else None
+                if not isinstance(image_ids, list):
+                    continue
+                clear_assignment = bool(assignment.get("clear_assignment")) if isinstance(assignment, dict) else False
                 unique_ids: list[int] = []
                 seen: set[int] = set()
                 for value in image_ids:
@@ -388,17 +414,32 @@ def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list
                         continue
                     seen.add(parsed)
                     unique_ids.append(parsed)
-                if not unique_ids:
+                if not unique_ids and not clear_assignment:
                     continue
 
-                patch = json.dumps(
-                    {
-                        "source": "llm",
-                        "llm_image_ids": unique_ids,
-                        "image_assignment_source": "vlm",
-                    },
-                    ensure_ascii=True,
-                )
+                source_default = "manual" if clear_assignment else "heuristic"
+                source = str(assignment.get("selection_source") or assignment.get("source") or source_default).strip()
+                reason = str(assignment.get("selection_reason") or assignment.get("reason") or "").strip()
+                strategy = str(assignment.get("strategy_requested") or assignment.get("strategy") or "").strip()
+                patch_payload: dict[str, Any] = {
+                    "image_assignment_ids": unique_ids,
+                    "llm_image_ids": unique_ids,
+                    "image_assignment_source": source,
+                    "image_assignment_reason": reason,
+                    "image_assignment_strategy": strategy or None,
+                }
+                if "review_checked" in assignment:
+                    review_checked = bool(assignment.get("review_checked"))
+                    patch_payload["review_checked"] = review_checked
+                    patch_payload["review_checked_at"] = (
+                        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+                        if review_checked
+                        else None
+                    )
+                    patch_payload["review_checked_reason"] = (
+                        str(assignment.get("review_checked_reason") or "").strip() or None
+                    )
+                patch = json.dumps(patch_payload, ensure_ascii=True)
                 cur.execute(
                     """
                     UPDATE line_items
@@ -409,6 +450,44 @@ def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list
                 )
                 updated_rows += int(cur.rowcount or 0)
     return updated_rows
+
+
+def update_line_item_review_state(
+    document_id: int,
+    line_item_id: int,
+    *,
+    checked: bool,
+    reason: str | None = None,
+) -> int:
+    patch = json.dumps(
+        {
+            "review_checked": bool(checked),
+            "review_checked_at": (
+                datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+                if checked
+                else None
+            ),
+            "review_checked_reason": (reason or "").strip() or None,
+        },
+        ensure_ascii=True,
+    )
+    with get_db() as conn:
+        updated = conn.execute(
+            """
+            UPDATE line_items
+            SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || %s::jsonb
+            WHERE document_id = %s AND id = %s;
+            """,
+            (patch, document_id, line_item_id),
+        ).rowcount or 0
+    return int(updated)
+
+
+def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list[int]]) -> int:
+    normalized: dict[int, dict[str, Any]] = {}
+    for line_item_id, image_ids in assignments.items():
+        normalized[line_item_id] = {"image_ids": image_ids, "selection_source": "vlm"}
+    return update_line_item_image_assignments(document_id, normalized)
 
 
 def reset_document_results(document_id: int) -> dict[str, Any] | None:
@@ -442,6 +521,8 @@ def reset_document_results(document_id: int) -> dict[str, Any] | None:
             UPDATE documents
             SET
                 supplier_name = NULL,
+                document_type = 'angebot',
+                offer_reference = NULL,
                 document_number = NULL,
                 document_date = NULL,
                 project_ref = NULL,
@@ -481,30 +562,11 @@ def _to_int(value: Any) -> int | None:
 
 
 def _metadata_dict(item: dict[str, Any]) -> dict[str, Any]:
-    raw = item.get("metadata_json")
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str):
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            return {}
-        return parsed if isinstance(parsed, dict) else {}
-    return {}
+    return metadata_dict(item)
 
 
 def _metadata_image_ids(item: dict[str, Any], valid_ids: set[int]) -> list[int]:
-    metadata = _metadata_dict(item)
-    raw = metadata.get("llm_image_ids")
-    if not isinstance(raw, list):
-        return []
-    values: list[int] = []
-    for value in raw:
-        parsed = _to_int(value)
-        if parsed is None or parsed not in valid_ids:
-            continue
-        values.append(parsed)
-    return _dedupe_ints(values)
+    return list(metadata_image_assignment(item, valid_ids).get("image_ids") or [])
 
 
 def _line_item_sort_key(item: dict[str, Any]) -> tuple[int, int, int]:
@@ -515,8 +577,8 @@ def _line_item_sort_key(item: dict[str, Any]) -> tuple[int, int, int]:
     return (1, _to_int(item.get("id")) or 0, 0)
 
 
-def _image_sort_key(image: dict[str, Any]) -> tuple[int, int]:
-    return (_to_int(image.get("image_index")) or 0, _to_int(image.get("id")) or 0)
+def _image_sort_key(image: dict[str, Any]) -> tuple[int, float, float, int, int]:
+    return image_layout_sort_key(image)
 
 
 def _is_probably_decorative_image(image: dict[str, Any], repeated_hashes: set[str]) -> bool:
@@ -547,9 +609,9 @@ def _pick_candidate_images_for_page(
     repeated_hashes: set[str],
 ) -> list[dict[str, Any]]:
     filtered = [img for img in page_images if not _is_probably_decorative_image(img, repeated_hashes)]
-    if filtered:
-        return sorted(filtered, key=_image_sort_key)
-    return sorted(page_images, key=_image_sort_key)
+    if not filtered:
+        return []
+    return sorted(filtered, key=_image_sort_key)
 
 
 def _dedupe_ints(values: list[int]) -> list[int]:
@@ -622,6 +684,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 sha256,
                 width,
                 height,
+                metadata_json,
                 bytes_size,
                 created_at
             FROM document_images
@@ -665,9 +728,22 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         item["image_ids"] = []
         item["image_count"] = 0
         item["image_ids_primary"] = []
+        item["image_candidate_ids"] = []
+        item["image_candidate_count"] = 0
         item["image_ids_page_all"] = []
         item["image_count_page_all"] = 0
-        item["_llm_image_ids"] = _metadata_image_ids(item, valid_image_ids)
+        item["image_next_page_allowed"] = False
+        assignment_meta = metadata_image_assignment(item, valid_image_ids)
+        review_meta = metadata_review_state(item)
+        item["_image_assignment_meta"] = assignment_meta
+        item["_review_meta"] = review_meta
+        item["image_assignment_source"] = assignment_meta.get("source")
+        item["image_assignment_reason"] = assignment_meta.get("reason")
+        item["image_assignment_has_decision"] = bool(assignment_meta.get("has_decision"))
+        item["image_assignment_is_final"] = bool(assignment_meta.get("is_final"))
+        item["review_checked"] = bool(review_meta.get("checked"))
+        item["review_checked_at"] = review_meta.get("checked_at")
+        item["review_checked_reason"] = review_meta.get("reason")
         page_ref = _to_int(item.get("page_ref"))
         if page_ref is None:
             continue
@@ -676,58 +752,124 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
     for page_ref, item_indexes in items_by_page.items():
         all_page_image_ids = all_ids_by_page.get(page_ref, [])
         current_candidates = candidate_ids_by_page.get(page_ref, [])
-        prev_candidates = candidate_ids_by_page.get(page_ref - 1, [])
         next_candidates = candidate_ids_by_page.get(page_ref + 1, [])
 
-        # Prefer broad recall: current-page candidates + adjacent-page candidates.
-        merged_candidates = _dedupe_ints(current_candidates + prev_candidates + next_candidates)
-        if not merged_candidates:
-            merged_candidates = _dedupe_ints(
-                all_page_image_ids
-                + all_ids_by_page.get(page_ref - 1, [])
-                + all_ids_by_page.get(page_ref + 1, [])
-            )
-
         sorted_item_indexes = sorted(item_indexes, key=lambda idx: _line_item_sort_key(line_item_list[idx]))
-        for item_idx in sorted_item_indexes:
+        visual_item_indexes = [idx for idx in sorted_item_indexes if not is_non_visual_line_item(line_item_list[idx])]
+        last_visual_item_idx = visual_item_indexes[-1] if visual_item_indexes else None
+        item_count = len(sorted_item_indexes)
+        for item_offset, item_idx in enumerate(sorted_item_indexes):
             item = line_item_list[item_idx]
-            llm_image_ids = item.get("_llm_image_ids") if isinstance(item.get("_llm_image_ids"), list) else []
-            if llm_image_ids:
-                item["image_ids"] = llm_image_ids
-                item["image_count"] = len(llm_image_ids)
-                item["image_ids_primary"] = llm_image_ids[:1]
+            allow_next_page_candidates = item_idx == last_visual_item_idx
+            item["image_next_page_allowed"] = allow_next_page_candidates
+            if is_non_visual_line_item(item):
+                item["image_ids"] = []
+                item["image_count"] = 0
+                item["image_ids_primary"] = []
+                item["image_candidate_ids"] = []
+                item["image_candidate_count"] = 0
+                item["image_ids_page_all"] = all_page_image_ids
+                item["image_count_page_all"] = len(all_page_image_ids)
+                item["image_assignment_source"] = "unmatched"
+                item["image_assignment_reason"] = "non_visual_line_item"
+                continue
+            assignment_meta = item.get("_image_assignment_meta") if isinstance(item.get("_image_assignment_meta"), dict) else {}
+            persisted_image_ids = list(assignment_meta.get("image_ids") or [])
+            has_assignment_decision = bool(assignment_meta.get("has_decision"))
+
+            focused_current = focused_image_ids(
+                current_candidates,
+                item_count=item_count,
+                item_index=item_offset,
+                max_candidates=4,
+            )
+            focused_neighbor = focused_image_ids(
+                next_candidates if allow_next_page_candidates else [],
+                item_count=item_count,
+                item_index=item_offset,
+                max_candidates=3,
+            )
+            focused_fallback = focused_image_ids(
+                _dedupe_ints(
+                    all_page_image_ids
+                    + (all_ids_by_page.get(page_ref + 1, []) if allow_next_page_candidates else [])
+                ),
+                item_count=item_count,
+                item_index=item_offset,
+                max_candidates=3,
+            )
+            candidate_ids = _dedupe_ints(focused_current + focused_neighbor + focused_fallback)
+
+            if persisted_image_ids:
+                final_ids = persisted_image_ids
+                item["image_assignment_source"] = item.get("image_assignment_source") or "persisted_assignment"
+                item["image_assignment_reason"] = item.get("image_assignment_reason") or "stored_assignment"
+            elif has_assignment_decision:
+                final_ids = []
+                item["image_assignment_source"] = item.get("image_assignment_source") or "unmatched"
+                item["image_assignment_reason"] = item.get("image_assignment_reason") or "stored_no_assignment"
+            elif focused_current:
+                final_ids = focused_current[:2] if len(focused_current) > 1 and item_count <= len(current_candidates) else focused_current[:1]
+                item["image_assignment_source"] = "page_layout"
+                item["image_assignment_reason"] = "same_page_image_distribution"
+            elif focused_neighbor:
+                final_ids = focused_neighbor[:1]
+                item["image_assignment_source"] = "page_neighbor_fallback"
+                item["image_assignment_reason"] = "adjacent_page_candidates"
+            elif focused_fallback:
+                final_ids = focused_fallback[:1]
+                item["image_assignment_source"] = "page_fallback"
+                item["image_assignment_reason"] = "page_image_fallback"
             else:
-                item["image_ids"] = merged_candidates
-                item["image_count"] = len(merged_candidates)
-                item["image_ids_primary"] = current_candidates[:1] if current_candidates else merged_candidates[:1]
+                final_ids = []
+                item["image_assignment_source"] = "unmatched"
+                item["image_assignment_reason"] = "no_candidate_images"
+
+            item["image_ids"] = final_ids
+            item["image_count"] = len(final_ids)
+            item["image_ids_primary"] = final_ids[:1]
+            item["image_candidate_ids"] = candidate_ids
+            item["image_candidate_count"] = len(candidate_ids)
             item["image_ids_page_all"] = all_page_image_ids
             item["image_count_page_all"] = len(all_page_image_ids)
 
-    llm_image_to_items: dict[int, list[int]] = {}
+    assigned_image_to_items: dict[int, list[int]] = {}
+    assigned_image_to_positions: dict[int, list[str]] = {}
     for item in line_item_list:
         item_id = _to_int(item.get("id"))
-        llm_image_ids = item.get("_llm_image_ids") if isinstance(item.get("_llm_image_ids"), list) else []
-        if item_id is None or not llm_image_ids:
+        assigned_image_ids = [
+            image_id
+            for image_id in (_to_int(image_id) for image_id in (item.get("image_ids") or []))
+            if image_id is not None
+        ]
+        if item_id is None or not assigned_image_ids:
             continue
-        for image_id in llm_image_ids:
-            if image_id not in llm_image_to_items:
-                llm_image_to_items[image_id] = []
-            llm_image_to_items[image_id].append(item_id)
+        position_no = str(item.get("position_no") or "").strip()
+        for image_id in assigned_image_ids:
+            if image_id not in assigned_image_to_items:
+                assigned_image_to_items[image_id] = []
+            assigned_image_to_items[image_id].append(item_id)
+            if position_no:
+                if image_id not in assigned_image_to_positions:
+                    assigned_image_to_positions[image_id] = []
+                if position_no not in assigned_image_to_positions[image_id]:
+                    assigned_image_to_positions[image_id].append(position_no)
 
     for image in image_list:
         image_id = _to_int(image.get("id"))
-        matched_item_ids = llm_image_to_items.get(image_id, []) if image_id is not None else []
+        matched_item_ids = assigned_image_to_items.get(image_id, []) if image_id is not None else []
+        matched_positions = assigned_image_to_positions.get(image_id, []) if image_id is not None else []
         image["is_llm_matched"] = bool(matched_item_ids)
         image["llm_matched_line_item_ids"] = matched_item_ids
         image["llm_match_count"] = len(matched_item_ids)
+        image["is_assigned"] = bool(matched_item_ids)
+        image["assigned_line_item_ids"] = matched_item_ids
+        image["assigned_match_count"] = len(matched_item_ids)
+        image["assigned_position_nos"] = matched_positions
 
     for item in line_item_list:
-        llm_image_ids = item.get("_llm_image_ids") if isinstance(item.get("_llm_image_ids"), list) else []
-        if llm_image_ids and not item.get("image_ids"):
-            item["image_ids"] = llm_image_ids
-            item["image_count"] = len(llm_image_ids)
-            item["image_ids_primary"] = llm_image_ids[:1]
-        item.pop("_llm_image_ids", None)
+        item.pop("_image_assignment_meta", None)
+        item.pop("_review_meta", None)
 
     validation = build_document_validation(
         document=document,
@@ -759,6 +901,7 @@ def get_document_image(document_id: int, image_id: int) -> dict[str, Any] | None
                 sha256,
                 width,
                 height,
+                metadata_json,
                 bytes_size,
                 created_at
             FROM document_images

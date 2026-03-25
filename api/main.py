@@ -21,7 +21,8 @@ from db import (
     insert_document,
     list_documents,
     reset_document_results,
-    update_line_item_llm_image_ids,
+    update_line_item_image_assignments,
+    update_line_item_review_state,
     replace_document_images,
     replace_document_amount_lines,
     replace_line_items,
@@ -30,6 +31,8 @@ from db import (
 )
 from extractor import extract_pdf_images, extract_pdf_text
 from exporter import build_export_content
+from image_assignment import is_non_visual_line_item, page_candidate_rank
+from image_preview import browser_preview_for_image
 from image_matcher import rank_line_item_candidates_with_vlm
 from llm import enrich_document_fields_with_ollama, extract_document_full_with_ollama
 from parser import parse_document_text, supplier_name_for_template
@@ -48,6 +51,8 @@ SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 PROCESS_MODES = ("parser_only", "hybrid_fill", "llm_override", "llm_only")
 COMPARE_FIELDS = (
     "supplier_name",
+    "document_type",
+    "offer_reference",
     "document_number",
     "document_date",
     "project_ref",
@@ -63,6 +68,10 @@ PROCESS_PROGRESS_LOCK = Lock()
 
 class ParseTextRequest(BaseModel):
     text: str = Field(min_length=1, description="Raw text content extracted from a PDF.")
+
+
+class AssignImageRequest(BaseModel):
+    image_id: int = Field(gt=0, description="Final image id to assign to the line item.")
 
 
 def _safe_filename(filename: str) -> str:
@@ -214,7 +223,7 @@ def _merge_parser_with_llm_fields(
         if parser_value != llm_value:
             changes.append({"field": field_name, "old": parser_value, "new": llm_value, "applied": False})
 
-    for field in ("document_number", "document_date", "project_ref", "currency"):
+    for field in ("document_type", "offer_reference", "document_number", "document_date", "project_ref", "currency"):
         _apply_field(field)
 
     merged_totals = dict(merged.get("totals") or {})
@@ -250,7 +259,7 @@ def _build_llm_only_fields(
         if parser_value != llm_value:
             changes.append({"field": field_name, "old": parser_value, "new": llm_value, "applied": True})
 
-    for field in ("document_number", "document_date", "project_ref", "currency"):
+    for field in ("document_type", "offer_reference", "document_number", "document_date", "project_ref", "currency"):
         _set_field(field)
 
     parser_totals = parsed.get("totals")
@@ -273,6 +282,8 @@ def _document_field_snapshot(parsed: dict[str, Any]) -> dict[str, Any]:
     totals = totals if isinstance(totals, dict) else {}
     return {
         "template": _clean_optional_str(parsed.get("template")) or "generic",
+        "document_type": _clean_optional_str(parsed.get("document_type")) or "angebot",
+        "offer_reference": _clean_optional_str(parsed.get("offer_reference")),
         "document_number": _clean_optional_str(parsed.get("document_number")),
         "document_date": _clean_optional_str(parsed.get("document_date")),
         "project_ref": _clean_optional_str(parsed.get("project_ref")),
@@ -392,6 +403,10 @@ def _normalize_compare_value(field: str, value: Any) -> str | None:
     if field in {"supplier_name", "project_ref"}:
         collapsed = re.sub(r"\s+", " ", text).strip()
         return collapsed.casefold()
+    if field == "document_type":
+        return text.strip().lower()
+    if field == "offer_reference":
+        return re.sub(r"\s+", " ", text).strip().casefold()
     if field == "document_number":
         return re.sub(r"\s+", "", text)
     if field.startswith("totals."):
@@ -486,26 +501,36 @@ def _candidate_images_for_item(
     *,
     max_candidates: int,
 ) -> list[dict[str, Any]]:
+    if is_non_visual_line_item(item):
+        return []
     candidate_ids: list[int] = []
-    for key in ("image_ids", "image_ids_page_all"):
+    for key in ("image_candidate_ids", "image_ids", "image_ids_page_all"):
         raw = item.get(key)
         if not isinstance(raw, list):
             continue
+        current_ids: list[int] = []
         for value in raw:
             parsed = _to_int_safe(value)
             if parsed is not None:
-                candidate_ids.append(parsed)
-    candidate_ids = _dedupe_int_list(candidate_ids)
+                current_ids.append(parsed)
+        current_ids = _dedupe_int_list(current_ids)
+        if current_ids:
+            candidate_ids = current_ids
+            break
     if not candidate_ids:
         return []
 
     page_ref = _to_int_safe(item.get("page_ref"))
+    next_page_allowed = bool(item.get("image_next_page_allowed"))
     primary_ids_raw = item.get("image_ids_primary")
-    primary_ids = {
-        parsed
-        for parsed in (_to_int_safe(val) for val in (primary_ids_raw if isinstance(primary_ids_raw, list) else []))
-        if parsed is not None
-    }
+    image_assignment_is_final = bool(item.get("image_assignment_is_final"))
+    primary_ids = set()
+    if image_assignment_is_final:
+        primary_ids = {
+            parsed
+            for parsed in (_to_int_safe(val) for val in (primary_ids_raw if isinstance(primary_ids_raw, list) else []))
+            if parsed is not None
+        }
 
     scored: list[tuple[float, dict[str, Any]]] = []
     for image_id in candidate_ids:
@@ -513,6 +538,15 @@ def _candidate_images_for_item(
         if image is None:
             continue
         image_page = _to_int_safe(image.get("page_ref"))
+        if (
+            not image_assignment_is_final
+            and page_ref is not None
+            and image_page is not None
+        ):
+            if image_page < page_ref:
+                continue
+            if image_page > page_ref and not next_page_allowed:
+                continue
         width = _to_int_safe(image.get("width")) or 0
         height = _to_int_safe(image.get("height")) or 0
         area = width * height
@@ -520,17 +554,20 @@ def _candidate_images_for_item(
         repeated_penalty = -0.25 if image.get("is_repeated_across_pages") else 0.0
         page_bonus = 0.0
         if page_ref is not None and image_page is not None:
-            if page_ref == image_page:
+            page_diff = image_page - page_ref
+            if page_diff == 0:
                 page_bonus = 0.80
-            elif abs(page_ref - image_page) == 1:
-                page_bonus = 0.20
+            elif page_diff == 1:
+                page_bonus = 0.24
+            elif page_diff == -1:
+                page_bonus = 0.16
         area_bonus = min(0.60, area / 420_000.0) if area > 0 else 0.0
         primary_bonus = 0.20 if image_id in primary_ids else 0.0
         score = page_bonus + area_bonus + primary_bonus + decorative_penalty + repeated_penalty
-        scored.append((score, image))
+        scored.append((score, page_candidate_rank(page_ref, image_page), image))
 
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [image for _, image in scored[:max_candidates]]
+    scored.sort(key=lambda pair: (-pair[0], pair[1], _to_int_safe(pair[2].get("id")) or 0))
+    return [image for _, _, image in scored[:max_candidates]]
 
 
 def _heuristic_match_for_item(
@@ -539,13 +576,22 @@ def _heuristic_match_for_item(
     *,
     allow_multiple: bool,
 ) -> dict[str, Any]:
+    if is_non_visual_line_item(item):
+        return {
+            "selected_image_ids": [],
+            "scores": [],
+        }
     page_ref = _to_int_safe(item.get("page_ref"))
+    next_page_allowed = bool(item.get("image_next_page_allowed"))
     primary_ids_raw = item.get("image_ids_primary")
-    primary_ids = {
-        parsed
-        for parsed in (_to_int_safe(val) for val in (primary_ids_raw if isinstance(primary_ids_raw, list) else []))
-        if parsed is not None
-    }
+    image_assignment_is_final = bool(item.get("image_assignment_is_final"))
+    primary_ids = set()
+    if image_assignment_is_final:
+        primary_ids = {
+            parsed
+            for parsed in (_to_int_safe(val) for val in (primary_ids_raw if isinstance(primary_ids_raw, list) else []))
+            if parsed is not None
+        }
 
     score_rows: list[dict[str, Any]] = []
     for image in candidate_images:
@@ -553,15 +599,27 @@ def _heuristic_match_for_item(
         if image_id is None:
             continue
         image_page = _to_int_safe(image.get("page_ref"))
+        if (
+            not image_assignment_is_final
+            and page_ref is not None
+            and image_page is not None
+        ):
+            if image_page < page_ref:
+                continue
+            if image_page > page_ref and not next_page_allowed:
+                continue
         width = _to_int_safe(image.get("width")) or 0
         height = _to_int_safe(image.get("height")) or 0
         area = width * height
         score = 0.0
         if page_ref is not None and image_page is not None:
-            if page_ref == image_page:
+            page_diff = image_page - page_ref
+            if page_diff == 0:
                 score += 0.85
-            elif abs(page_ref - image_page) == 1:
-                score += 0.25
+            elif page_diff == 1:
+                score += 0.32
+            elif page_diff == -1:
+                score += 0.22
         score += min(0.55, area / 420_000.0) if area > 0 else 0.0
         if image_id in primary_ids:
             score += 0.20
@@ -574,19 +632,24 @@ def _heuristic_match_for_item(
                 "image_id": image_id,
                 "score": round(score, 4),
                 "reason": "heuristic(page+area+decorative+primary)",
+                "_page_rank": page_candidate_rank(page_ref, image_page),
             }
         )
 
-    score_rows.sort(key=lambda row: row["score"], reverse=True)
+    score_rows.sort(key=lambda row: (-row["score"], row["_page_rank"], row["image_id"]))
     selected_image_ids: list[int] = []
-    if score_rows:
+    minimum_assignment_score = 0.25
+    if score_rows and score_rows[0]["score"] >= minimum_assignment_score:
         selected_image_ids = [score_rows[0]["image_id"]]
         if allow_multiple and len(score_rows) > 1:
             top = score_rows[0]["score"]
             second = score_rows[1]["score"]
-            if second >= top - 0.10 and second >= 0.25:
+            if second >= top - 0.10 and second >= minimum_assignment_score:
                 selected_image_ids.append(score_rows[1]["image_id"])
     selected_image_ids = _dedupe_int_list(selected_image_ids)
+
+    for row in score_rows:
+        row.pop("_page_rank", None)
 
     return {
         "selected_image_ids": selected_image_ids,
@@ -870,12 +933,166 @@ def document_image(document_id: int, image_id: int):
     image_path = Path(image["storage_path"])
     if not image_path.exists() or not image_path.is_file():
         raise HTTPException(status_code=404, detail=f"Image file not found: {image_path}")
-    media_type = image.get("mime_type") or "application/octet-stream"
+    preview_path, media_type, transcoded = browser_preview_for_image(
+        image_path,
+        mime_type=image.get("mime_type"),
+        cache_key=str(image.get("sha256") or f"document_{document_id}_image_{image_id}"),
+    )
+    output_path = preview_path if preview_path.exists() else image_path
+    filename = output_path.name
     headers = {
-        "Content-Disposition": f'inline; filename="{image_path.name}"',
+        "Content-Disposition": f'inline; filename="{filename}"',
         "Cache-Control": "no-store",
+        "X-Original-Mime-Type": str(image.get("mime_type") or ""),
+        "X-Preview-Transcoded": "1" if transcoded else "0",
     }
-    return FileResponse(image_path, media_type=media_type, headers=headers)
+    return FileResponse(output_path, media_type=media_type, headers=headers)
+
+
+@app.post("/documents/{document_id}/line-items/{line_item_id}/assign-image")
+def assign_line_item_image(document_id: int, line_item_id: int, payload: AssignImageRequest):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    images_raw = result_data.get("images")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    images = list(images_raw) if isinstance(images_raw, list) else []
+
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    image = next((item for item in images if _to_int_safe(item.get("id")) == payload.image_id), None)
+    if not image:
+        raise HTTPException(status_code=404, detail=f"Image {payload.image_id} for document {document_id} not found.")
+
+    updated = update_line_item_image_assignments(
+        document_id,
+        {
+            line_item_id: {
+                "image_ids": [payload.image_id],
+                "selection_source": "manual",
+                "selection_reason": "ui_manual_assignment",
+                "strategy_requested": "manual",
+                "review_checked": True,
+                "review_checked_reason": "ui_manual_assignment",
+            }
+        },
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Image assignment could not be persisted.")
+
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "image_id": payload.image_id,
+        "selection_source": "manual",
+        "selection_reason": "ui_manual_assignment",
+        "review_checked": True,
+    }
+
+
+@app.delete("/documents/{document_id}/line-items/{line_item_id}/assign-image")
+def clear_line_item_image_assignment(document_id: int, line_item_id: int):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    updated = update_line_item_image_assignments(
+        document_id,
+        {
+            line_item_id: {
+                "image_ids": [],
+                "selection_source": "manual",
+                "selection_reason": "ui_manual_clear",
+                "strategy_requested": "manual",
+                "clear_assignment": True,
+                "review_checked": True,
+                "review_checked_reason": "ui_manual_clear",
+            }
+        },
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Image assignment could not be cleared.")
+
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "image_id": None,
+        "selection_source": "manual",
+        "selection_reason": "ui_manual_clear",
+        "review_checked": True,
+    }
+
+
+@app.post("/documents/{document_id}/line-items/{line_item_id}/review-check")
+def check_line_item_review(document_id: int, line_item_id: int):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    updated = update_line_item_review_state(
+        document_id,
+        line_item_id,
+        checked=True,
+        reason="ui_manual_review",
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Review state could not be persisted.")
+
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "review_checked": True,
+        "review_checked_reason": "ui_manual_review",
+    }
+
+
+@app.delete("/documents/{document_id}/line-items/{line_item_id}/review-check")
+def clear_line_item_review(document_id: int, line_item_id: int):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    updated = update_line_item_review_state(
+        document_id,
+        line_item_id,
+        checked=False,
+        reason="ui_review_reset",
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Review state could not be cleared.")
+
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "review_checked": False,
+        "review_checked_reason": "ui_review_reset",
+    }
 
 
 @app.post("/upload")
@@ -1098,6 +1315,8 @@ def compare_document(document_id: int):
                 extracted_text=extracted_text,
                 parser_snapshot={
                     "template": parser_snapshot.get("template"),
+                    "document_type": parser_snapshot.get("document_type"),
+                    "offer_reference": parser_snapshot.get("offer_reference"),
                     "document_number": parser_snapshot.get("document_number"),
                     "document_date": parser_snapshot.get("document_date"),
                     "project_ref": parser_snapshot.get("project_ref"),
@@ -1123,6 +1342,8 @@ def compare_document(document_id: int):
         llm_snapshot = {
             "template": template,
             "supplier_name": _clean_optional_str(llm_fields.get("supplier_name")),
+            "document_type": _clean_optional_str(llm_fields.get("document_type")),
+            "offer_reference": _clean_optional_str(llm_fields.get("offer_reference")),
             "document_number": _clean_optional_str(llm_fields.get("document_number")),
             "document_date": _clean_optional_str(llm_fields.get("document_date")),
             "project_ref": _clean_optional_str(llm_fields.get("project_ref")),
@@ -1242,6 +1463,9 @@ def match_images(
         if not allow_multiple and len(final_selected) > 1:
             final_selected = final_selected[:1]
         final_selected = _dedupe_int_list([_to_int_safe(image_id) for image_id in final_selected if _to_int_safe(image_id) is not None])
+        if not final_selected:
+            final_source = "unmatched"
+            final_reason = "no_confident_candidate" if candidates else "no_candidate_images"
 
         candidate_summaries = [
             {
@@ -1310,14 +1534,19 @@ def match_images(
     )
 
 
-def _persist_llm_image_assignments(document_id: int) -> dict[str, Any]:
+def _persist_image_assignments(
+    document_id: int,
+    *,
+    strategy: Literal["heuristic", "vlm", "hybrid"],
+    allow_multiple: bool = False,
+) -> dict[str, Any]:
     try:
         payload = match_images(
             document_id=document_id,
-            strategy="hybrid",
+            strategy=strategy,
             max_candidates=6,
             max_items=250,
-            allow_multiple=True,
+            allow_multiple=allow_multiple,
             vlm_min_confidence=0.40,
         )
     except HTTPException as exc:
@@ -1329,7 +1558,7 @@ def _persist_llm_image_assignments(document_id: int) -> dict[str, Any]:
     if not isinstance(raw_items, list):
         return {"status": "skipped", "reason": "match_items_missing", "updated_line_items": 0}
 
-    assignments: dict[int, list[int]] = {}
+    assignments: dict[int, dict[str, Any]] = {}
     for item in raw_items:
         if not isinstance(item, dict):
             continue
@@ -1343,16 +1572,24 @@ def _persist_llm_image_assignments(document_id: int) -> dict[str, Any]:
             if parsed is not None:
                 selected_ids.append(parsed)
         selected_ids = _dedupe_int_list(selected_ids)
-        if selected_ids:
-            assignments[line_item_id] = selected_ids
+        assignments[line_item_id] = {
+            "image_ids": selected_ids,
+            "selection_source": item.get("selection_source"),
+            "selection_reason": item.get("selection_reason"),
+            "strategy_requested": strategy,
+            "clear_assignment": not bool(selected_ids),
+        }
 
-    updated_count = update_line_item_llm_image_ids(document_id, assignments)
+    updated_count = update_line_item_image_assignments(document_id, assignments)
     return {
         "status": "ok",
+        "strategy": strategy,
+        "allow_multiple": allow_multiple,
         "updated_line_items": updated_count,
         "assigned_line_items": len(assignments),
         "matched_items": (payload.get("summary") or {}).get("matched_items"),
         "vlm_selected_items": (payload.get("summary") or {}).get("vlm_selected_items"),
+        "heuristic_selected_items": (payload.get("summary") or {}).get("heuristic_selected_items"),
     }
 
 
@@ -1422,6 +1659,7 @@ def process_document(
     llm_enabled_env = _is_truthy(os.getenv("LLM_ENABLED"), default=True)
     llm_enabled = llm_requested and llm_enabled_env
     llm_override_effective = requested_mode == "llm_override"
+    vlm_enabled_env = _is_truthy(os.getenv("VLM_ENABLED"), default=False)
     llm_result: dict[str, Any] | None = None
     llm_changes: list[dict[str, Any]] = []
     llm_dump_path: str | None = None
@@ -1433,7 +1671,7 @@ def process_document(
     position_count = 0
     line_item_rows: list[dict[str, Any]] = []
     amount_line_rows: list[dict[str, Any]] = []
-    llm_image_assignment_summary: dict[str, Any] | None = None
+    image_assignment_summary: dict[str, Any] | None = None
 
     try:
         _set_process_progress(
@@ -1469,6 +1707,8 @@ def process_document(
         if requested_mode == "llm_only":
             parsed_base = {
                 "template": "llm_only",
+                "document_type": None,
+                "offer_reference": None,
                 "document_number": None,
                 "document_date": None,
                 "project_ref": None,
@@ -1560,6 +1800,8 @@ def process_document(
                     extracted_text=extracted_text,
                     parser_snapshot={
                         "template": parsed_base.get("template"),
+                        "document_type": parsed_base.get("document_type"),
+                        "offer_reference": parsed_base.get("offer_reference"),
                         "document_number": parsed_base.get("document_number"),
                         "document_date": parsed_base.get("document_date"),
                         "project_ref": parsed_base.get("project_ref"),
@@ -1648,15 +1890,22 @@ def process_document(
         replace_document_amount_lines(document_id, amount_line_rows)
         replace_line_items(document_id, line_item_rows)
         replace_document_images(document_id, image_rows)
-        if requested_mode == "llm_only":
+        if line_item_rows and image_rows:
+            image_match_strategy: Literal["heuristic", "vlm", "hybrid"] = "heuristic"
+            if requested_mode != "parser_only" and vlm_enabled_env:
+                image_match_strategy = "hybrid"
             _set_process_progress(
                 document_id,
-                stage="llm_image_match",
-                message="LLM Bild-Matching laeuft.",
+                stage="image_match",
+                message="Bildzuordnung pro Position wird berechnet.",
                 mode=requested_mode,
                 status="processing",
             )
-            llm_image_assignment_summary = _persist_llm_image_assignments(document_id)
+            image_assignment_summary = _persist_image_assignments(
+                document_id,
+                strategy=image_match_strategy,
+                allow_multiple=False,
+            )
 
         position_count = len(line_item_rows) if line_item_rows else int(parsed.get("position_count", 0) or 0)
         confidence = _compute_confidence(
@@ -1668,6 +1917,8 @@ def process_document(
         updated = update_document_parse_result(
             document_id,
             supplier_name=supplier_name,
+            document_type=parsed.get("document_type"),
+            offer_reference=parsed.get("offer_reference"),
             document_number=parsed.get("document_number"),
             document_date=date_value,
             project_ref=parsed.get("project_ref"),
@@ -1717,6 +1968,8 @@ def process_document(
         "amount_line_count": len(amount_line_rows),
         "image_count": len(image_rows),
         "supplier_name": updated["supplier_name"],
+        "document_type": updated["document_type"],
+        "offer_reference": updated["offer_reference"],
         "document_number": updated["document_number"],
         "document_date": str(updated["document_date"]) if updated["document_date"] else None,
         "project_ref": updated["project_ref"],
@@ -1740,7 +1993,8 @@ def process_document(
         "llm_change_total": len(llm_changes),
         "llm_line_item_count": len((llm_result or {}).get("line_items") or []) if requested_mode == "llm_only" else None,
         "llm_amount_line_count": len((llm_result or {}).get("amount_lines") or []) if requested_mode == "llm_only" else None,
-        "llm_image_assignment": llm_image_assignment_summary,
+        "image_assignment": image_assignment_summary,
+        "llm_image_assignment": image_assignment_summary,
         "llm_dump_path": llm_dump_path,
         "updated_at": updated["updated_at"],
     }

@@ -32,6 +32,8 @@ def _to_csv(data: dict[str, Any]) -> str:
 
     fieldnames = [
         "document_id",
+        "document_type",
+        "offer_reference",
         "document_number",
         "document_date",
         "supplier_name",
@@ -65,6 +67,8 @@ def _to_csv(data: dict[str, Any]) -> str:
         writer.writerow(
             {
                 "document_id": document.get("id"),
+                "document_type": document.get("document_type"),
+                "offer_reference": document.get("offer_reference"),
                 "document_number": document.get("document_number"),
                 "document_date": document.get("document_date"),
                 "supplier_name": document.get("supplier_name"),
@@ -129,6 +133,8 @@ def _to_sql(data: dict[str, Any]) -> str:
         "file_size_bytes",
         "content_type",
         "supplier_name",
+        "document_type",
+        "offer_reference",
         "document_number",
         "document_date",
         "project_ref",
@@ -192,11 +198,32 @@ def _to_sql(data: dict[str, Any]) -> str:
         lines.append(f"INSERT INTO line_items ({', '.join(item_cols)}) VALUES ({', '.join(row_values)});")
 
     lines.append(f"DELETE FROM document_images WHERE document_id = {_sql_literal(document_id)};")
-    image_cols = ["document_id", "page_ref", "image_index", "mime_type", "storage_path", "sha256", "width", "height", "bytes_size", "created_at"]
+    image_cols = [
+        "document_id",
+        "page_ref",
+        "image_index",
+        "mime_type",
+        "storage_path",
+        "sha256",
+        "width",
+        "height",
+        "bytes_size",
+        "metadata_json",
+        "created_at",
+    ]
     for row in images:
         payload = dict(row)
         payload["document_id"] = document_id
-        lines.append(_insert_sql("document_images", image_cols, payload))
+        metadata = payload.get("metadata_json")
+        if isinstance(metadata, (dict, list)):
+            payload["metadata_json"] = json.dumps(metadata, ensure_ascii=False)
+        row_values: list[str] = []
+        for col in image_cols:
+            if col == "metadata_json":
+                row_values.append(f"{_sql_literal(payload.get(col))}::jsonb")
+            else:
+                row_values.append(_sql_literal(payload.get(col)))
+        lines.append(f"INSERT INTO document_images ({', '.join(image_cols)}) VALUES ({', '.join(row_values)});")
 
     lines.append("COMMIT;")
     return "\n".join(lines) + "\n"
