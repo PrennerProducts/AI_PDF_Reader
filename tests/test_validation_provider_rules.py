@@ -66,6 +66,55 @@ def test_alu_one_provider_policy_excludes_az_and_vorbemerkungen() -> None:
     assert validation["line_item_summary"]["warning_count"] == 0
 
 
+def test_alu_one_az_item_is_not_treated_as_visual_image_requirement() -> None:
+    line_items = [
+        {
+            "position_no": "001",
+            "description_short": "Türelement",
+            "quantity": "1",
+            "unit_price": "180.00",
+            "line_total": "180.00",
+            "page_ref": 1,
+            "is_alternative": False,
+            "image_ids": [77],
+        },
+        {
+            "position_no": "008",
+            "description_short": "AZ - Glasauschnitt",
+            "quantity": "1",
+            "unit_price": "180.00",
+            "line_total": "180.00",
+            "page_ref": 2,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "alu-one Metallbaupartner GmbH",
+            "document_type": "angebot",
+            "document_number": "C2509283TB",
+            "document_date": "2025-11-10",
+            "project_ref": "Kinderhotel Felben",
+            "currency": "EUR",
+            "net_total": "180.00",
+            "vat_total": "36.00",
+            "gross_total": "216.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[{"id": 77, "page_ref": 1}],
+    )
+
+    az_item = line_items[1]
+    az_issue_codes = [issue.get("code") for issue in (az_item.get("validation_issues") or [])]
+
+    assert "missing_image_assignment" not in az_issue_codes
+    assert az_item["validation_status"] == "auto_accept"
+
+
 def test_entholzer_system_header_is_informational() -> None:
     validation = build_document_validation(
         document={
@@ -271,3 +320,82 @@ def test_manual_review_does_not_resolve_errors() -> None:
     assert validation["status"] == "reject"
     assert validation["error_count"] > 0
     assert line_items[0]["validation_status"] == "reject"
+
+
+def test_document_approval_summary_is_exposed_for_approved_document() -> None:
+    validation = build_document_validation(
+        document={
+            "supplier_name": "alu-one Metallbaupartner GmbH",
+            "document_type": "angebot",
+            "document_number": "C2509283TB",
+            "document_date": "2025-11-10",
+            "project_ref": "Kinderhotel Felben",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+            "approval_status": "approved",
+            "reviewed_by": "Daniela",
+            "reviewed_at": "2026-03-26T09:15:00Z",
+            "approval_note": "OK fuer Export",
+        },
+        amount_lines=[],
+        line_items=[
+            {
+                "position_no": "001",
+                "description_short": "Türelement",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+                "image_ids": [7],
+            },
+        ],
+        images=[{"id": 7, "page_ref": 1}],
+    )
+
+    assert validation["status"] == "auto_accept"
+    assert validation["approval"]["approved"] is True
+    assert validation["approval"]["eligible"] is True
+    assert validation["approval"]["reviewed_by"] == "Daniela"
+    assert validation["approval"]["approval_note"] == "OK fuer Export"
+
+
+def test_document_approval_summary_stays_pending_when_validation_blocks_release() -> None:
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Rieder",
+            "document_type": "auftragsbestaetigung",
+            "document_number": "131584-2",
+            "document_date": "2025-06-11",
+            "project_ref": "Sevignani",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+            "approval_status": "pending",
+        },
+        amount_lines=[],
+        line_items=[
+            {
+                "position_no": "1",
+                "description_short": "Fenster",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+            },
+        ],
+        images=[],
+    )
+
+    assert validation["status"] == "reject"
+    assert validation["approval"]["approved"] is False
+    assert validation["approval"]["eligible"] is False
+    assert validation["approval"]["status"] == "pending"

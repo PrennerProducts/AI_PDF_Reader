@@ -119,12 +119,67 @@ def test_candidate_images_disallow_next_page_for_non_last_item() -> None:
     assert candidates == []
 
 
-def test_candidate_images_allow_next_page_for_last_item() -> None:
+def test_candidate_images_allow_next_page_for_last_item_without_same_page_visual() -> None:
     item = {
         "page_ref": 1,
         "image_candidate_ids": [21],
         "image_assignment_is_final": False,
         "image_next_page_allowed": True,
+    }
+    image_by_id = {
+        21: {
+            "id": 21,
+            "page_ref": 2,
+            "width": 900,
+            "height": 900,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        }
+    }
+
+    candidates = _candidate_images_for_item(item, image_by_id, max_candidates=4)
+
+    assert [candidate["id"] for candidate in candidates] == [21]
+
+
+def test_candidate_images_prefer_same_page_visual_over_next_page_carryover() -> None:
+    item = {
+        "page_ref": 1,
+        "image_candidate_ids": [11, 21],
+        "image_assignment_is_final": False,
+        "image_next_page_allowed": True,
+    }
+    image_by_id = {
+        11: {
+            "id": 11,
+            "page_ref": 1,
+            "width": 480,
+            "height": 900,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+        21: {
+            "id": 21,
+            "page_ref": 2,
+            "width": 900,
+            "height": 900,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+    }
+
+    candidates = _candidate_images_for_item(item, image_by_id, max_candidates=4)
+
+    assert [candidate["id"] for candidate in candidates] == [11]
+
+
+def test_candidate_images_keep_persisted_final_assignment_across_pages() -> None:
+    item = {
+        "page_ref": 1,
+        "image_candidate_ids": [21],
+        "image_ids_primary": [21],
+        "image_assignment_is_final": True,
+        "image_next_page_allowed": False,
     }
     image_by_id = {
         21: {

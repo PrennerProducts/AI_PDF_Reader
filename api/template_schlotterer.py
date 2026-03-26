@@ -13,12 +13,24 @@ BODY_RE = re.compile(r"^(?P<customer_pos>.*?)\s*(?P<qty>\d+)\s+(?P<description>[
 
 
 def detect(normalized_lower: str) -> bool:
-    return "schlotterer sonnenschutz systeme gmbh" in normalized_lower and "auftragsbestätigung:" in normalized_lower
+    if "schlotterer sonnenschutz systeme gmbh" not in normalized_lower:
+        return False
+    return any(
+        marker in normalized_lower
+        for marker in (
+            "auftragsbestätigung:",
+            "angebot:",
+            "angebotsnummer",
+            "gesamt nettosumme",
+        )
+    )
 
 
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
     document_number = headers.get("document_number") or first_match(
         [
+            r"Angebot:\s*([A-Za-z0-9./-]+)",
+            r"Angebotsnummer:\s*([A-Za-z0-9./-]+)",
             r"Auftragsbestätigung:\s*([0-9]+)",
             r"Auftragsnummer:\s*([0-9]+)",
         ],
@@ -27,6 +39,7 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
     )
     document_date = headers.get("document_date") or first_match(
         [
+            r"Angebot:\s*[A-Za-z0-9./-]+\s+vom:?\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"vom:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"vom\s+([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
         ],

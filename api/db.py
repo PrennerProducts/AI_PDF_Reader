@@ -12,6 +12,7 @@ from image_assignment import (
     focused_image_ids,
     image_layout_sort_key,
     is_non_visual_line_item,
+    is_viable_auto_assignment_image,
     metadata_dict,
     metadata_image_assignment,
     metadata_review_state,
@@ -122,6 +123,9 @@ def list_documents(limit: int = 20) -> list[dict[str, Any]]:
                 offer_reference,
                 document_number,
                 document_date,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
                 status,
                 created_at
             FROM documents
@@ -154,6 +158,10 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 vat_total,
                 gross_total,
                 parse_confidence,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                approval_note,
                 status,
                 error_message,
                 raw_text_path,
@@ -223,6 +231,10 @@ def update_document_parse_result(
                 gross_total = %s,
                 parse_confidence = %s,
                 raw_text_path = %s,
+                approval_status = 'pending',
+                reviewed_by = NULL,
+                reviewed_at = NULL,
+                approval_note = NULL,
                 status = %s,
                 error_message = NULL,
                 updated_at = NOW()
@@ -241,6 +253,10 @@ def update_document_parse_result(
                 gross_total,
                 parse_confidence,
                 raw_text_path,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                approval_note,
                 status,
                 updated_at;
             """,
@@ -391,6 +407,22 @@ def replace_document_images(document_id: int, rows: list[dict[str, Any]]) -> int
     return len(rows)
 
 
+def _clear_document_approval_state(conn: psycopg.Connection, document_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE documents
+        SET
+            approval_status = 'pending',
+            reviewed_by = NULL,
+            reviewed_at = NULL,
+            approval_note = NULL,
+            updated_at = NOW()
+        WHERE id = %s;
+        """,
+        (document_id,),
+    )
+
+
 def update_line_item_image_assignments(document_id: int, assignments: dict[int, dict[str, Any]]) -> int:
     if not assignments:
         return 0
@@ -449,6 +481,8 @@ def update_line_item_image_assignments(document_id: int, assignments: dict[int, 
                     (patch, document_id, line_item_id),
                 )
                 updated_rows += int(cur.rowcount or 0)
+        if updated_rows > 0:
+            _clear_document_approval_state(conn, document_id)
     return updated_rows
 
 
@@ -480,7 +514,54 @@ def update_line_item_review_state(
             """,
             (patch, document_id, line_item_id),
         ).rowcount or 0
+        if updated:
+            _clear_document_approval_state(conn, document_id)
     return int(updated)
+
+
+def update_document_approval_state(
+    document_id: int,
+    *,
+    approval_status: str,
+    reviewed_by: str | None = None,
+    approval_note: str | None = None,
+) -> dict[str, Any] | None:
+    normalized = str(approval_status or "").strip().lower()
+    if normalized not in {"pending", "approved"}:
+        raise ValueError(f"Unsupported approval_status: {approval_status}")
+
+    reviewed_by_value = (reviewed_by or "").strip() or None
+    approval_note_value = (approval_note or "").strip() or None
+    reviewed_at_value = datetime.now(timezone.utc) if normalized == "approved" else None
+
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET
+                approval_status = %s,
+                reviewed_by = %s,
+                reviewed_at = %s,
+                approval_note = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                approval_note,
+                updated_at;
+            """,
+            (
+                normalized,
+                reviewed_by_value if normalized == "approved" else None,
+                reviewed_at_value,
+                approval_note_value if normalized == "approved" else None,
+                document_id,
+            ),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list[int]]) -> int:
@@ -531,6 +612,10 @@ def reset_document_results(document_id: int) -> dict[str, Any] | None:
                 vat_total = NULL,
                 gross_total = NULL,
                 parse_confidence = NULL,
+                approval_status = 'pending',
+                reviewed_by = NULL,
+                reviewed_at = NULL,
+                approval_note = NULL,
                 status = 'uploaded',
                 error_message = NULL,
                 raw_text_path = NULL,
@@ -600,6 +685,9 @@ def _is_probably_decorative_image(image: dict[str, Any], repeated_hashes: set[st
 
     # Repeated strip-like images across pages are usually headers/footers.
     if repeated and ratio >= 4.0 and min(width, height) <= 360:
+        return True
+    # Single-page ultra-wide strips are also usually separators or footer bars.
+    if ratio >= 4.5 and min(width, height) <= 90 and bytes_size < 30_000:
         return True
     return False
 
@@ -709,6 +797,9 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
     valid_image_ids = {
         image_id for image_id in (_to_int(image.get("id")) for image in image_list) if image_id is not None
     }
+    image_by_id = {
+        image_id: image for image_id, image in (( _to_int(image.get("id")), image) for image in image_list) if image_id is not None
+    }
 
     for image in image_list:
         image["is_repeated_across_pages"] = bool(image.get("sha256") in repeated_hashes if image.get("sha256") else False)
@@ -733,6 +824,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         item["image_ids_page_all"] = []
         item["image_count_page_all"] = 0
         item["image_next_page_allowed"] = False
+        item["image_prefers_next_page"] = False
         assignment_meta = metadata_image_assignment(item, valid_image_ids)
         review_meta = metadata_review_state(item)
         item["_image_assignment_meta"] = assignment_meta
@@ -756,8 +848,14 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
 
         sorted_item_indexes = sorted(item_indexes, key=lambda idx: _line_item_sort_key(line_item_list[idx]))
         visual_item_indexes = [idx for idx in sorted_item_indexes if not is_non_visual_line_item(line_item_list[idx])]
+        visual_item_order = {idx: order for order, idx in enumerate(visual_item_indexes)}
         last_visual_item_idx = visual_item_indexes[-1] if visual_item_indexes else None
         item_count = len(sorted_item_indexes)
+        current_viable_page_ids = [
+            image_id
+            for image_id in current_candidates
+            if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+        ]
         for item_offset, item_idx in enumerate(sorted_item_indexes):
             item = line_item_list[item_idx]
             allow_next_page_candidates = item_idx == last_visual_item_idx
@@ -783,12 +881,22 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 item_index=item_offset,
                 max_candidates=4,
             )
+            viable_current = [
+                image_id
+                for image_id in focused_current
+                if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+            ]
             focused_neighbor = focused_image_ids(
                 next_candidates if allow_next_page_candidates else [],
                 item_count=item_count,
                 item_index=item_offset,
                 max_candidates=3,
             )
+            viable_neighbor = [
+                image_id
+                for image_id in focused_neighbor
+                if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+            ]
             focused_fallback = focused_image_ids(
                 _dedupe_ints(
                     all_page_image_ids
@@ -798,7 +906,18 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 item_index=item_offset,
                 max_candidates=3,
             )
-            candidate_ids = _dedupe_ints(focused_current + focused_neighbor + focused_fallback)
+            visual_item_offset = visual_item_order.get(item_idx)
+            prefers_next_page = bool(
+                allow_next_page_candidates
+                and visual_item_offset is not None
+                and visual_item_offset >= len(current_viable_page_ids)
+                and viable_neighbor
+            )
+            item["image_prefers_next_page"] = prefers_next_page
+            if prefers_next_page:
+                candidate_ids = _dedupe_ints(viable_neighbor + focused_current + focused_neighbor + focused_fallback)
+            else:
+                candidate_ids = _dedupe_ints(focused_current + focused_neighbor + focused_fallback)
 
             if persisted_image_ids:
                 final_ids = persisted_image_ids
@@ -808,22 +927,25 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 final_ids = []
                 item["image_assignment_source"] = item.get("image_assignment_source") or "unmatched"
                 item["image_assignment_reason"] = item.get("image_assignment_reason") or "stored_no_assignment"
-            elif focused_current:
-                final_ids = focused_current[:2] if len(focused_current) > 1 and item_count <= len(current_candidates) else focused_current[:1]
+            elif prefers_next_page and viable_neighbor:
+                final_ids = viable_neighbor[:1]
+                item["image_assignment_source"] = "page_neighbor_fallback"
+                item["image_assignment_reason"] = "overflow_to_next_page_visual"
+            elif viable_current:
+                final_ids = viable_current[:2] if len(viable_current) > 1 and item_count <= len(current_candidates) else viable_current[:1]
                 item["image_assignment_source"] = "page_layout"
                 item["image_assignment_reason"] = "same_page_image_distribution"
-            elif focused_neighbor:
-                final_ids = focused_neighbor[:1]
+            elif viable_neighbor and allow_next_page_candidates:
+                final_ids = viable_neighbor[:1]
                 item["image_assignment_source"] = "page_neighbor_fallback"
-                item["image_assignment_reason"] = "adjacent_page_candidates"
-            elif focused_fallback:
-                final_ids = focused_fallback[:1]
-                item["image_assignment_source"] = "page_fallback"
-                item["image_assignment_reason"] = "page_image_fallback"
+                item["image_assignment_reason"] = "adjacent_page_visual_carryover"
             else:
                 final_ids = []
                 item["image_assignment_source"] = "unmatched"
-                item["image_assignment_reason"] = "no_candidate_images"
+                if viable_neighbor or focused_fallback:
+                    item["image_assignment_reason"] = "same_page_candidates_missing"
+                else:
+                    item["image_assignment_reason"] = "no_candidate_images"
 
             item["image_ids"] = final_ids
             item["image_count"] = len(final_ids)

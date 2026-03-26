@@ -16,7 +16,7 @@ def detect(normalized_lower: str) -> bool:
     return (
         "rieder-zillertal.at" in normalized_lower
         or "ku.pos.:" in normalized_lower
-        or ("angebot:" in normalized_lower and "kommission" in normalized_lower)
+        or ("rieder" in normalized_lower and "angebot:" in normalized_lower and "kommission" in normalized_lower)
     )
 
 

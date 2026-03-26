@@ -282,6 +282,15 @@
       cursor: pointer;
     }
 
+    .doc-select-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
     .controls select:focus,
     .controls input[type="file"]:focus {
       outline: 2px solid rgba(213, 26, 15, 0.18);
@@ -404,6 +413,64 @@
       box-shadow: 0 16px 30px rgba(20, 19, 22, 0.18);
     }
 
+    .document-approval-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(35, 32, 32, 0.12);
+      background: rgba(255, 255, 255, 0.86);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #2b2625;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.76),
+        0 8px 18px rgba(28, 19, 17, 0.08);
+      white-space: nowrap;
+    }
+
+    .document-approval-pill.approved {
+      color: #0f6a4f;
+      border-color: rgba(39, 198, 143, 0.28);
+      background: linear-gradient(135deg, rgba(111, 242, 202, 0.18), rgba(255, 255, 255, 0.9));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 10px 22px rgba(39, 198, 143, 0.14);
+    }
+
+    .document-approval-pill.eligible {
+      color: #0f6a4f;
+      border-color: rgba(39, 198, 143, 0.24);
+      background: linear-gradient(135deg, rgba(111, 242, 202, 0.13), rgba(255, 255, 255, 0.88));
+    }
+
+    .document-approval-pill.blocked {
+      color: #9c6510;
+      border-color: rgba(240, 171, 0, 0.26);
+      background: linear-gradient(135deg, rgba(255, 216, 109, 0.18), rgba(255, 255, 255, 0.9));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 10px 22px rgba(240, 171, 0, 0.12);
+    }
+
+    .document-approval-pill.rejected {
+      color: #98324c;
+      border-color: rgba(227, 59, 95, 0.26);
+      background: linear-gradient(135deg, rgba(255, 109, 141, 0.18), rgba(255, 255, 255, 0.9));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 10px 22px rgba(227, 59, 95, 0.12);
+    }
+
+    .document-approval-pill.pending {
+      color: #665d58;
+      border-color: rgba(92, 92, 91, 0.18);
+      background: rgba(255, 255, 255, 0.84);
+    }
+
     .live-label {
       font-size: 11px;
       font-weight: 700;
@@ -457,6 +524,12 @@
       font-size: 10px;
       letter-spacing: 0.06em;
       color: rgba(255, 255, 255, 0.68);
+    }
+
+    .topbar.is-collapsed .document-approval-pill {
+      min-height: 26px;
+      padding: 4px 10px;
+      font-size: 11px;
     }
 
     .topbar.is-collapsed .controls select,
@@ -1295,6 +1368,51 @@
 
     .review-filter-tools .filter-select {
       width: 100%;
+    }
+
+    .review-approval-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .review-approval-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: #5f5956;
+      font-weight: 700;
+    }
+
+    .review-approval-field input,
+    .review-approval-field textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 32, 32, 0.12);
+      background: rgba(255, 255, 255, 0.74);
+      color: #2a2423;
+      padding: 10px 12px;
+      font: inherit;
+      box-sizing: border-box;
+      resize: vertical;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .review-approval-field input:focus,
+    .review-approval-field textarea:focus {
+      outline: none;
+      border-color: rgba(213, 26, 15, 0.35);
+      box-shadow:
+        0 0 0 3px rgba(213, 26, 15, 0.09),
+        inset 0 1px 0 rgba(255, 255, 255, 0.76);
+    }
+
+    .review-approval-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .review-task-list {
@@ -2842,7 +2960,10 @@
       </div>
       <div class="controls">
         <div class="control-card control-card-wide">
-          <label class="control-label" for="docSelect">Dokument</label>
+          <div class="doc-select-head">
+            <label class="control-label" for="docSelect">Dokument</label>
+            <span class="document-approval-pill pending" id="documentApprovalBadge">Freigabe offen</span>
+          </div>
           <select id="docSelect" aria-label="Dokument auswählen"></select>
         </div>
         <div class="control-card">
@@ -2873,6 +2994,7 @@
       <div class="status-strip">
         <div class="statusbar" id="statusBar">Lade Dokumentliste...</div>
         <div class="live-state-wrap">
+          <span id="documentApprovalState" class="document-approval-pill pending">Freigabe offen</span>
           <span class="live-label">Run</span>
           <span id="processLiveState" class="debug-state">idle</span>
         </div>
@@ -2978,6 +3100,24 @@
           <div class="extract-pane" id="tabPaneReview" role="tabpanel" aria-labelledby="tabBtnReview" data-extract-pane="review" hidden>
             <div class="review-workbench">
               <div class="review-workbench-sidebar">
+                <div class="review-card">
+                  <h2>Freigabe</h2>
+                  <div class="review-list" id="documentApprovalSummary"></div>
+                  <div class="review-approval-form">
+                    <label class="review-approval-field">
+                      <span>Prüfer</span>
+                      <input id="documentReviewerInput" type="text" maxlength="160" placeholder="Optionaler Name">
+                    </label>
+                    <label class="review-approval-field">
+                      <span>Notiz</span>
+                      <textarea id="documentApprovalNoteInput" rows="3" maxlength="1000" placeholder="Optionale Freigabenotiz"></textarea>
+                    </label>
+                    <div class="review-approval-actions">
+                      <button class="btn btn-primary" id="approveDocumentBtn" type="button">Freigeben</button>
+                      <button class="btn btn-ghost" id="resetDocumentApprovalBtn" type="button">Freigabe zurücksetzen</button>
+                    </div>
+                  </div>
+                </div>
                 <div class="review-card">
                   <h2>Review-Status</h2>
                   <div class="review-list" id="reviewTaskSummary"></div>
@@ -3134,6 +3274,8 @@
       app: document.querySelector(".app"),
       topbar: document.querySelector(".topbar"),
       docSelect: document.getElementById("docSelect"),
+      documentApprovalBadge: document.getElementById("documentApprovalBadge"),
+      documentApprovalState: document.getElementById("documentApprovalState"),
       uploadInput: document.getElementById("uploadInput"),
       uploadBtn: document.getElementById("uploadBtn"),
       resetBtn: document.getElementById("resetBtn"),
@@ -3161,6 +3303,11 @@
       totalsAudit: document.getElementById("totalsAudit"),
       sourceBreakdown: document.getElementById("sourceBreakdown"),
       documentIssueList: document.getElementById("documentIssueList"),
+      documentApprovalSummary: document.getElementById("documentApprovalSummary"),
+      documentReviewerInput: document.getElementById("documentReviewerInput"),
+      documentApprovalNoteInput: document.getElementById("documentApprovalNoteInput"),
+      approveDocumentBtn: document.getElementById("approveDocumentBtn"),
+      resetDocumentApprovalBtn: document.getElementById("resetDocumentApprovalBtn"),
       reviewTaskSummary: document.getElementById("reviewTaskSummary"),
       reviewTaskFilter: document.getElementById("reviewTaskFilter"),
       reviewTaskMeta: document.getElementById("reviewTaskMeta"),
@@ -3269,6 +3416,21 @@
         return `${day}.${month}.${dotMatch[3]}`;
       }
       return raw;
+    }
+
+    function formatDateTime(value, fallback = "-") {
+      if (value === null || value === undefined || value === "") return fallback;
+      const raw = String(value).trim();
+      if (!raw) return fallback;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return raw;
+      return parsed.toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     }
 
     function formatDocumentType(value, fallback = "-") {
@@ -3715,7 +3877,18 @@
       ui.documentIssueList.innerHTML = rows.join("");
     }
 
-    function reviewStatusMeta(status) {
+    function reviewStatusMeta(status, approval = null) {
+      const approvalStatus = String(
+        (approval && typeof approval === "object" ? approval.status : null)
+          || (approval && typeof approval === "string" ? approval : "")
+      ).trim().toLowerCase();
+      if (approvalStatus === "approved") {
+        return {
+          label: "Freigegeben",
+          css: "auto-accept",
+          note: "Dokument wurde manuell freigegeben.",
+        };
+      }
       if (status === "auto_accept") {
         return {
           label: "Freigabe möglich",
@@ -3749,6 +3922,117 @@
         css: "unknown",
         note: "Für dieses Dokument liegt noch keine verwertbare Validierung vor.",
       };
+    }
+
+    function documentApprovalMeta(result) {
+      const document = (result && result.document && typeof result.document === "object") ? result.document : {};
+      const validation = (result && result.validation && typeof result.validation === "object") ? result.validation : {};
+      const approval = (validation.approval && typeof validation.approval === "object") ? validation.approval : {};
+      const approvalStatus = String(
+        approval.status || document.approval_status || "pending"
+      ).trim().toLowerCase();
+      const validationStatus = String(validation.status || "").trim().toLowerCase();
+      const eligible = approval.eligible !== undefined
+        ? !!approval.eligible
+        : ["auto_accept", "manual_checked"].includes(validationStatus);
+      const reviewedBy = fmt(approval.reviewed_by ?? document.reviewed_by);
+      const reviewedAt = approval.reviewed_at ?? document.reviewed_at;
+      const note = fmt(approval.approval_note ?? document.approval_note);
+
+      if (approvalStatus === "approved") {
+        return {
+          label: "Freigegeben",
+          css: "auto-accept",
+          note: reviewedBy !== "-" ? `Freigegeben durch ${reviewedBy}.` : "Dokument wurde manuell freigegeben.",
+          eligible,
+          approved: true,
+          reviewedBy,
+          reviewedAt,
+          noteText: note,
+        };
+      }
+      if (eligible) {
+        return {
+          label: "Freigabe möglich",
+          css: "auto-accept",
+          note: "Dokument erfüllt aktuell alle Freigabekriterien.",
+          eligible,
+          approved: false,
+          reviewedBy,
+          reviewedAt,
+          noteText: note,
+        };
+      }
+      if (validationStatus === "review") {
+        return {
+          label: "Freigabe gesperrt",
+          css: "review",
+          note: "Vor der Freigabe müssen Warnungen manuell geprüft werden.",
+          eligible,
+          approved: false,
+          reviewedBy,
+          reviewedAt,
+          noteText: note,
+        };
+      }
+      if (validationStatus === "reject") {
+        return {
+          label: "Freigabe blockiert",
+          css: "reject",
+          note: "Fehler blockieren derzeit die Dokumentfreigabe.",
+          eligible,
+          approved: false,
+          reviewedBy,
+          reviewedAt,
+          noteText: note,
+        };
+      }
+      return {
+        label: "Noch nicht freigabefähig",
+        css: "unknown",
+        note: "Für dieses Dokument liegt noch keine vollständige Bewertung vor.",
+        eligible,
+        approved: false,
+        reviewedBy,
+        reviewedAt,
+        noteText: note,
+      };
+    }
+
+    function documentApprovalVisual(meta) {
+      const status = String(meta && meta.css || "");
+      if (status === "auto-accept" && meta && meta.approved) {
+        return { label: "Freigegeben", className: "approved" };
+      }
+      if (status === "auto-accept") {
+        return { label: "Freigabe möglich", className: "eligible" };
+      }
+      if (status === "review") {
+        return { label: "Prüfung offen", className: "blocked" };
+      }
+      if (status === "reject") {
+        return { label: "Freigabe blockiert", className: "rejected" };
+      }
+      return { label: "Freigabe offen", className: "pending" };
+    }
+
+    function setDocumentApprovalPills(result) {
+      const meta = documentApprovalMeta(result);
+      const visual = documentApprovalVisual(meta);
+      for (const node of [ui.documentApprovalBadge, ui.documentApprovalState]) {
+        if (!(node instanceof HTMLElement)) continue;
+        node.textContent = visual.label;
+        node.className = `document-approval-pill ${visual.className}`;
+      }
+    }
+
+    function syncCurrentDocumentIntoList(document) {
+      if (!document || typeof document !== "object" || !Number.isFinite(Number(document.id))) return;
+      const currentId = Number(document.id);
+      const idx = state.documents.findIndex((item) => Number(item && item.id) === currentId);
+      if (idx < 0) return;
+      state.documents[idx] = { ...state.documents[idx], ...document };
+      renderDocuments();
     }
 
     function reviewFlagHtml(label, kind = "neutral") {
@@ -3946,7 +4230,46 @@
       return tasks;
     }
 
+    function renderDocumentApproval(result) {
+      clearNode(ui.documentApprovalSummary);
+
+      if (!result || typeof result !== "object") {
+        ui.documentApprovalSummary.innerHTML = `<div class="review-empty">Noch keine Freigabeinformationen verfügbar.</div>`;
+        if (ui.documentReviewerInput) ui.documentReviewerInput.value = "";
+        if (ui.documentApprovalNoteInput) ui.documentApprovalNoteInput.value = "";
+        if (ui.approveDocumentBtn) ui.approveDocumentBtn.disabled = true;
+        if (ui.resetDocumentApprovalBtn) ui.resetDocumentApprovalBtn.disabled = true;
+        return;
+      }
+
+      const approvalMeta = documentApprovalMeta(result);
+      const reviewedBy = approvalMeta.reviewedBy;
+      const noteText = approvalMeta.noteText;
+      const reviewedAt = approvalMeta.reviewedAt;
+
+      ui.documentApprovalSummary.innerHTML = [
+        reviewRowHtml("Status", approvalMeta.note, reviewFlagHtml(approvalMeta.label, approvalMeta.css === "reject" ? "err" : (approvalMeta.css === "review" ? "review" : (approvalMeta.css === "auto-accept" ? "ok" : "neutral")))),
+        reviewRowHtml("Prüfer", reviewedBy, reviewedBy !== "-" ? reviewFlagHtml("gesetzt", "ok") : reviewFlagHtml("offen", "neutral")),
+        reviewRowHtml("Zeitpunkt", formatDateTime(reviewedAt), reviewedAt ? reviewFlagHtml("erfasst", "ok") : reviewFlagHtml("offen", "neutral")),
+        reviewRowHtml("Notiz", noteText, noteText !== "-" ? reviewFlagHtml("vorhanden", "ok") : reviewFlagHtml("optional", "neutral")),
+      ].join("");
+
+      if (ui.documentReviewerInput) {
+        ui.documentReviewerInput.value = reviewedBy !== "-" ? reviewedBy : "";
+      }
+      if (ui.documentApprovalNoteInput) {
+        ui.documentApprovalNoteInput.value = noteText !== "-" ? noteText : "";
+      }
+      if (ui.approveDocumentBtn) {
+        ui.approveDocumentBtn.disabled = !approvalMeta.eligible || approvalMeta.approved;
+      }
+      if (ui.resetDocumentApprovalBtn) {
+        ui.resetDocumentApprovalBtn.disabled = !approvalMeta.approved;
+      }
+    }
+
     function renderReviewWorkbench(result) {
+      renderDocumentApproval(result);
       clearNode(ui.reviewTaskSummary);
       clearNode(ui.reviewTaskList);
 
@@ -4087,7 +4410,7 @@
       const totals = validation.totals || {};
       const lineSummary = validation.line_item_summary || {};
       const imageSummary = validation.image_summary || {};
-      const statusMeta = reviewStatusMeta(validation.status);
+      const statusMeta = reviewStatusMeta(validation.status, validation.approval);
       const sourceSummary = buildSourceBreakdown(result);
 
       const requiredPresent = countPresent(required);
@@ -4384,6 +4707,7 @@
         option.textContent = "Keine Dokumente vorhanden";
         ui.docSelect.appendChild(option);
         ui.docSelect.disabled = true;
+        setDocumentApprovalPills(null);
         return;
       }
 
@@ -4392,7 +4716,9 @@
         const option = document.createElement("option");
         option.value = String(doc.id);
         const supplier = doc.supplier_name || "ohne Lieferant";
-        option.textContent = `#${doc.id} | ${doc.original_filename} | ${supplier} | ${doc.status}`;
+        const approvalStatus = String(doc.approval_status || "pending").trim().toLowerCase();
+        const approvalLabel = approvalStatus === "approved" ? "freigegeben" : "offen";
+        option.textContent = `#${doc.id} | ${doc.original_filename} | ${supplier} | ${doc.status} | ${approvalLabel}`;
         ui.docSelect.appendChild(option);
       }
 
@@ -4401,6 +4727,20 @@
         state.documentId = state.documents[0].id;
       }
       ui.docSelect.value = String(state.documentId);
+      const currentDoc = state.documents.find((doc) => Number(doc.id) === Number(state.documentId));
+      if (currentDoc) {
+        setDocumentApprovalPills({
+          document: currentDoc,
+          validation: {
+            approval: {
+              status: currentDoc.approval_status,
+              reviewed_by: currentDoc.reviewed_by,
+              reviewed_at: currentDoc.reviewed_at,
+              approval_note: currentDoc.approval_note,
+            },
+          },
+        });
+      }
     }
 
     async function loadDocuments() {
@@ -4428,6 +4768,7 @@
       const cards = [
         ["Dokument-ID", document.id, null, false],
         ["Status", document.status, null, false],
+        ["Freigabe", String(document.approval_status || "").toLowerCase() === "approved" ? "Freigegeben" : "Offen", null, false],
         ["Dokumenttyp", formatDocumentType(document.document_type), "document_type", true],
         ["Lieferant", document.supplier_name, "supplier_name", true],
         ...(String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
@@ -4798,6 +5139,38 @@
       }
     }
 
+    async function setDocumentApproval(approved, button) {
+      if (!state.documentId) return;
+      const targetButton = button instanceof HTMLElement ? button : null;
+      const reviewerName = ui.documentReviewerInput ? String(ui.documentReviewerInput.value || "").trim() : "";
+      const note = ui.documentApprovalNoteInput ? String(ui.documentApprovalNoteInput.value || "").trim() : "";
+      if (targetButton) targetButton.disabled = true;
+      setStatus(approved ? "Dokument wird freigegeben ..." : "Dokumentfreigabe wird zurückgesetzt ...");
+      try {
+        if (approved) {
+          await apiJson(`/documents/${state.documentId}/approval`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reviewer_name: reviewerName || null,
+              note: note || null,
+            }),
+          });
+        } else {
+          await apiJson(`/documents/${state.documentId}/approval`, { method: "DELETE" });
+        }
+        await loadResult(state.documentId);
+        setStatus(
+          approved ? "Dokument wurde freigegeben." : "Dokumentfreigabe wurde zurückgesetzt.",
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Dokumentfreigabe fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        if (targetButton) targetButton.disabled = false;
+      }
+    }
+
     function mappedImageLabel(item) {
       const mapped = Number(item.image_count || 0);
       const candidates = Number(item.image_candidate_count || 0);
@@ -5096,6 +5469,8 @@
       try {
         const result = await apiJson(`/result/${documentId}`);
         state.result = result;
+        syncCurrentDocumentIntoList(result.document || {});
+        setDocumentApprovalPills(result);
         state.compare = null;
         state.fieldSources = deriveFieldSources(null);
         state.expandedItemKeys = new Set();
@@ -5133,6 +5508,7 @@
         state.compare = null;
         state.fieldSources = {};
         state.expandedItemKeys = new Set();
+        setDocumentApprovalPills(null);
         renderReview(null);
         renderDocumentIssues(null);
         setStatus(`Result konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
@@ -5375,6 +5751,14 @@
     ui.reviewTaskFilter.addEventListener("change", () => {
       state.reviewFilter = String(ui.reviewTaskFilter.value || "all");
       if (state.result) renderReviewWorkbench(state.result);
+    });
+
+    ui.approveDocumentBtn.addEventListener("click", () => {
+      void setDocumentApproval(true, ui.approveDocumentBtn);
+    });
+
+    ui.resetDocumentApprovalBtn.addEventListener("click", () => {
+      void setDocumentApproval(false, ui.resetDocumentApprovalBtn);
     });
 
     for (const button of ui.extractTabs) {

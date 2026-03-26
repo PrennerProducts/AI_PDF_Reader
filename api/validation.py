@@ -678,6 +678,12 @@ def build_document_validation(
     else:
         status = "auto_accept"
 
+    approval_status = _normalized_text(document.get("approval_status")) or "pending"
+    approval_eligible = status in {"auto_accept", "manual_checked"}
+    approval_reviewed_by = document.get("reviewed_by")
+    approval_reviewed_at = document.get("reviewed_at")
+    approval_note = document.get("approval_note")
+
     return {
         "status": status,
         "issue_count": error_count + warning_count,
@@ -706,5 +712,13 @@ def build_document_validation(
             "total": len(images),
             "assigned_duplicate_count": len(duplicate_image_assignments),
             "assigned_duplicate_images": sorted(duplicate_image_assignments.keys()),
+        },
+        "approval": {
+            "status": approval_status,
+            "approved": approval_status == "approved",
+            "eligible": approval_eligible,
+            "reviewed_by": approval_reviewed_by,
+            "reviewed_at": approval_reviewed_at,
+            "approval_note": approval_note,
         },
     }

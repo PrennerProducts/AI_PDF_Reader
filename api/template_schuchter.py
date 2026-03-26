@@ -13,12 +13,24 @@ PRICE_PAIR_RE = re.compile(
 
 
 def detect(normalized_lower: str) -> bool:
-    return "schuchter fenster gmbh" in normalized_lower and "auftragsbestätigung" in normalized_lower
+    if "schuchter fenster gmbh" not in normalized_lower:
+        return False
+    return any(
+        marker in normalized_lower
+        for marker in (
+            "auftragsbestätigung",
+            "angebot",
+            "angebotsnummer",
+            "pos.",
+        )
+    )
 
 
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
     document_number = headers.get("document_number") or first_match(
         [
+            r"ANGEBOT\s+([A-Za-z0-9./-]+)",
+            r"Angebotsnummer\s*:?\s*([A-Za-z0-9./-]+)",
             r"AUFTRAGSBESTÄTIGUNG\s+([0-9]+)",
             r"Auftrag\s+([0-9]+)\s+vom",
         ],
@@ -27,6 +39,7 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
     )
     document_date = headers.get("document_date") or first_match(
         [
+            r"Angebot\s+[A-Za-z0-9./-]+\s+vom\s+([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"Datum:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
             r"vom\s+([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
         ],

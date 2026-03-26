@@ -23,8 +23,8 @@ Stand: 2026-03-24
 | `koch` | 1 | 2 | stabil | 3 Angebots-PDFs mit eigenem Template und gruenem Korpus |
 | `muigg` | 1 | 2 | stabil | Varianten in Klammern und Unterpositionen sind jetzt abgedeckt |
 | `schachermayer` | 1 | 1 | stabil | tabellarische Offert-Layouts plus Kommissionsfallback laufen gruen |
-| `schuchter` | 0 | 0 | AB-only | Angebotsfall fehlt noch, AB-Parser für 3 vorhandene PDFs ist umgesetzt |
-| `schlotterer` | 0 | 0 | AB-only | Angebotsfall fehlt noch, AB-Parser für 3 vorhandene PDFs ist umgesetzt |
+| `schuchter` | 0 | 0 | vorlaeufig | Angebots-/AB-Header jetzt parserseitig vorbereitet, echte Angebots-PDFs fehlen weiter |
+| `schlotterer` | 0 | 0 | vorlaeufig | Angebots-/AB-Header jetzt parserseitig vorbereitet, echte Angebots-PDFs fehlen weiter |
 
 ## Green Provider Set
 
@@ -81,12 +81,12 @@ Stand: 2026-03-24
 ### Schuchter
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/`
 - Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
-- Parserstatus: vorhandene ABs werden jetzt provider-spezifisch erkannt und positioniert
+- Parserstatus: vorhandene ABs werden provider-spezifisch erkannt und positioniert; Angebotskoepfe werden jetzt ebenfalls detektiert, aber noch ohne echte Angebots-PDFs validiert
 
 ### Schlotterer
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/`
 - Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
-- Parserstatus: vorhandene ABs werden jetzt provider-spezifisch erkannt und positioniert
+- Parserstatus: vorhandene ABs werden provider-spezifisch erkannt und positioniert; Angebotskoepfe werden jetzt ebenfalls detektiert, aber noch ohne echte Angebots-PDFs validiert
 
 ## Test Commands
 

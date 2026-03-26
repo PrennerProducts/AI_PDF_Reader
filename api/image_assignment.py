@@ -40,11 +40,28 @@ def dedupe_int_list(values: list[int]) -> list[int]:
 def is_non_visual_line_item(item: dict[str, Any]) -> bool:
     description = _normalized_text(item.get("description_short"))
     position_no = _normalized_text(item.get("position_no"))
+    lv_pos = _normalized_text(item.get("lv_pos"))
+    if description in {"umfang", "lieferung", "montage", "fracht", "transport", "rabatt", "skonto"}:
+        return True
     if description.startswith("vorbemerk"):
+        return True
+    if description.startswith("az - ") or description.startswith("az-"):
+        return True
+    if lv_pos == "umfang":
         return True
     if position_no in {"000", "0"} and description in {"vorbemerkungen", "vorbemerkung"}:
         return True
     return False
+
+
+def is_viable_auto_assignment_image(image: dict[str, Any]) -> bool:
+    if not isinstance(image, dict):
+        return False
+    if image.get("is_probably_decorative"):
+        return False
+    width = _to_int(image.get("width")) or 0
+    height = _to_int(image.get("height")) or 0
+    return width > 0 and height > 0
 
 
 def metadata_dict(row: dict[str, Any]) -> dict[str, Any]:
@@ -172,3 +189,156 @@ def focused_image_ids(
         if len(selected) >= max_candidates:
             break
     return selected
+
+
+def _match_item_candidate_ids(match_item: dict[str, Any]) -> list[int]:
+    raw = match_item.get("candidate_image_ids")
+    if not isinstance(raw, list):
+        return []
+    values: list[int] = []
+    for value in raw:
+        parsed = _to_int(value)
+        if parsed is not None:
+            values.append(parsed)
+    return dedupe_int_list(values)
+
+
+def _match_item_score_map(match_item: dict[str, Any]) -> dict[int, float]:
+    scores: dict[int, float] = {}
+    heuristic = match_item.get("heuristic")
+    raw_rows = heuristic.get("scores") if isinstance(heuristic, dict) else None
+    if isinstance(raw_rows, list):
+        for row in raw_rows:
+            if not isinstance(row, dict):
+                continue
+            image_id = _to_int(row.get("image_id"))
+            score = _to_float(row.get("score"))
+            if image_id is None or score is None:
+                continue
+            scores[image_id] = score
+    return scores
+
+
+def _selected_primary_image_id(match_item: dict[str, Any]) -> int | None:
+    raw = match_item.get("selected_image_ids")
+    if not isinstance(raw, list):
+        return None
+    for value in raw:
+        parsed = _to_int(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _best_alternative_image_id(
+    match_item: dict[str, Any],
+    *,
+    blocked_ids: set[int],
+    minimum_score: float,
+) -> int | None:
+    candidate_ids = _match_item_candidate_ids(match_item)
+    if not candidate_ids:
+        return None
+    score_map = _match_item_score_map(match_item)
+    ordered = sorted(
+        candidate_ids,
+        key=lambda image_id: (
+            -(score_map.get(image_id, float("-inf"))),
+            candidate_ids.index(image_id),
+            image_id,
+        ),
+    )
+    for image_id in ordered:
+        if image_id in blocked_ids:
+            continue
+        if score_map.get(image_id, float("-inf")) < minimum_score:
+            continue
+        return image_id
+    return None
+
+
+def rebalance_unique_primary_image_assignments(
+    match_items: list[dict[str, Any]],
+    *,
+    minimum_score: float = 0.25,
+) -> list[dict[str, Any]]:
+    if not match_items:
+        return match_items
+
+    while True:
+        assigned_by_image: dict[int, list[int]] = {}
+        for item_index, match_item in enumerate(match_items):
+            selected_id = _selected_primary_image_id(match_item)
+            if selected_id is None:
+                continue
+            assigned_by_image.setdefault(selected_id, []).append(item_index)
+
+        duplicate_groups = {
+            image_id: item_indexes
+            for image_id, item_indexes in assigned_by_image.items()
+            if len(item_indexes) > 1
+        }
+        if not duplicate_groups:
+            return match_items
+
+        reserved_unique_ids = {
+            image_id
+            for image_id, item_indexes in assigned_by_image.items()
+            if len(item_indexes) == 1
+        }
+        changed = False
+
+        for image_id, item_indexes in duplicate_groups.items():
+            score_map_by_item = {
+                item_index: _match_item_score_map(match_items[item_index])
+                for item_index in item_indexes
+            }
+
+            def _keeper_key(item_index: int) -> tuple[int, float, float, int]:
+                match_item = match_items[item_index]
+                item_scores = score_map_by_item[item_index]
+                selected_score = item_scores.get(image_id, float("-inf"))
+                alt_blocked_ids = set(reserved_unique_ids)
+                alt_blocked_ids.add(image_id)
+                alt_id = _best_alternative_image_id(
+                    match_item,
+                    blocked_ids=alt_blocked_ids,
+                    minimum_score=minimum_score,
+                )
+                alt_score = item_scores.get(alt_id, float("-inf")) if alt_id is not None else float("-inf")
+                no_alternative = 1 if alt_id is None else 0
+                margin = selected_score - alt_score if alt_id is not None else 999.0
+                return (no_alternative, margin, selected_score, -item_index)
+
+            keeper_index = max(item_indexes, key=_keeper_key)
+            reserved_unique_ids.add(image_id)
+
+            for item_index in item_indexes:
+                if item_index == keeper_index:
+                    continue
+                match_item = match_items[item_index]
+                alt_image_id = _best_alternative_image_id(
+                    match_item,
+                    blocked_ids=reserved_unique_ids,
+                    minimum_score=minimum_score,
+                )
+                if alt_image_id is None:
+                    if _selected_primary_image_id(match_item) is not None:
+                        changed = True
+                    match_item["selected_image_ids"] = []
+                    match_item["selected_primary_image_id"] = None
+                    match_item["selection_source"] = "unmatched"
+                    match_item["selection_reason"] = "unique_image_resolution_no_viable_alternative"
+                    continue
+
+                if _selected_primary_image_id(match_item) != alt_image_id:
+                    changed = True
+                match_item["selected_image_ids"] = [alt_image_id]
+                match_item["selected_primary_image_id"] = alt_image_id
+                previous_source = str(match_item.get("selection_source") or "").strip()
+                match_item["selection_source"] = f"{previous_source}_unique" if previous_source else "unique_rebalanced"
+                match_item["selection_reason"] = "unique_image_resolution"
+                reserved_unique_ids.add(alt_image_id)
+
+        if not changed:
+            return match_items

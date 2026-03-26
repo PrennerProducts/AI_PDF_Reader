@@ -15,10 +15,13 @@ CREATE TABLE IF NOT EXISTS documents (
     vat_total NUMERIC(14, 2),
     gross_total NUMERIC(14, 2),
     parse_confidence NUMERIC(5, 4),
+    approval_status TEXT NOT NULL DEFAULT 'pending',
+    reviewed_by TEXT,
+    reviewed_at TIMESTAMPTZ,
+    approval_note TEXT,
     status TEXT NOT NULL DEFAULT 'uploaded',
     error_message TEXT,
     raw_text_path TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-

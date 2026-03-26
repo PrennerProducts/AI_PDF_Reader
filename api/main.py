@@ -26,12 +26,18 @@ from db import (
     replace_document_images,
     replace_document_amount_lines,
     replace_line_items,
+    update_document_approval_state,
     update_document_parse_result,
     update_document_status,
 )
 from extractor import extract_pdf_images, extract_pdf_text
 from exporter import build_export_content
-from image_assignment import is_non_visual_line_item, page_candidate_rank
+from image_assignment import (
+    is_non_visual_line_item,
+    is_viable_auto_assignment_image,
+    page_candidate_rank,
+    rebalance_unique_primary_image_assignments,
+)
 from image_preview import browser_preview_for_image
 from image_matcher import rank_line_item_candidates_with_vlm
 from llm import enrich_document_fields_with_ollama, extract_document_full_with_ollama
@@ -72,6 +78,11 @@ class ParseTextRequest(BaseModel):
 
 class AssignImageRequest(BaseModel):
     image_id: int = Field(gt=0, description="Final image id to assign to the line item.")
+
+
+class DocumentApprovalRequest(BaseModel):
+    reviewer_name: str | None = Field(default=None, max_length=160, description="Optional reviewer name.")
+    note: str | None = Field(default=None, max_length=1000, description="Optional approval note.")
 
 
 def _safe_filename(filename: str) -> str:
@@ -522,6 +533,7 @@ def _candidate_images_for_item(
 
     page_ref = _to_int_safe(item.get("page_ref"))
     next_page_allowed = bool(item.get("image_next_page_allowed"))
+    prefers_next_page = bool(item.get("image_prefers_next_page"))
     primary_ids_raw = item.get("image_ids_primary")
     image_assignment_is_final = bool(item.get("image_assignment_is_final"))
     primary_ids = set()
@@ -532,8 +544,16 @@ def _candidate_images_for_item(
             if parsed is not None
         }
 
+    same_page_viable_exists = any(
+        (
+            _to_int_safe(image_by_id.get(image_id, {}).get("page_ref")) == page_ref
+            and is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+        )
+        for image_id in candidate_ids
+    )
+
     scored: list[tuple[float, dict[str, Any]]] = []
-    for image_id in candidate_ids:
+    for candidate_index, image_id in enumerate(candidate_ids):
         image = image_by_id.get(image_id)
         if image is None:
             continue
@@ -543,9 +563,14 @@ def _candidate_images_for_item(
             and page_ref is not None
             and image_page is not None
         ):
-            if image_page < page_ref:
-                continue
-            if image_page > page_ref and not next_page_allowed:
+            same_page = image_page == page_ref
+            next_page_carryover = (
+                image_page == page_ref + 1
+                and next_page_allowed
+                and (prefers_next_page or not same_page_viable_exists)
+                and is_viable_auto_assignment_image(image)
+            )
+            if not same_page and not next_page_carryover:
                 continue
         width = _to_int_safe(image.get("width")) or 0
         height = _to_int_safe(image.get("height")) or 0
@@ -558,12 +583,16 @@ def _candidate_images_for_item(
             if page_diff == 0:
                 page_bonus = 0.80
             elif page_diff == 1:
-                page_bonus = 0.24
-            elif page_diff == -1:
-                page_bonus = 0.16
+                page_bonus = 0.28
+            if prefers_next_page:
+                if page_diff == 1:
+                    page_bonus += 0.72
+                elif page_diff == 0:
+                    page_bonus -= 0.22
         area_bonus = min(0.60, area / 420_000.0) if area > 0 else 0.0
         primary_bonus = 0.20 if image_id in primary_ids else 0.0
-        score = page_bonus + area_bonus + primary_bonus + decorative_penalty + repeated_penalty
+        rank_bonus = max(0.0, 0.24 - (candidate_index * 0.12))
+        score = page_bonus + area_bonus + primary_bonus + rank_bonus + decorative_penalty + repeated_penalty
         scored.append((score, page_candidate_rank(page_ref, image_page), image))
 
     scored.sort(key=lambda pair: (-pair[0], pair[1], _to_int_safe(pair[2].get("id")) or 0))
@@ -583,6 +612,7 @@ def _heuristic_match_for_item(
         }
     page_ref = _to_int_safe(item.get("page_ref"))
     next_page_allowed = bool(item.get("image_next_page_allowed"))
+    prefers_next_page = bool(item.get("image_prefers_next_page"))
     primary_ids_raw = item.get("image_ids_primary")
     image_assignment_is_final = bool(item.get("image_assignment_is_final"))
     primary_ids = set()
@@ -593,8 +623,16 @@ def _heuristic_match_for_item(
             if parsed is not None
         }
 
+    same_page_viable_exists = any(
+        (
+            _to_int_safe(image.get("page_ref")) == page_ref
+            and is_viable_auto_assignment_image(image)
+        )
+        for image in candidate_images
+    )
+
     score_rows: list[dict[str, Any]] = []
-    for image in candidate_images:
+    for candidate_index, image in enumerate(candidate_images):
         image_id = _to_int_safe(image.get("id"))
         if image_id is None:
             continue
@@ -604,9 +642,14 @@ def _heuristic_match_for_item(
             and page_ref is not None
             and image_page is not None
         ):
-            if image_page < page_ref:
-                continue
-            if image_page > page_ref and not next_page_allowed:
+            same_page = image_page == page_ref
+            next_page_carryover = (
+                image_page == page_ref + 1
+                and next_page_allowed
+                and (prefers_next_page or not same_page_viable_exists)
+                and is_viable_auto_assignment_image(image)
+            )
+            if not same_page and not next_page_carryover:
                 continue
         width = _to_int_safe(image.get("width")) or 0
         height = _to_int_safe(image.get("height")) or 0
@@ -617,10 +660,14 @@ def _heuristic_match_for_item(
             if page_diff == 0:
                 score += 0.85
             elif page_diff == 1:
-                score += 0.32
-            elif page_diff == -1:
-                score += 0.22
+                score += 0.30
+            if prefers_next_page:
+                if page_diff == 1:
+                    score += 0.74
+                elif page_diff == 0:
+                    score -= 0.22
         score += min(0.55, area / 420_000.0) if area > 0 else 0.0
+        score += max(0.0, 0.24 - (candidate_index * 0.12))
         if image_id in primary_ids:
             score += 0.20
         if image.get("is_probably_decorative"):
@@ -1095,6 +1142,66 @@ def clear_line_item_review(document_id: int, line_item_id: int):
     }
 
 
+@app.post("/documents/{document_id}/approval")
+def approve_document(document_id: int, payload: DocumentApprovalRequest):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
+    validation = result_data.get("validation") if isinstance(result_data.get("validation"), dict) else {}
+    validation_status = str(validation.get("status") or "").strip().lower()
+
+    if str(document.get("status") or "").strip().lower() != "processed":
+        raise HTTPException(
+            status_code=409,
+            detail="Dokument kann erst nach abgeschlossener Verarbeitung freigegeben werden.",
+        )
+    if validation_status not in {"auto_accept", "manual_checked"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Dokument ist aktuell nicht freigabefähig (Status: {validation_status or 'unknown'}).",
+        )
+
+    updated = update_document_approval_state(
+        document_id,
+        approval_status="approved",
+        reviewed_by=_clean_optional_str(payload.reviewer_name),
+        approval_note=_clean_optional_str(payload.note),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "approval_status": updated["approval_status"],
+        "reviewed_by": updated.get("reviewed_by"),
+        "reviewed_at": updated.get("reviewed_at"),
+        "approval_note": updated.get("approval_note"),
+    }
+
+
+@app.delete("/documents/{document_id}/approval")
+def reset_document_approval(document_id: int):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    updated = update_document_approval_state(document_id, approval_status="pending")
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "approval_status": updated["approval_status"],
+        "reviewed_by": updated.get("reviewed_by"),
+        "reviewed_at": updated.get("reviewed_at"),
+        "approval_note": updated.get("approval_note"),
+    }
+
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     if not file.filename:
@@ -1501,6 +1608,8 @@ def match_images(
             }
         )
 
+    items_out = rebalance_unique_primary_image_assignments(items_out, minimum_score=0.25)
+
     matched_items = len([item for item in items_out if item.get("selected_image_ids")])
     single_matches = len([item for item in items_out if len(item.get("selected_image_ids") or []) == 1])
     multi_matches = len([item for item in items_out if len(item.get("selected_image_ids") or []) > 1])
@@ -1646,6 +1755,7 @@ def process_document(
         raise HTTPException(status_code=400, detail=f"Source file does not exist: {source_path}")
 
     update_document_status(document_id, status="processing", error_message=None)
+    update_document_approval_state(document_id, approval_status="pending")
 
     requested_mode = _resolve_process_mode(process_mode=process_mode, use_llm=use_llm, llm_override=llm_override)
     _set_process_progress(

@@ -90,9 +90,6 @@ def _extract_amount_via_inline_pattern(text: str, patterns: tuple[str, ...]) -> 
 
 
 def _detect_document_type(normalized_text: str, template: str) -> str:
-    if template in {"schlotterer", "schuchter"}:
-        return "auftragsbestaetigung"
-
     first_page = normalized_text.split("\f", 1)[0]
     head_text = "\n".join(first_page.splitlines()[:80])
     head_lower = head_text.lower()
