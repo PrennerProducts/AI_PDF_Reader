@@ -15,7 +15,7 @@ def _is_amount_header_line(line: str) -> bool:
 
 def _classify_amount_line(label: str) -> str:
     lower = label.lower()
-    if "gesamtbetrag netto" in lower or "summe positionen" in lower or "gesamtpreis positionen" in lower:
+    if "gesamtbetrag netto" in lower or "gesamtbetrag (netto)" in lower or "summe positionen" in lower or "gesamtpreis positionen" in lower:
         return "net_total"
     if "gesamtpreis ohne mwst" in lower or "gesamtpreis ohne ust" in lower or "nettosumme" in lower or "nettowert" in lower or "summe netto" in lower:
         return "net_total"
@@ -25,9 +25,9 @@ def _classify_amount_line(label: str) -> str:
         return "total"
     if "zwischensumme" in lower or "summe ohne montagekosten" in lower or "summe der positionen" in lower or lower.startswith("summe"):
         return "subtotal"
-    if lower.startswith("zuzüglich") and ("mehrwertsteuer" in lower or "ust." in lower or "mwst" in lower):
+    if lower.startswith("zuzüglich") and ("mehrwertsteuer" in lower or "ust." in lower or "ust" in lower or "mwst" in lower):
         return "vat"
-    if "mehrwertsteuer" in lower or "ust." in lower or "mwst" in lower:
+    if "mehrwertsteuer" in lower or "ust." in lower or "ust" in lower or "mwst" in lower:
         return "vat"
     if "rabatt" in lower or "abzug" in lower:
         return "discount"
@@ -60,6 +60,7 @@ def _has_amount_trigger(line: str) -> bool:
             "bruttobetrag",
             "summe brutto",
             "mehrwertsteuer",
+            "ust",
             "ust.",
             "mwst",
             "rabatt",

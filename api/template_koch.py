@@ -29,9 +29,11 @@ OBJECT_POSITION_RE = re.compile(r"Objektposition:\s*(.+)", flags=re.IGNORECASE)
 def detect(normalized_lower: str) -> bool:
     return (
         "koch türen gmbh" in normalized_lower
-        and "angebotsnummer:" in normalized_lower
-        and "angebotsdatum:" in normalized_lower
         and "objekt:" in normalized_lower
+        and (
+            ("angebotsnummer:" in normalized_lower and "angebotsdatum:" in normalized_lower)
+            or ("auftragsnummer:" in normalized_lower and "auftragsdatum:" in normalized_lower)
+        )
     )
 
 
@@ -41,11 +43,17 @@ def count_positions(text: str) -> int:
 
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
     document_number = headers.get("document_number") or first_match(
-        [r"Angebotsnummer:\s*([A-Za-z0-9.-]+)"],
+        [
+            r"Angebotsnummer:\s*([A-Za-z0-9.-]+)",
+            r"Auftragsnummer:\s*([A-Za-z0-9.-]+)",
+        ],
         normalized_text,
     )
     document_date = headers.get("document_date") or first_match(
-        [r"Angebotsdatum:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})"],
+        [
+            r"Angebotsdatum:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
+            r"Auftragsdatum:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
+        ],
         normalized_text,
     )
     project_ref = headers.get("project_ref") or first_match(

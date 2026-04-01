@@ -62,6 +62,7 @@ TEMPLATES = (
         detector=template_newo.detect,
         count_positions=template_newo.count_positions,
         extract_line_items=template_newo.extract_line_items,
+        refine_headers=template_newo.refine_headers,
     ),
     TemplateSpec(
         key="muigg",

@@ -98,6 +98,8 @@ def _detect_document_type(normalized_text: str, template: str) -> str:
         return "auftragsbestaetigung"
     if re.search(r"(?mi)^\s*auftragsnummer\s*:", head_text):
         return "auftragsbestaetigung"
+    if re.search(r"(?mi)^\s*auftrag\s+nr\.\s*[A-Za-z0-9.-]+\b", head_text):
+        return "auftragsbestaetigung"
     if re.search(r"(?mi)^\s*auftrag\b(?:\s*:)?\s*[A-Za-z0-9.-]+\b", head_text):
         return "auftragsbestaetigung"
     if re.search(r"(?mi)^\s*angebot(?:\s*:|\b)", head_text) or "angebotsnummer" in head_lower:
@@ -133,6 +135,7 @@ def _extract_offer_reference(normalized_text: str, document_type: str) -> str | 
                 r"(?mi)\bAngebotsreferenz\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
                 r"(?mi)\bReferenzangebot\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
                 r"(?mi)\bbezugnehmend auf Angebot\s*:?\s*([A-Za-z0-9.+/\- ]+)\b",
+                r"(?mi)^\s*Auftragsnummer aus moveIT:\s*([A-Za-z0-9.+/\-]+)\b",
             ],
             normalized_text,
         )
@@ -162,6 +165,7 @@ def _extract_totals(text: str) -> dict[str, str | None]:
     net_total = _extract_amount_via_inline_pattern(
         text,
         (
+            r"Gesamtbetrag\s*\(\s*Netto\s*\)\s*:\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})\s*(?:EUR|\u20ac)?",
             r"Gesamtbetrag netto\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Gesamt Nettosumme\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Summe Netto\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
@@ -185,18 +189,19 @@ def _extract_totals(text: str) -> dict[str, str | None]:
     vat_total = _extract_amount_via_inline_pattern(
         text,
         (
+            r"zuzüglich\s*[0-9., ]*%\s*(?:MwSt|Mwst|Mehrwertsteuer|USt\.?)\s*[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}\s+([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})\s*(?:EUR|\u20ac)",
             r"zuzüglich\s*[0-9., ]*%\s*(?:MwSt|Mwst|Mehrwertsteuer|USt\.)\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"(?:MwSt|Mehrwertsteuer|USt\.)\s*[0-9., ]*%\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"(?:MwSt|Mwst|Mehrwertsteuer|USt\.)\s*[0-9., ]*%\s*(?:EUR|\u20ac)?\s*[+-]?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
         ),
     )
     if vat_total is None:
-        vat_total = _find_labeled_amount(lines, ("zuzüglich", "mwst", "mehrwertsteuer", "ust."), pick="first")
+        vat_total = _find_labeled_amount(lines, ("zuzüglich", "mwst", "mehrwertsteuer", "ust.", "ust"), pick="first")
     gross_total = _extract_amount_via_inline_pattern(
         text,
         (
-            r"Endbetrag\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
-            r"Gesamtbetrag(?!\s*netto)\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Endbetrag\s*:?\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
+            r"Gesamtbetrag(?!\s*(?:\(\s*Netto\s*\)|netto))\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Gesamtpreis incl\. Mwst\.\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Gesamtpreis inkl\. Mwst\.\s*(?:EUR|\u20ac)?\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
             r"Summe Brutto\s*([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})",
