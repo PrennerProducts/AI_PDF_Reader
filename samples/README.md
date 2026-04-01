@@ -23,6 +23,7 @@ The PDF corpus is now split by purpose so parser work, regression coverage, and 
 - `samples/pdfs/regression/offers/koch/1050685_Angebot.pdf`
 - `samples/pdfs/regression/offers/muigg/AN 251409.pdf`
 - `samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF`
+- `samples/pdfs/regression/offers/schlotterer/Angebot_Schlotterer.pdf`
 
 ## Provider matrix
 - `samples/OFFER_PROVIDER_MATRIX.md`: current green/red parser status by provider
@@ -43,7 +44,7 @@ pdftotext -layout "samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 A
 ```
 
 ## Why these samples matter
-- Different supplier templates: Rieder, Entholzer, NeWo, Rekord Vomp, SR-Schauraum, alu-one, Koch, Muigg, Schachermayer
+- Different supplier templates: Rieder, Entholzer, NeWo, Rekord Vomp, SR-Schauraum, alu-one, Koch, Muigg, Schachermayer, Schlotterer
 - Different table styles for line items and totals
 - Alternative positions, zero-value items, and VAT blocks
 - Good base set for deterministic parser regression

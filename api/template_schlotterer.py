@@ -9,7 +9,7 @@ ROW_WITH_AMOUNTS_RE = re.compile(
     rf"^(?P<position>\d+)\s+(?P<body>.+?)\s+(?P<unit_price>{AMOUNT_PATTERN})\s+(?P<line_total>{AMOUNT_PATTERN})$"
 )
 ROW_NO_AMOUNTS_RE = re.compile(r"^(?P<position>\d+)\s+(?P<body>.+)$")
-BODY_RE = re.compile(r"^(?P<customer_pos>.*?)\s*(?P<qty>\d+)\s+(?P<description>[A-Za-zÄÖÜäöüß].+)$")
+BODY_RE = re.compile(r"^(?:(?P<customer_pos>.+?)\s+)?(?P<qty>\d+)\s+(?P<description>[A-Za-zÄÖÜäöüß].+)$")
 
 
 def detect(normalized_lower: str) -> bool:
@@ -83,7 +83,8 @@ def _parse_row(line: str) -> dict[str, str] | None:
     if not body_match:
         return None
 
-    customer_pos = normalize_line(body_match.group("customer_pos")) or None
+    customer_pos_raw = body_match.group("customer_pos")
+    customer_pos = normalize_line(customer_pos_raw) if customer_pos_raw else None
     description = normalize_line(body_match.group("description"))
     if not description:
         return None

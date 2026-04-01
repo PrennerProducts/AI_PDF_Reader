@@ -1,6 +1,6 @@
 # Regression Set
 
-Stand: 2026-03-24
+Stand: 2026-04-01
 
 ## Canonical Offer Regression PDFs
 
@@ -40,6 +40,9 @@ Stand: 2026-03-24
 ### Schachermayer
 - `samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF`
 
+### Schlotterer
+- `samples/pdfs/regression/offers/schlotterer/Angebot_Schlotterer.pdf`
+
 ## Candidate Offer PDFs
 
 ### alu-one
@@ -67,6 +70,10 @@ Stand: 2026-03-24
 
 ### Schachermayer
 - `samples/pdfs/candidates/offers/schachermayer/SCH Offert 225009480.PDF`
+
+### Schlotterer
+- `samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf`
+- `samples/pdfs/candidates/offers/schlotterer/Angebot_schlotterer3.pdf`
 
 ## Non-Offer Material
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/`

@@ -15,7 +15,7 @@ def _is_amount_header_line(line: str) -> bool:
 
 def _classify_amount_line(label: str) -> str:
     lower = label.lower()
-    if "gesamtbetrag netto" in lower or "summe positionen" in lower:
+    if "gesamtbetrag netto" in lower or "summe positionen" in lower or "gesamtpreis positionen" in lower:
         return "net_total"
     if "gesamtpreis ohne mwst" in lower or "gesamtpreis ohne ust" in lower or "nettosumme" in lower or "nettowert" in lower or "summe netto" in lower:
         return "net_total"
@@ -39,6 +39,8 @@ def _classify_amount_line(label: str) -> str:
 def _has_amount_trigger(line: str) -> bool:
     lower = line.lower()
     if _is_amount_header_line(line):
+        return False
+    if "inklusive rabatte" in lower:
         return False
     return any(
         word in lower

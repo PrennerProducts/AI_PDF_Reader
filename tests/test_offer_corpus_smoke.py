@@ -264,6 +264,33 @@ GREEN_OFFER_CASES = [
         "project_ref": "01 INNENTÜRELEMENT BIS MST 170",
         "position_count": 4,
     },
+    {
+        "path": "samples/pdfs/regression/offers/schlotterer/Angebot_Schlotterer.pdf",
+        "template": "schlotterer",
+        "supplier_name": "Schlotterer Sonnenschutz Systeme GmbH",
+        "document_number": "826004412",
+        "document_date": "18.03.2026",
+        "project_ref": "LV MS Fieberbrunn",
+        "position_count": 25,
+    },
+    {
+        "path": "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf",
+        "template": "schlotterer",
+        "supplier_name": "Schlotterer Sonnenschutz Systeme GmbH",
+        "document_number": "825018528",
+        "document_date": "25.11.2025",
+        "project_ref": "Kals B",
+        "position_count": 21,
+    },
+    {
+        "path": "samples/pdfs/candidates/offers/schlotterer/Angebot_schlotterer3.pdf",
+        "template": "schlotterer",
+        "supplier_name": "Schlotterer Sonnenschutz Systeme GmbH",
+        "document_number": "825015125",
+        "document_date": "18.09.2025",
+        "project_ref": "BVH Teismann",
+        "position_count": 31,
+    },
 ]
 
 

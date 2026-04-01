@@ -330,6 +330,27 @@ def test_schachermayer_regression() -> None:
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
 
 
+def test_schlotterer_regression() -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/schlotterer/Angebot_Schlotterer.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    amount_lines = extract_amount_lines(text)
+
+    assert parsed["template"] == "schlotterer"
+    assert parsed["document_type"] == "angebot"
+    assert parsed["supplier_name"] == "Schlotterer Sonnenschutz Systeme GmbH"
+    assert parsed["document_number"] == "826004412"
+    assert parsed["document_date"] == "18.03.2026"
+    assert parsed["project_ref"] == "LV MS Fieberbrunn"
+    _assert_totals(parsed, ("EUR 57 790,35", "EUR 11 558,07", "EUR 69 348,42"))
+    assert len(items) == 25
+    assert items[0]["description_short"] == "Raff S"
+    assert items[0]["lv_pos"] == "75.50.02 B"
+    assert items[-1]["description_short"] == "Verpackungsbeitrag"
+    assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
 def test_rieder_ab_reference_regression() -> None:
     pdf_path = ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/rieder/131584_Sevignani, zu 130629_3.pdf"
     text = _read_pdf_text(pdf_path)

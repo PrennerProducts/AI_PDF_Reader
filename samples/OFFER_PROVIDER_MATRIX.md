@@ -1,14 +1,14 @@
 # Offer Provider Matrix
 
-Stand: 2026-03-24
+Stand: 2026-04-01
 
 ## Corpus Summary
 
-- Angebots-PDFs gesamt: `30`
-- Aktuell gruene Angebots-PDFs: `30`
+- Angebots-PDFs gesamt: `33`
+- Aktuell gruene Angebots-PDFs: `33`
 - Noch offene neue Angebotslayouts: `0`
-- Regression-Satz: `17` PDFs
-- Zusätzliche grüne Kandidaten: `13` PDFs
+- Regression-Satz: `18` PDFs
+- Zusätzliche grüne Kandidaten: `15` PDFs
 
 ## Provider Status
 
@@ -24,7 +24,7 @@ Stand: 2026-03-24
 | `muigg` | 1 | 2 | stabil | Varianten in Klammern und Unterpositionen sind jetzt abgedeckt |
 | `schachermayer` | 1 | 1 | stabil | tabellarische Offert-Layouts plus Kommissionsfallback laufen gruen |
 | `schuchter` | 0 | 0 | vorlaeufig | Angebots-/AB-Header jetzt parserseitig vorbereitet, echte Angebots-PDFs fehlen weiter |
-| `schlotterer` | 0 | 0 | vorlaeufig | Angebots-/AB-Header jetzt parserseitig vorbereitet, echte Angebots-PDFs fehlen weiter |
+| `schlotterer` | 1 | 2 | stabil | drei echte Angebots-PDFs plus vorhandene ABs liefern jetzt gruene Ergebnisse |
 
 ## Green Provider Set
 
@@ -76,15 +76,16 @@ Stand: 2026-03-24
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schachermayer/`
 - Parserstatus: beide Offerte-PDFs plus die AB-Trennung sind jetzt sauber eingeordnet
 
+### Schlotterer
+- Regression: `samples/pdfs/regression/offers/schlotterer/`
+- Kandidaten: `samples/pdfs/candidates/offers/schlotterer/`
+- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/`
+- Parserstatus: alle `3` echten Angebots-PDFs plus die vorhandenen ABs liefern jetzt grüne Ergebnisse
+
 ## Pending Provider Set
 
 ### Schuchter
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/`
-- Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
-- Parserstatus: vorhandene ABs werden provider-spezifisch erkannt und positioniert; Angebotskoepfe werden jetzt ebenfalls detektiert, aber noch ohne echte Angebots-PDFs validiert
-
-### Schlotterer
-- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/`
 - Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
 - Parserstatus: vorhandene ABs werden provider-spezifisch erkannt und positioniert; Angebotskoepfe werden jetzt ebenfalls detektiert, aber noch ohne echte Angebots-PDFs validiert
 
@@ -117,5 +118,5 @@ python -m pytest tests/test_non_offer_corpus_smoke.py -q
 ## Next Provider Watchlist
 
 1. `schuchter`
-2. `schlotterer`
-3. weitere echte Angebotsanbieter aus dem Feldimport
+2. `koch` AB-Layouts
+3. `newo` AB-Layouts
