@@ -8,6 +8,28 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+## Ubuntu Server ohne NVIDIA-GPU
+
+Für CPU-only Server:
+
+```bash
+cd infra
+cp .env.cpu.example .env
+docker compose -f docker-compose.cpu.yml up -d --build
+```
+
+Empfohlener Startmodus auf dem Server:
+- `LLM_ENABLED=false`
+- `VLM_ENABLED=false`
+- zuerst `parser_only` live prüfen
+
+Danach prüfen:
+
+```bash
+curl http://localhost:8000/health
+./infra/api-canary.sh
+```
+
 ## One-Terminal Live Mode
 
 ```bash

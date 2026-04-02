@@ -1,0 +1,52 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    image: ai-pdf-reader-api:local
+    container_name: pdr-api
+    working_dir: /app
+    volumes:
+      - ../api:/app
+      - ../data/uploads:/data/uploads
+      - ../data/exports:/data/exports
+      - ../data/logs:/data/logs
+    environment:
+      - PDR_ENV=${PDR_ENV}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - DATABASE_URL=${DATABASE_URL}
+      - LLM_ENABLED=${LLM_ENABLED}
+      - VLM_ENABLED=${VLM_ENABLED}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      - ollama
+      - db
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pdr-ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: pdr-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  pg_data:
