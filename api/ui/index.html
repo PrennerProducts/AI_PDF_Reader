@@ -1336,6 +1336,169 @@
       letter-spacing: -0.01em;
     }
 
+    .approval-guide,
+    .approval-checklist {
+      border: 1px solid rgba(35, 32, 32, 0.10);
+      border-radius: 22px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(245, 240, 235, 0.76)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.08));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.78),
+        0 16px 32px rgba(28, 19, 17, 0.07);
+      padding: 14px;
+    }
+
+    .approval-checklist {
+      margin-bottom: 12px;
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: none;
+    }
+
+    .approval-guide-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .approval-guide-title {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.15;
+      color: #262222;
+      letter-spacing: -0.01em;
+    }
+
+    .approval-guide-note {
+      margin-top: 3px;
+      color: #645d59;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .approval-guide-state {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      background: rgba(35, 32, 32, 0.08);
+      color: #3b3533;
+      white-space: nowrap;
+    }
+
+    .approval-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .approval-step {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 9px;
+      align-items: start;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      border-radius: 16px;
+      padding: 11px;
+      background: rgba(255, 255, 255, 0.62);
+      min-width: 0;
+    }
+
+    .approval-step.done {
+      border-color: rgba(11, 122, 72, 0.18);
+      background: rgba(236, 249, 241, 0.82);
+    }
+
+    .approval-step.open {
+      border-color: rgba(218, 146, 0, 0.22);
+      background: rgba(255, 248, 229, 0.84);
+    }
+
+    .approval-step.blocked {
+      border-color: rgba(159, 23, 42, 0.20);
+      background: rgba(255, 240, 244, 0.84);
+    }
+
+    .approval-step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: #eee7e1;
+      color: #4d4642;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .approval-step.done .approval-step-num {
+      background: #0b7a48;
+      color: #ffffff;
+    }
+
+    .approval-step.open .approval-step-num {
+      background: #d89200;
+      color: #ffffff;
+    }
+
+    .approval-step.blocked .approval-step-num {
+      background: #9f172a;
+      color: #ffffff;
+    }
+
+    .approval-step-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #262222;
+      line-height: 1.2;
+    }
+
+    .approval-step-text {
+      margin-top: 3px;
+      color: #655d59;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .approval-step-action {
+      margin-top: 8px;
+      border: 1px solid rgba(35, 32, 32, 0.12);
+      border-radius: 999px;
+      background: #ffffff;
+      color: #292526;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 6px 9px;
+      cursor: pointer;
+    }
+
+    .approval-step-action:hover {
+      border-color: rgba(213, 26, 15, 0.24);
+      color: var(--brand);
+    }
+
+    .approval-checklist .approval-guide-head {
+      margin-bottom: 10px;
+    }
+
+    .approval-checklist .approval-steps {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .approval-checklist .approval-step {
+      border-radius: 14px;
+      padding: 10px;
+    }
+
     .review-list {
       display: flex;
       flex-direction: column;
@@ -2617,6 +2780,10 @@
         grid-template-columns: 1fr 1fr;
       }
 
+      .approval-steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .review-workbench {
         grid-template-columns: 1fr;
       }
@@ -2638,6 +2805,10 @@
       .review-hero,
       .review-grid,
       .review-workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .approval-steps {
         grid-template-columns: 1fr;
       }
 
@@ -2874,6 +3045,446 @@
       }
     }
 
+    /* Production operator shell: keep the main workflow compact and remove PoC noise from the visible chrome. */
+    body {
+      background:
+        radial-gradient(circle at 16% 0%, rgba(213, 26, 15, 0.10), transparent 22%),
+        linear-gradient(180deg, #efebe7 0%, #dfd8d2 46%, #cbc4bd 100%);
+    }
+
+    .app {
+      max-width: none;
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(190px, 0.72fr) minmax(390px, 1.65fr) auto;
+      gap: 8px 10px;
+      align-items: end;
+      padding: 10px 12px;
+      border-radius: 18px;
+      overflow: visible;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 44%),
+        linear-gradient(130deg, #232323, #4e4e4d 58%, #1f2022);
+    }
+
+    .topbar::before {
+      opacity: 0.16;
+      animation: none;
+    }
+
+    .topbar::after {
+      left: 16px;
+      right: auto;
+      width: 74px;
+      height: 3px;
+      border-radius: 0 0 999px 999px;
+    }
+
+    .hero-head {
+      align-self: center;
+      margin: 0;
+      max-height: none;
+      gap: 8px;
+    }
+
+    .hero-copy {
+      max-width: none;
+    }
+
+    .hero-aside {
+      display: none;
+    }
+
+    .topbar h1 {
+      font-size: clamp(18px, 1.15vw, 22px);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .topbar p {
+      display: block;
+      margin-top: 3px;
+      max-width: 34ch;
+      font-size: 11px;
+      line-height: 1.25;
+      color: rgba(255, 255, 255, 0.66);
+    }
+
+    .controls {
+      grid-template-columns: minmax(250px, 1.2fr) minmax(220px, 0.8fr);
+      gap: 8px;
+      align-items: end;
+    }
+
+    .control-card {
+      gap: 5px;
+      padding: 8px 10px;
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.10);
+      box-shadow: none;
+      backdrop-filter: blur(10px);
+    }
+
+    .control-card::before {
+      display: none;
+    }
+
+    .doc-select-head {
+      margin-bottom: 0;
+      gap: 8px;
+    }
+
+    .control-label {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.68);
+    }
+
+    .controls select,
+    .controls input[type="file"] {
+      min-height: 36px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      border-color: rgba(255, 255, 255, 0.58);
+    }
+
+    .action-bar {
+      align-self: end;
+      justify-content: flex-end;
+      margin-top: 0;
+      gap: 0;
+    }
+
+    .action-group {
+      flex-wrap: nowrap;
+      gap: 8px;
+    }
+
+    .btn {
+      min-height: 36px;
+      padding: 7px 12px;
+      font-size: 12px;
+      box-shadow: none;
+    }
+
+    .btn-primary {
+      box-shadow: 0 10px 24px rgba(213, 26, 15, 0.22);
+    }
+
+    .status-strip {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      margin-top: 0;
+    }
+
+    .statusbar,
+    .live-state-wrap {
+      min-height: 30px;
+      padding: 5px 10px;
+      border-radius: 11px;
+      box-shadow: none;
+    }
+
+    .statusbar {
+      font-size: 12px;
+      border-left-width: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .live-state-wrap {
+      gap: 7px;
+      background: rgba(255, 255, 255, 0.10);
+    }
+
+    .live-label {
+      display: none;
+    }
+
+    .document-approval-pill {
+      min-height: 24px;
+      padding: 4px 9px;
+      font-size: 11px;
+      box-shadow: none;
+    }
+
+    .debug-state {
+      margin-left: 0;
+      padding: 3px 8px;
+      font-size: 10px;
+    }
+
+    .advanced-tools {
+      grid-column: 1 / -1;
+      margin-top: 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.07);
+      box-shadow: none;
+    }
+
+    .advanced-tools:not([open]) {
+      border-color: rgba(255, 255, 255, 0.10);
+      max-height: 28px;
+    }
+
+    .advanced-tools summary,
+    .topbar.is-collapsed .advanced-tools summary {
+      padding: 6px 10px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .advanced-actions {
+      gap: 8px;
+      padding: 0 10px 10px;
+    }
+
+    .advanced-actions .btn {
+      min-height: 32px;
+      padding: 6px 10px;
+    }
+
+    .diagnostic-action,
+    .source-diagnostics-card,
+    #itemSourceFilter {
+      display: none;
+    }
+
+    .topbar.is-collapsed {
+      grid-template-columns: minmax(280px, 1fr) auto;
+      padding: 8px 10px;
+      border-radius: 16px;
+    }
+
+    .topbar.is-collapsed .controls {
+      grid-column: 1;
+      grid-template-columns: minmax(250px, 1fr) minmax(180px, 0.62fr);
+      gap: 7px;
+    }
+
+    .topbar.is-collapsed .action-bar {
+      grid-column: 2;
+    }
+
+    .topbar.is-collapsed .status-strip,
+    .topbar.is-collapsed .advanced-tools:not([open]) {
+      display: none;
+    }
+
+    .topbar.is-collapsed .control-card {
+      padding: 6px 8px;
+    }
+
+    .topbar.is-collapsed .controls select,
+    .topbar.is-collapsed .controls input[type="file"] {
+      min-height: 32px;
+      padding: 5px 8px;
+    }
+
+    .panel {
+      border-radius: 18px;
+    }
+
+    .panel-head {
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+
+    .panel-body {
+      padding: 10px;
+    }
+
+    .extract-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 8px;
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(238, 232, 226, 0.66)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.08));
+      border-color: rgba(35, 32, 32, 0.10);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        0 10px 22px rgba(28, 19, 17, 0.07);
+    }
+
+    .extract-tab {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 9px;
+      justify-content: stretch;
+      min-height: 54px;
+      padding: 8px 10px;
+      border-radius: 13px;
+      font-size: 12px;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.68);
+      border-color: rgba(35, 32, 32, 0.08);
+      box-shadow: none;
+    }
+
+    .extract-tab:hover {
+      transform: none;
+      background: rgba(255, 255, 255, 0.86);
+    }
+
+    .extract-tab.is-active {
+      background:
+        linear-gradient(135deg, rgba(234, 42, 31, 0.98), rgba(213, 26, 15, 0.98));
+      box-shadow: 0 12px 26px rgba(213, 26, 15, 0.20);
+    }
+
+    .tab-step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: #f4efea;
+      color: #4b4542;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .extract-tab.is-active .tab-step {
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--brand);
+    }
+
+    .tab-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .tab-copy strong,
+    .tab-copy small {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tab-copy strong {
+      font-size: 13px;
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+    }
+
+    .tab-copy small {
+      font-size: 10px;
+      line-height: 1.1;
+      color: #776f6b;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .extract-tab.is-active .tab-copy small {
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .tab-badge {
+      align-self: start;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: rgba(35, 32, 32, 0.08);
+      color: #3a3432;
+      font-size: 10px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .extract-tab.is-active .tab-badge {
+      background: rgba(255, 255, 255, 0.20);
+      color: #ffffff;
+    }
+
+    .workflow-hint {
+      margin: 0 0 10px;
+      padding: 0 4px;
+      color: #645d59;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 1100px) {
+      .topbar,
+      .topbar.is-collapsed {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-head,
+      .topbar.is-collapsed .hero-head {
+        display: flex;
+        max-height: none;
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+      }
+
+      .topbar.is-collapsed .controls,
+      .topbar.is-collapsed .action-bar {
+        grid-column: auto;
+      }
+
+      .controls,
+      .topbar.is-collapsed .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .action-bar,
+      .action-group {
+        width: 100%;
+      }
+
+      .action-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .extract-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        padding: 10px;
+      }
+
+      .topbar h1 {
+        font-size: 20px;
+      }
+
+      .topbar p {
+        font-size: 11px;
+      }
+
+      .status-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .extract-tabs {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .topbar::before,
       .panel,
@@ -2888,8 +3499,8 @@
     <div class="topbar">
       <div class="hero-head">
         <div class="hero-copy">
-          <h1>Angebote und Auftragsbestätigungen strukturiert prüfen</h1>
-          <p>Upload, Extraktion, Summenprüfung, Bildzuordnung und Ergebnisvalidierung in einer Oberfläche für die interne Bearbeitung und Freigabe.</p>
+          <h1>VenDoc Importprüfung</h1>
+          <p>Dokument auswählen, PDF verarbeiten, Auffälligkeiten prüfen und freigeben.</p>
         </div>
         <div class="hero-aside">
           <div class="customer-brand">
@@ -2958,6 +3569,9 @@
           </div>
         </div>
       </div>
+      <select id="processModeSelect" aria-label="Verarbeitungsmodus" hidden>
+        <option value="parser_only" selected>Parser only</option>
+      </select>
       <div class="controls">
         <div class="control-card control-card-wide">
           <div class="doc-select-head">
@@ -2970,25 +3584,11 @@
           <label class="control-label" for="uploadInput">Upload</label>
           <input id="uploadInput" type="file" accept=".pdf,application/pdf" aria-label="PDF hochladen">
         </div>
-        <div class="control-card">
-          <label class="control-label" for="processModeSelect">Verarbeitungsmodus</label>
-          <select id="processModeSelect" aria-label="Verarbeitungsmodus">
-            <option value="hybrid_fill">Hybrid: Parser + LLM fuellt Luecken</option>
-            <option value="parser_only">Parser only</option>
-            <option value="llm_override">LLM override</option>
-            <option value="llm_only">LLM only</option>
-          </select>
-        </div>
       </div>
       <div class="action-bar">
         <div class="action-group">
-          <button class="btn btn-primary" id="uploadBtn">PDF hochladen</button>
           <button class="btn btn-primary" id="processBtn">Verarbeiten</button>
-          <button class="btn btn-secondary" id="refreshBtn">Ergebnis laden</button>
-          <button class="btn btn-ghost" id="reloadBtn">Dokumentliste</button>
-        </div>
-        <div class="action-group">
-          <button class="btn btn-danger" id="resetBtn">Reset</button>
+          <button class="btn btn-secondary" id="uploadBtn">PDF hochladen</button>
         </div>
       </div>
       <div class="status-strip">
@@ -3000,16 +3600,19 @@
         </div>
       </div>
       <details class="advanced-tools">
-        <summary>Erweiterte Aktionen und Debug</summary>
+        <summary>Diagnose und Exporte</summary>
         <div class="advanced-actions">
-          <button class="btn btn-ghost" id="comparePreviewBtn">Parser vs LLM</button>
+          <button class="btn btn-ghost" id="refreshBtn">Ergebnis neu laden</button>
+          <button class="btn btn-ghost" id="reloadBtn">Dokumentliste aktualisieren</button>
           <button class="btn btn-ghost" id="jsonPreviewBtn">JSON Vorschau</button>
           <button class="btn btn-secondary" id="csvDownloadBtn">CSV Download</button>
-          <button class="btn btn-ghost" id="llmRunPreviewBtn">LLM Run JSON</button>
-          <button class="btn btn-ghost" id="llmHistoryPreviewBtn">LLM History</button>
-          <button class="btn btn-ghost" id="imageMatchBtn">Bild-Match</button>
           <button class="btn btn-ghost" id="csvPreviewBtn">CSV Vorschau</button>
           <button class="btn btn-ghost" id="jsonDownloadBtn">JSON Download</button>
+          <button class="btn btn-ghost diagnostic-action" id="comparePreviewBtn">Parser vs LLM</button>
+          <button class="btn btn-ghost diagnostic-action" id="llmRunPreviewBtn">LLM Run JSON</button>
+          <button class="btn btn-ghost diagnostic-action" id="llmHistoryPreviewBtn">LLM History</button>
+          <button class="btn btn-ghost diagnostic-action" id="imageMatchBtn">Bild-Match</button>
+          <button class="btn btn-danger" id="resetBtn">Verarbeitung zurücksetzen</button>
         </div>
         <div class="debug-panel">
           <div class="debug-head">
@@ -3030,13 +3633,30 @@
       <section class="panel">
         <div class="panel-head">Extraktion</div>
         <div class="panel-body">
-          <div class="extract-tabs" id="extractTabs" role="tablist" aria-label="Extraktionsansichten">
-            <button class="extract-tab is-active" id="tabBtnOverview" type="button" role="tab" aria-selected="true" aria-controls="tabPaneOverview" data-extract-tab="overview">Cockpit</button>
-            <button class="extract-tab" id="tabBtnReview" type="button" role="tab" aria-selected="false" aria-controls="tabPaneReview" data-extract-tab="review">Review</button>
-            <button class="extract-tab" id="tabBtnItems" type="button" role="tab" aria-selected="false" aria-controls="tabPaneItems" data-extract-tab="items">Positionen</button>
-            <button class="extract-tab" id="tabBtnAudit" type="button" role="tab" aria-selected="false" aria-controls="tabPaneAudit" data-extract-tab="audit">Bilder</button>
-            <button class="extract-tab" id="tabBtnSources" type="button" role="tab" aria-selected="false" aria-controls="tabPaneSources" data-extract-tab="sources">Quellen</button>
+          <div class="extract-tabs" id="extractTabs" role="tablist" aria-label="Arbeitsablauf Dokumentenprüfung">
+            <button class="extract-tab is-active" id="tabBtnOverview" type="button" role="tab" aria-selected="true" aria-controls="tabPaneOverview" data-extract-tab="overview">
+              <span class="tab-step">1</span>
+              <span class="tab-copy"><strong>Prüfung</strong><small>Freigabereife</small></span>
+              <span class="tab-badge" id="tabBadgeOverview">-</span>
+            </button>
+            <button class="extract-tab" id="tabBtnReview" type="button" role="tab" aria-selected="false" aria-controls="tabPaneReview" data-extract-tab="review">
+              <span class="tab-step">2</span>
+              <span class="tab-copy"><strong>Aufgaben</strong><small>Offene Punkte</small></span>
+              <span class="tab-badge" id="tabBadgeReview">0</span>
+            </button>
+            <button class="extract-tab" id="tabBtnItems" type="button" role="tab" aria-selected="false" aria-controls="tabPaneItems" data-extract-tab="items">
+              <span class="tab-step">3</span>
+              <span class="tab-copy"><strong>Positionen</strong><small>Mengen, Preise, Texte</small></span>
+              <span class="tab-badge" id="tabBadgeItems">0</span>
+            </button>
+            <button class="extract-tab" id="tabBtnAudit" type="button" role="tab" aria-selected="false" aria-controls="tabPaneAudit" data-extract-tab="audit">
+              <span class="tab-step">4</span>
+              <span class="tab-copy"><strong>Bilder</strong><small>Zuordnung prüfen</small></span>
+              <span class="tab-badge" id="tabBadgeAudit">0</span>
+            </button>
+            <button class="extract-tab" id="tabBtnSources" type="button" role="tab" aria-selected="false" aria-controls="tabPaneSources" data-extract-tab="sources" hidden>Quellen</button>
           </div>
+          <div class="workflow-hint" id="workflowHint">Starte mit der Prüfung. Offene Punkte führen dich direkt zu Positionen oder Bildern.</div>
 
           <div class="extract-pane" id="tabPaneOverview" role="tabpanel" aria-labelledby="tabBtnOverview" data-extract-pane="overview">
             <div class="extract-overview-shell">
@@ -3045,6 +3665,7 @@
                   <div class="review-main" id="reviewHero"></div>
                   <div class="review-metrics" id="reviewMetrics"></div>
                 </div>
+                <div class="approval-guide" id="approvalGuide"></div>
                 <div class="summary" id="summary"></div>
                 <div class="review-grid">
                   <div class="review-card">
@@ -3059,7 +3680,7 @@
                     <h2>Summenprüfung</h2>
                     <div class="review-list" id="totalsAudit"></div>
                   </div>
-                  <div class="review-card">
+                  <div class="review-card source-diagnostics-card">
                     <h2>Quellenlage</h2>
                     <div class="review-list" id="sourceBreakdown"></div>
                   </div>
@@ -3102,6 +3723,7 @@
               <div class="review-workbench-sidebar">
                 <div class="review-card">
                   <h2>Freigabe</h2>
+                  <div class="approval-checklist" id="approvalChecklist"></div>
                   <div class="review-list" id="documentApprovalSummary"></div>
                   <div class="review-approval-form">
                     <label class="review-approval-field">
@@ -3159,7 +3781,6 @@
                   <select id="itemSourceFilter" class="filter-select" aria-label="Positionsquelle filtern">
                     <option value="all">Alle Quellen</option>
                     <option value="parser">Nur Parser</option>
-                    <option value="llm">Nur LLM</option>
                   </select>
                 </div>
               </div>
@@ -3298,6 +3919,8 @@
       pdfFrame: document.getElementById("pdfFrame"),
       reviewHero: document.getElementById("reviewHero"),
       reviewMetrics: document.getElementById("reviewMetrics"),
+      approvalGuide: document.getElementById("approvalGuide"),
+      approvalChecklist: document.getElementById("approvalChecklist"),
       reviewHighlights: document.getElementById("reviewHighlights"),
       fieldChecklist: document.getElementById("fieldChecklist"),
       totalsAudit: document.getElementById("totalsAudit"),
@@ -3315,6 +3938,11 @@
       extractTabs: Array.from(document.querySelectorAll("[data-extract-tab]")),
       extractPanes: Array.from(document.querySelectorAll("[data-extract-pane]")),
       extractPanelBody: document.querySelector(".panel-body"),
+      workflowHint: document.getElementById("workflowHint"),
+      tabBadgeOverview: document.getElementById("tabBadgeOverview"),
+      tabBadgeReview: document.getElementById("tabBadgeReview"),
+      tabBadgeItems: document.getElementById("tabBadgeItems"),
+      tabBadgeAudit: document.getElementById("tabBadgeAudit"),
       summary: document.getElementById("summary"),
       llmRunInfo: document.getElementById("llmRunInfo"),
       llmChangeRows: document.getElementById("llmChangeRows"),
@@ -3767,6 +4395,51 @@
         const tab = String(pane.dataset.extractPane || "");
         pane.hidden = tab !== state.activeExtractTab;
       }
+      updateWorkflowNavigation();
+    }
+
+    function workflowHintForTab(tab) {
+      if (tab === "review") return "Arbeite offene Punkte ab und gib das Dokument frei, wenn keine blockierenden Fehler mehr offen sind.";
+      if (tab === "items") return "Prüfe nur auffällige Positionen zuerst. Details öffnen Menge, Preis, Text und Bildkandidaten.";
+      if (tab === "audit") return "Konfliktbilder und fehlende Zuordnungen stehen oben. Finale Bilder können direkt gesetzt werden.";
+      return "Starte mit der Prüfung. Offene Punkte führen dich direkt zu Positionen oder Bildern.";
+    }
+
+    function validationStatusShortLabel(status) {
+      const value = String(status || "").trim().toLowerCase();
+      if (value === "auto_accept") return "OK";
+      if (value === "manual_checked") return "Geprüft";
+      if (value === "review") return "Prüfen";
+      if (value === "reject") return "Fehler";
+      return "-";
+    }
+
+    function setTabBadge(el, value) {
+      if (!el) return;
+      el.textContent = String(value);
+    }
+
+    function updateWorkflowNavigation() {
+      if (ui.workflowHint) ui.workflowHint.textContent = workflowHintForTab(state.activeExtractTab);
+      const result = state.result;
+      if (!result || typeof result !== "object") {
+        setTabBadge(ui.tabBadgeOverview, "-");
+        setTabBadge(ui.tabBadgeReview, "0");
+        setTabBadge(ui.tabBadgeItems, "0");
+        setTabBadge(ui.tabBadgeAudit, "0");
+        return;
+      }
+
+      const validation = result.validation && typeof result.validation === "object" ? result.validation : {};
+      const items = Array.isArray(result.line_items) ? result.line_items : [];
+      const images = Array.isArray(result.images) ? result.images : [];
+      const reviewTaskCount = buildReviewTasks(result).length;
+      const itemIssueCount = items.filter((item) => Number(item && item.validation_issue_count || 0) > 0).length;
+
+      setTabBadge(ui.tabBadgeOverview, validationStatusShortLabel(validation.status));
+      setTabBadge(ui.tabBadgeReview, reviewTaskCount);
+      setTabBadge(ui.tabBadgeItems, itemIssueCount ? `${itemIssueCount}/${items.length}` : items.length);
+      setTabBadge(ui.tabBadgeAudit, images.length);
     }
 
     function desktopShellActive() {
@@ -4230,6 +4903,119 @@
       return tasks;
     }
 
+    function countTaskSeverity(tasks, severity) {
+      return (Array.isArray(tasks) ? tasks : []).filter((task) => task && task.severity === severity).length;
+    }
+
+    function buildApprovalSteps(result) {
+      const validation = (result && result.validation && typeof result.validation === "object") ? result.validation : {};
+      const approval = documentApprovalMeta(result);
+      const tasks = buildReviewTasks(result);
+      const errors = countTaskSeverity(tasks, "error");
+      const warnings = countTaskSeverity(tasks, "warning");
+      const items = Array.isArray(result && result.line_items) ? result.line_items : [];
+      const images = Array.isArray(result && result.images) ? result.images : [];
+      const itemIssues = items.filter((item) => Number(item && item.validation_issue_count || 0) > 0).length;
+      const imageTasks = tasks.filter((task) => {
+        const category = String(task && task.category || "");
+        const field = String(task && task.field || "");
+        return category === "image" || field.includes("image");
+      }).length;
+      const validationStatus = String(validation.status || "").trim().toLowerCase();
+
+      return [
+        {
+          title: "Dokument verarbeitet",
+          text: result ? `${items.length} Positionen und ${images.length} Bilder geladen.` : "PDF hochladen und Verarbeitung starten.",
+          state: result ? "done" : "open",
+          action: result ? "" : "overview",
+          actionLabel: result ? "" : "Zum Start",
+        },
+        {
+          title: "Prüfhinweise klären",
+          text: errors
+            ? `${errors} Fehler blockieren die Freigabe.`
+            : (warnings ? `${warnings} Warnung(en) prüfen oder bewusst bestätigen.` : "Keine offenen Prüfhinweise."),
+          state: errors ? "blocked" : (warnings ? "open" : "done"),
+          action: errors || warnings ? "review" : "",
+          actionLabel: errors || warnings ? "Aufgaben öffnen" : "",
+        },
+        {
+          title: "Positionen und Bilder prüfen",
+          text: itemIssues || imageTasks
+            ? `${itemIssues} auffällige Position(en), ${imageTasks} Bildthema(en).`
+            : "Positionen und Bildzuordnungen sind ohne offene Auffälligkeiten.",
+          state: itemIssues || imageTasks ? "open" : "done",
+          action: imageTasks ? "audit" : (itemIssues ? "items" : ""),
+          actionLabel: imageTasks ? "Bilder prüfen" : (itemIssues ? "Positionen prüfen" : ""),
+        },
+        {
+          title: "Freigeben",
+          text: approval.approved
+            ? "Dokument ist freigegeben."
+            : (approval.eligible ? "Freigabe ist möglich." : approval.note),
+          state: approval.approved ? "done" : (approval.eligible ? "open" : (validationStatus === "reject" ? "blocked" : "open")),
+          action: approval.approved ? "" : "review",
+          actionLabel: approval.approved ? "" : "Zur Freigabe",
+        },
+      ];
+    }
+
+    function approvalStateLabel(steps) {
+      if (!Array.isArray(steps) || !steps.length) return "Noch offen";
+      if (steps.every((step) => step.state === "done")) return "Bereit";
+      if (steps.some((step) => step.state === "blocked")) return "Blockiert";
+      return "In Prüfung";
+    }
+
+    function approvalStepHtml(step, index) {
+      const state = String(step && step.state || "open");
+      const action = String(step && step.action || "");
+      const actionHtml = action
+        ? `<button class="approval-step-action" type="button" data-guide-jump="${escapeHtml(action)}">${escapeHtml(step.actionLabel || "Öffnen")}</button>`
+        : "";
+      return `
+        <div class="approval-step ${escapeHtml(state)}">
+          <div class="approval-step-num">${index + 1}</div>
+          <div>
+            <div class="approval-step-title">${escapeHtml(step.title)}</div>
+            <div class="approval-step-text">${escapeHtml(step.text)}</div>
+            ${actionHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function approvalGuideHtml(result, compact = false) {
+      const steps = buildApprovalSteps(result);
+      const stateLabel = approvalStateLabel(steps);
+      const title = compact ? "Vor der Freigabe" : "Freigabe-Assistent";
+      const note = compact
+        ? "Diese Punkte müssen vor dem Klick auf Freigeben sauber sein."
+        : "Arbeite die Schritte von links nach rechts ab. Offene Punkte führen dich direkt zur passenden Ansicht.";
+      return `
+        <div class="approval-guide-head">
+          <div>
+            <h2 class="approval-guide-title">${escapeHtml(title)}</h2>
+            <div class="approval-guide-note">${escapeHtml(note)}</div>
+          </div>
+          <span class="approval-guide-state">${escapeHtml(stateLabel)}</span>
+        </div>
+        <div class="approval-steps">
+          ${steps.map((step, index) => approvalStepHtml(step, index)).join("")}
+        </div>
+      `;
+    }
+
+    function renderApprovalGuidance(result) {
+      if (ui.approvalGuide) {
+        ui.approvalGuide.innerHTML = approvalGuideHtml(result, false);
+      }
+      if (ui.approvalChecklist) {
+        ui.approvalChecklist.innerHTML = approvalGuideHtml(result, true);
+      }
+    }
+
     function renderDocumentApproval(result) {
       clearNode(ui.documentApprovalSummary);
 
@@ -4373,6 +5159,29 @@
       scrollIntoViewSoon(target || ui.imageGrid);
     }
 
+    function openGuideTarget(target) {
+      const value = String(target || "overview");
+      if (value === "items") {
+        setExtractTab("items");
+        if (ui.itemIssuesOnly) ui.itemIssuesOnly.checked = true;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        scrollIntoViewSoon(ui.itemRows);
+        return;
+      }
+      if (value === "audit") {
+        setExtractTab("audit");
+        scrollIntoViewSoon(ui.imageGrid);
+        return;
+      }
+      if (value === "review") {
+        setExtractTab("review");
+        scrollIntoViewSoon(ui.approvalChecklist || ui.reviewTaskList);
+        return;
+      }
+      setExtractTab("overview");
+      scrollIntoViewSoon(ui.approvalGuide || ui.reviewHero);
+    }
+
     function renderReview(result) {
       clearNode(ui.reviewHero);
       clearNode(ui.reviewMetrics);
@@ -4380,6 +5189,7 @@
       clearNode(ui.fieldChecklist);
       clearNode(ui.totalsAudit);
       clearNode(ui.sourceBreakdown);
+      renderApprovalGuidance(result);
       renderReviewWorkbench(result);
 
       if (!result || typeof result !== "object") {
@@ -4422,7 +5232,11 @@
       const imageTotal = Number(imageSummary.total || (result.images || []).length || 0);
       const duplicateImageAssignments = Number(imageSummary.assigned_duplicate_count || 0);
       const lineItems = Array.isArray(result.line_items) ? result.line_items : [];
-      const itemsWithImages = lineItems.filter((item) => Number(item.image_count || 0) > 0).length;
+      const imageRequiredItems = lineItems.filter(lineItemNeedsImageForUi);
+      const imageRequiredTotal = imageRequiredItems.length;
+      const imageRequiredWithImages = imageRequiredItems.filter((item) => Number(item.image_count || 0) > 0).length;
+      const imageOptionalCount = Math.max(0, lineItems.length - imageRequiredTotal);
+      const missingRequiredImages = Math.max(0, imageRequiredTotal - imageRequiredWithImages);
       const docErrorCount = Number(validation.error_count || 0);
       const docWarningCount = Number(validation.warning_count || 0);
       const requiredMetricClass = validation.missing_required_fields && validation.missing_required_fields.length
@@ -4433,8 +5247,8 @@
       const errorMetricClass = docErrorCount > 0 ? "metric-err" : "metric-ok";
       const warningMetricClass = docWarningCount > 0 ? "metric-review" : "metric-ok";
       const openMetricClass = lineWithIssues > 0 ? "metric-review" : "metric-ok";
-      const coverageMetricClass = lineTotal > 0
-        ? (itemsWithImages < lineTotal ? "metric-review" : "metric-ok")
+      const coverageMetricClass = imageRequiredTotal > 0
+        ? (missingRequiredImages > 0 ? "metric-review" : "metric-ok")
         : "";
       const duplicateMetricClass = lineTotal > 0
         ? (duplicateImageAssignments > 0 ? "metric-err" : "metric-ok")
@@ -4467,10 +5281,10 @@
           <div class="review-metric-value">${lineWithIssues}</div>
           <div class="review-metric-note">${lineTotal ? `${lineTotal - lineWithIssues}/${lineTotal} ohne Auffälligkeit` : "Noch keine Positionen"}</div>
         </div>
-        <div class="review-metric is-actionable ${coverageMetricClass}" data-review-jump="review" data-review-filter="image">
+        <div class="review-metric is-actionable ${coverageMetricClass}" data-review-jump="${missingRequiredImages ? "review" : "audit"}" ${missingRequiredImages ? 'data-review-filter="image"' : ""}>
           <div class="review-metric-label">Bildabdeckung</div>
-          <div class="review-metric-value">${itemsWithImages}/${lineTotal || 0}</div>
-          <div class="review-metric-note">${lineTotal ? `${lineTotal - itemsWithImages} Position(en) ohne Bild` : `${imageTotal} Bilder im Dokument`}</div>
+          <div class="review-metric-value">${imageRequiredWithImages}/${imageRequiredTotal || 0}</div>
+          <div class="review-metric-note">${missingRequiredImages ? `${missingRequiredImages} bildpflichtige Position(en) ohne Bild` : (imageOptionalCount ? `${imageOptionalCount} Position(en) nicht bildpflichtig` : `${imageTotal} Bilder im Dokument`)}</div>
         </div>
         <div class="review-metric is-actionable ${duplicateMetricClass}" data-review-jump="review" data-review-filter="image">
           <div class="review-metric-label">Bildkonflikte</div>
@@ -4518,12 +5332,12 @@
           )
         );
       }
-      if (lineTotal > 0 && itemsWithImages < lineTotal) {
+      if (imageRequiredTotal > 0 && missingRequiredImages > 0) {
         highlights.push(
           reviewRowHtml(
             "Bildzuordnung unvollständig",
-            `${lineTotal - itemsWithImages} von ${lineTotal} Positionen haben aktuell kein finales Bild.`,
-            reviewFlagHtml(`${itemsWithImages}/${lineTotal}`, "review")
+            `${missingRequiredImages} von ${imageRequiredTotal} bildpflichtigen Positionen haben aktuell kein finales Bild.`,
+            reviewFlagHtml(`${imageRequiredWithImages}/${imageRequiredTotal}`, "review")
           )
         );
       }
@@ -4591,7 +5405,23 @@
       ui.fieldChecklist.innerHTML = fieldRows.join("");
 
       const grossFlag = validationBooleanFlag(totals.net_plus_vat_matches_gross);
-      const componentFlag = validationBooleanFlag(totals.component_sum_matches_net);
+      const componentCheckMode = String(totals.component_check_mode || "").trim().toLowerCase();
+      const componentIsHeuristic = componentCheckMode === "heuristic";
+      const componentFlag = componentIsHeuristic
+        ? {
+            label: totals.component_sum_matches_net === true ? "plausibel" : "nur Hinweis",
+            kind: totals.component_sum_matches_net === true ? "ok" : "neutral",
+          }
+        : validationBooleanFlag(totals.component_sum_matches_net);
+      const componentTitle = componentIsHeuristic
+        ? "Positionssumme als Plausibilitätswert"
+        : "Positionen und Zu-/Abschläge = Netto";
+      const componentDescription = componentIsHeuristic
+        ? `${euro(totals.computed_net_from_components)} Positionsbasis · Netto-Delta ${euro(totals.net_delta_from_components)} · nicht freigabeblockierend`
+        : `${euro(totals.computed_net_from_components)} erwartet · Delta ${euro(totals.net_delta_from_components)}`;
+      const componentModeLabel = componentIsHeuristic
+        ? "heuristik · nicht blockierend"
+        : (totals.component_check_mode || "-");
       ui.totalsAudit.innerHTML = [
         reviewRowHtml(
           "Netto + MwSt = Brutto",
@@ -4599,9 +5429,9 @@
           reviewFlagHtml(grossFlag.label, grossFlag.kind)
         ),
         reviewRowHtml(
-          "Positionen und Zu-/Abschläge = Netto",
-          `${euro(totals.computed_net_from_components)} erwartet · Delta ${euro(totals.net_delta_from_components)}`,
-          `${reviewFlagHtml(componentFlag.label, componentFlag.kind)}${reviewFlagHtml(totals.component_check_mode || "-", "neutral")}`
+          componentTitle,
+          componentDescription,
+          `${reviewFlagHtml(componentFlag.label, componentFlag.kind)}${reviewFlagHtml(componentModeLabel, "neutral")}`
         ),
         reviewRowHtml(
           "Betragsbasis",
@@ -5196,6 +6026,30 @@
       return value.replaceAll("_", " ");
     }
 
+    function normalizedUiText(value) {
+      if (value === null || value === undefined) return "";
+      return String(value).trim().toLowerCase().replace(/\s+/g, " ");
+    }
+
+    function lineItemNeedsImageForUi(item) {
+      const reason = normalizedUiText(item && item.image_assignment_reason);
+      const description = normalizedUiText(item && item.description_short);
+      const lvPos = normalizedUiText(item && item.lv_pos);
+      const positionNo = normalizedUiText(item && item.position_no);
+      if (reason === "non_visual_line_item") return false;
+      if (["umfang", "lieferung", "montage", "fracht", "transport", "rabatt", "skonto"].includes(description)) return false;
+      if (/^(?:€|eur)?\s*[-+]?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?$/.test(description)) return false;
+      if (description.startsWith("vorbemerk")) return false;
+      if (description.startsWith("az - ") || description.startsWith("az-")) return false;
+      if (description.startsWith("modul ") || description.startsWith("optional")) return false;
+      if (description.startsWith("aufpreis ") || description.startsWith("mehrpreis ")) return false;
+      if (description.includes("bereits in grundposition enthalten")) return false;
+      if (description.startsWith("xx-lief-") || description.includes("lieferung auf baustelle") || description.includes("lkw-kran") || description.includes("lkw kran")) return false;
+      if (lvPos === "umfang") return false;
+      if (["000", "0"].includes(positionNo) && ["vorbemerkungen", "vorbemerkung"].includes(description)) return false;
+      return true;
+    }
+
     function lineItemSource(item) {
       const direct = String(item && (item.source || item.extraction_source || "")).trim().toLowerCase();
       if (direct === "llm") return "llm";
@@ -5481,7 +6335,10 @@
         renderAmountLines(result.amount_lines || []);
         renderLineItems(result.line_items || []);
         renderImages(result.images || []);
-        await loadLatestLlmRun(documentId);
+        updateWorkflowNavigation();
+        state.llmRun = null;
+        renderLlmRun(null);
+        syncFieldSources();
         const imageCount = (result.images || []).length;
         const itemCount = (result.line_items || []).length;
         setStatus(`Dokument #${documentId} geladen: ${itemCount} Positionen, ${imageCount} Bilder.`, "ok");
@@ -5509,6 +6366,7 @@
         state.fieldSources = {};
         state.expandedItemKeys = new Set();
         setDocumentApprovalPills(null);
+        updateWorkflowNavigation();
         renderReview(null);
         renderDocumentIssues(null);
         setStatus(`Result konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
@@ -5524,25 +6382,19 @@
 
     async function processCurrent() {
       if (!state.documentId) return;
-      const processMode = ui.processModeSelect.value || "hybrid_fill";
+      const processMode = ui.processModeSelect.value || "parser_only";
       const modeLabel = PROCESS_MODE_LABELS[processMode] || processMode;
       startProcessingMonitor(state.documentId, modeLabel, processMode);
       setStatus(
-        `Starte Verarbeitung fuer Dokument #${state.documentId} ... (Mode: ${modeLabel})`
+        `Starte Verarbeitung fuer Dokument #${state.documentId} ...`
       );
       ui.processBtn.disabled = true;
       try {
         const query = new URLSearchParams({ process_mode: processMode });
         const payload = await apiJson(`/process/${state.documentId}?${query.toString()}`, { method: "POST" });
-        const llmInfo = payload.llm_requested
-          ? (payload.llm_used
-            ? `LLM ${payload.llm_status || "ok"} (${payload.llm_model || "-"})`
-            : `LLM ${payload.llm_status || "off"}${payload.llm_error ? `: ${payload.llm_error}` : ""}`)
-          : "LLM off";
-        const level = payload.llm_requested && !payload.llm_used ? "warn" : "ok";
         setStatus(
-          `Verarbeitung fertig: ${payload.line_item_count} Positionen, ${payload.image_count} Bilder, Status ${payload.status}. Mode ${payload.process_mode_effective || payload.process_mode_requested}. ${llmInfo}`,
-          level
+          `Verarbeitung fertig: ${payload.line_item_count} Positionen, ${payload.image_count} Bilder, Status ${payload.status}.`,
+          "ok"
         );
         setLiveState("fertig", "ok");
         await loadDocuments();
@@ -5772,6 +6624,14 @@
       ui.extractPanelBody.addEventListener("scroll", () => {
         syncTopbarCollapse();
       }, { passive: true });
+      ui.extractPanelBody.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const guideButton = target.closest("[data-guide-jump]");
+        if (!guideButton) return;
+        event.preventDefault();
+        openGuideTarget(guideButton.getAttribute("data-guide-jump"));
+      });
     }
 
     if (ui.topbar) {
@@ -5804,6 +6664,11 @@
         setExtractTab("review");
         if (state.result) renderReviewWorkbench(state.result);
         scrollIntoViewSoon(ui.reviewTaskList);
+        return;
+      }
+      if (jump === "audit") {
+        setExtractTab("audit");
+        scrollIntoViewSoon(ui.imageGrid);
       }
     });
 

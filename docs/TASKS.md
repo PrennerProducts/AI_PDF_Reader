@@ -154,6 +154,7 @@ Tasks:
 - Persistenter Progress.
 - Dokument-Lock.
 - Retry/Cancel.
+- Timeout-Fall `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/koch/49440_Auftragsbestätigung.pdf` analysieren: `/process` erzeugt Zwischendaten, laeuft aber laenger als der Client-Timeout.
 
 ### P1-003 Feldkorrekturen
 
@@ -228,7 +229,8 @@ Aktueller erledigter Stand:
 - 4 Muigg-Auftragsbestaetigungen als Nicht-Angebote aufgenommen.
 - 4 technische SR-Schauraum-Detailansichten als Nicht-Angebote aufgenommen.
 - Konkrete Dokumentenanforderung an Daniela steht in `docs/DANIELA_DOCUMENT_REQUEST.md`.
-- Betrags-/Summenvalidierung fuer alle 39 Angebots-PDFs per `tests/test_offer_validation_smoke.py` abgesichert.
+- Betrags-/Summenvalidierung fuer alle Angebots-PDFs per `tests/test_offer_validation_smoke.py` abgesichert.
+- Finaler API-Corpuslauf am 2026-04-27: 41/41 Angebots-/Import-PDFs verarbeitet, 0 Pflichtfeldfehler, 0 leere Positionslisten, 3 offene Bildreviews.
 
 Naechster Dokumentenbedarf:
 
@@ -240,7 +242,7 @@ Naechster Dokumentenbedarf:
 
 ### P2-004 Bildworkflow verbessern
 
-Status: offen
+Status: laufend
 
 Tasks:
 
@@ -248,3 +250,45 @@ Tasks:
 - `no_image_required` als Zustand.
 - Schnellere UI fuer Bildkandidaten.
 - VLM nur fuer Review-Faelle optional nutzen.
+
+Umgesetzt:
+
+- PyMuPDF-Bildbloecke sind die produktive Quelle fuer eingebettete Bilder, weil sie sichtbare Bildrechtecke stabiler liefern als die alte manuelle `pypdf`-CTM-Erkennung.
+- Die alte `pypdf`-CTM-Fallbackstrecke wurde entfernt; PyMuPDF ist verpflichtende Runtime-Abhaengigkeit.
+- Kleine PyMuPDF-Header-/Logo-Fragmente werden direkt verworfen, damit sie nicht als Produktbilder im Review auftauchen.
+- Schuchter-Line-Art-Ergaenzung: Positionsbloecke werden ueber `Pos. <Nr>` erkannt, links gerendert und als PNG-Bild gespeichert, wenn technische Linien erkannt werden.
+- Schuchter-Line-Art-Crops werden auf die technische Zeichnung inklusive Bemaszung verfeinert; Positionskopf, Menge und Trennlinien werden aus dem Crop entfernt.
+- `A260172` liefert dadurch 13 Vektor-Positionsbilder und 13/13 Bildzuordnungen.
+- SR-Schauraum Software-/Servicepositionen werden als nicht bildpflichtig behandelt.
+- Liefer-/Transport-/Kran-, Aufpreis-, Summen- und "bereits in Grundposition enthalten"-Zeilen werden als nicht bildpflichtig behandelt.
+
+Offen:
+
+- Offene Bildreviews im Angebots-Corpus klaeren:
+  - Alu-One `A2506340MC-1`, Pos. `003`.
+  - Muigg `AN 251073`, Pos. `002` und `003`.
+  - Schuchter `A260344`, 0 extrahierte Bilder.
+- Line-Art-Ergaenzung an weiteren Schuchter-Angeboten und Detail-PDFs regressionstesten.
+- Bildkarten im UI kompakter machen und Kandidaten/Finalbild schneller vergleichbar machen.
+- Segmentierung fuer voll gerenderte Seiten als dritte Stufe pruefen, falls kuenftige PDFs weder Bildbloecke noch erkennbare Positions-Line-Art enthalten.
+
+### P2-005 UI vereinfachen
+
+Status: erster Schnitt erledigt am 2026-04-27
+
+Umgesetzt:
+
+- Grosser Hero-Header durch kompakte Operator-Leiste ersetzt.
+- Sichtbarer Hauptflow reduziert auf Dokumentauswahl, Upload, Verarbeitung, Status, Pruefung und Freigabe.
+- Parser-only ist der einzige sichtbare Verarbeitungsmodus.
+- LLM-/Debug-/Preview-Aktionen aus dem Hauptflow entfernt und in Diagnosebereich verschoben.
+- Quellen-/LLM-Tab aus sichtbarer Navigation entfernt.
+- Tab-Leiste als Workflow-Stepper `Pruefung -> Aufgaben -> Positionen -> Bilder` mit Status-Badges und Hilfetext umgebaut.
+- Freigabe-Assistent mit konkreten Vor-Freigabe-Schritten eingebaut.
+- Schritt-Aktionen springen direkt zu Aufgaben, Positionen, Bildern oder Freigabe.
+
+Offen:
+
+- Review-Queue als Startscreen.
+- VenDoc-Dry-Run/Exportstatus als eigener UI-Bereich.
+- Feldkorrekturen fuer Kopf und Positionen.

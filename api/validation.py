@@ -261,6 +261,7 @@ def build_document_validation(
     amount_lines: list[dict[str, Any]],
     line_items: list[dict[str, Any]],
     images: list[dict[str, Any]],
+    enforce_image_validation: bool = False,
 ) -> dict[str, Any]:
     document_issues: list[dict[str, Any]] = []
     required_fields, recommended_fields = _build_required_field_summary(document)
@@ -458,7 +459,7 @@ def build_document_validation(
                 except (TypeError, ValueError):
                     continue
         assigned_image_ids = list(dict.fromkeys(assigned_image_ids))
-        if is_visual_item and images and not assigned_image_ids:
+        if is_visual_item and (images or enforce_image_validation) and not assigned_image_ids:
             issues.append(
                 _make_issue(
                     code="missing_image_assignment",

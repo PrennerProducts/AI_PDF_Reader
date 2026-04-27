@@ -13,7 +13,6 @@ dependencies = [
   "pillow>=10,<12",
   "PyMuPDF>=1.24,<2",
   "psycopg[binary]>=3.2,<4",
-  "pypdf[image]>=5,<6",
   "python-multipart>=0.0.9,<1",
   "uvicorn[standard]>=0.30,<1",
 ]

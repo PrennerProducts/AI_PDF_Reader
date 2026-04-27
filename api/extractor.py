@@ -1,18 +1,11 @@
-import mimetypes
+import re
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageChops, ImageFilter, ImageOps
-from pypdf import PdfReader, Transformation
-from pypdf._utils import matrix_multiply
-from pypdf.generic import ContentStream
-
-try:
-    import fitz
-except Exception:  # pragma: no cover - optional runtime dependency
-    fitz = None
+import fitz
+from PIL import Image, ImageChops, ImageFilter
 
 MIME_BY_SUFFIX = {
     ".jpg": "image/jpeg",
@@ -28,8 +21,6 @@ MIME_BY_SUFFIX = {
     ".jb2": "image/jbig2",
     ".jbig2": "image/jbig2",
 }
-IDENTITY_CTM = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
-EPS = 1e-6
 VECTOR_RENDER_SCALE = 2.0
 VECTOR_COMPONENT_MIN_AREA = 80
 VECTOR_COMPONENT_MAX_FILL = 0.15
@@ -38,18 +29,25 @@ LEFT_SKETCH_STRIP_TOP_RATIO = 0.12
 LEFT_SKETCH_STRIP_BOTTOM_RATIO = 0.92
 VECTOR_STRIP_MIN_NONWHITE_RATIO = 0.34
 VECTOR_STRIP_MAX_DARK_RATIO = 0.22
+POSITION_LINE_ART_LEFT_PT = 26.0
+POSITION_LINE_ART_RIGHT_PT = 220.0
+POSITION_LINE_ART_TOP_PAD_PT = 8.0
+POSITION_LINE_ART_BOTTOM_PAD_PT = 6.0
+POSITION_LINE_ART_LAST_BLOCK_PT = 170.0
+POSITION_LINE_ART_MIN_WIDTH = 80
+POSITION_LINE_ART_MIN_HEIGHT = 60
+FITZ_IMAGE_SOURCE = "fitz_image_block"
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    reader = PdfReader(str(pdf_path))
-    pages: list[str] = []
-    for page in reader.pages:
-        pages.append(page.extract_text() or "")
-
-    text = "\n\f\n".join(pages).strip()
+    document = fitz.open(str(pdf_path))
+    try:
+        text = "\n\f\n".join(page.get_text("text", sort=True) or "" for page in document).strip()
+    finally:
+        document.close()
     if not text:
         raise ValueError("No text could be extracted from the PDF.")
     return text
@@ -66,160 +64,8 @@ def _clear_directory(path: Path) -> None:
             child.rmdir()
 
 
-def _normalize_image_name(raw_name: str | None) -> str:
-    if not raw_name:
-        return ""
-    base = Path(str(raw_name)).name
-    stem = Path(base).stem
-    return stem.lstrip("/")
-
-
-def _compose_ctm(base: tuple[float, float, float, float, float, float], op: tuple[float, float, float, float, float, float]) -> tuple[float, float, float, float, float, float]:
-    return Transformation.compress(matrix_multiply(Transformation(base).matrix, Transformation(op).matrix))
-
-
-def _extract_page_image_placements(page, reader: PdfReader) -> list[dict[str, Any]]:
-    content = page.get_contents()
-    if content is None:
-        return []
-    try:
-        stream = ContentStream(content, reader)
-    except Exception:
-        return []
-
-    placements: list[dict[str, Any]] = []
-    ctm_stack: list[tuple[float, float, float, float, float, float]] = []
-    current_ctm = IDENTITY_CTM
-
-    for operands, operator in stream.operations:
-        op = operator.decode("latin1") if isinstance(operator, bytes) else str(operator)
-        if op == "q":
-            ctm_stack.append(current_ctm)
-            continue
-        if op == "Q":
-            current_ctm = ctm_stack.pop() if ctm_stack else IDENTITY_CTM
-            continue
-        if op == "cm" and len(operands) >= 6:
-            try:
-                matrix = tuple(float(val) for val in operands[:6])
-                current_ctm = _compose_ctm(current_ctm, matrix)
-            except Exception:
-                continue
-            continue
-        if op == "Do" and operands:
-            name = _normalize_image_name(str(operands[0]))
-            if not name:
-                continue
-            placements.append({"name": name, "ctm": current_ctm})
-
-    return placements
-
-
-def _render_ops_from_ctm(ctm: tuple[float, float, float, float, float, float]) -> tuple[int, bool, bool]:
-    a, b, c, d, _, _ = ctm
-    rotate = 0
-    flip_x = False
-    flip_y = False
-
-    if abs(b) < EPS and abs(c) < EPS:
-        flip_x = a < 0
-        flip_y = d < 0
-        return rotate, flip_x, flip_y
-
-    if abs(a) < EPS and abs(d) < EPS:
-        if b > 0 and c < 0:
-            rotate = 90
-        elif b < 0 and c > 0:
-            rotate = 270
-    return rotate, flip_x, flip_y
-
-
-def _build_image_payload(image, *, ctm: tuple[float, float, float, float, float, float]) -> dict[str, Any]:
-    rotate, flip_x, flip_y = _render_ops_from_ctm(ctm)
-    base_name = Path(image.name or "").name
-    suffix = Path(base_name).suffix.lower() or ".bin"
-    mime_type = MIME_BY_SUFFIX.get(suffix) or mimetypes.guess_type(base_name)[0] or "application/octet-stream"
-
-    pil_image = getattr(image, "image", None)
-    needs_transform = bool(rotate or flip_x or flip_y)
-    transformed = False
-
-    if needs_transform and pil_image is not None:
-        rendered = pil_image.copy()
-        if flip_x:
-            rendered = ImageOps.mirror(rendered)
-        if flip_y:
-            rendered = ImageOps.flip(rendered)
-        if rotate in {90, 180, 270}:
-            rendered = rendered.rotate(rotate, expand=True)
-
-        buffer = BytesIO()
-        rendered.save(buffer, format="PNG")
-        data = buffer.getvalue()
-        suffix = ".png"
-        mime_type = "image/png"
-        width, height = rendered.size
-        transformed = True
-    else:
-        data = image.data
-        width = None
-        height = None
-        if pil_image is not None and getattr(pil_image, "size", None):
-            width, height = pil_image.size
-
-    return {
-        "data": data,
-        "suffix": suffix,
-        "mime_type": mime_type,
-        "width": width,
-        "height": height,
-        "render_rotation": rotate,
-        "render_flip_x": flip_x,
-        "render_flip_y": flip_y,
-        "render_transform_applied": transformed,
-    }
-
-
 def _clamp_ratio(value: float) -> float:
     return max(0.0, min(1.0, value))
-
-
-def _ctm_layout_metadata(
-    ctm: tuple[float, float, float, float, float, float],
-    *,
-    page_width: float,
-    page_height: float,
-) -> dict[str, Any]:
-    if page_width <= 0 or page_height <= 0:
-        return {}
-
-    a, b, c, d, e, f = ctm
-    corners = (
-        (e, f),
-        (a + e, b + f),
-        (c + e, d + f),
-        (a + c + e, b + d + f),
-    )
-    xs = [point[0] for point in corners]
-    ys = [point[1] for point in corners]
-    left = min(xs)
-    right = max(xs)
-    bottom = min(ys)
-    top = max(ys)
-    center_x = (left + right) / 2.0
-    center_y = (bottom + top) / 2.0
-
-    return {
-        "layout_source": "pdf_placement",
-        "left_ratio": round(_clamp_ratio(left / page_width), 6),
-        "right_ratio": round(_clamp_ratio(right / page_width), 6),
-        "width_ratio": round(_clamp_ratio((right - left) / page_width), 6),
-        "top_ratio": round(_clamp_ratio(1.0 - (top / page_height)), 6),
-        "bottom_ratio": round(_clamp_ratio(1.0 - (bottom / page_height)), 6),
-        "height_ratio": round(_clamp_ratio((top - bottom) / page_height), 6),
-        "center_x_ratio": round(_clamp_ratio(center_x / page_width), 6),
-        "center_y_ratio": round(_clamp_ratio(1.0 - (center_y / page_height)), 6),
-    }
 
 
 def _crop_layout_metadata(
@@ -250,6 +96,90 @@ def _crop_layout_metadata(
         "center_x_ratio": round(_clamp_ratio(center_x / canvas_width), 6),
         "center_y_ratio": round(_clamp_ratio(center_y / canvas_height), 6),
     }
+
+
+def _normal_image_suffix(ext: Any) -> str:
+    value = str(ext or "").strip().lower().lstrip(".")
+    if value in {"jpg", "jpeg"}:
+        return ".jpg"
+    if value in {"jpx", "jp2"}:
+        return f".{value}"
+    if value in {"png", "gif", "bmp", "tif", "tiff", "jb2", "jbig2"}:
+        return f".{value}"
+    return ".png"
+
+
+def _fitz_image_block_rows(pdf_path: Path, output_dir: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    document = fitz.open(str(pdf_path))
+    try:
+        for page_idx in range(document.page_count):
+            page_ref = page_idx + 1
+            page = document.load_page(page_idx)
+            page_width = float(page.rect.width or 0)
+            page_height = float(page.rect.height or 0)
+            try:
+                text_dict = page.get_text("dict")
+            except Exception:
+                continue
+
+            image_index = 0
+            for block_no, block in enumerate(text_dict.get("blocks", []), start=1):
+                if not isinstance(block, dict) or block.get("type") != 1:
+                    continue
+                data = block.get("image")
+                if not isinstance(data, (bytes, bytearray)) or not data:
+                    continue
+
+                bbox = block.get("bbox")
+                if not isinstance(bbox, (tuple, list)) or len(bbox) < 4:
+                    continue
+                try:
+                    left, top, right, bottom = [float(value) for value in bbox[:4]]
+                except (TypeError, ValueError):
+                    continue
+                if right <= left or bottom <= top:
+                    continue
+                display_width = right - left
+                display_height = bottom - top
+                if max(display_width, display_height) < 40 or display_width * display_height < 900:
+                    continue
+
+                image_index += 1
+                suffix = _normal_image_suffix(block.get("ext"))
+                filename = f"page_{page_ref:03d}_img_{image_index:03d}{suffix}"
+                target_path = output_dir / filename
+                payload = bytes(data)
+                target_path.write_bytes(payload)
+
+                metadata = _crop_layout_metadata(
+                    left,
+                    top,
+                    right,
+                    bottom,
+                    canvas_width=page_width,
+                    canvas_height=page_height,
+                    source=FITZ_IMAGE_SOURCE,
+                )
+                metadata["fitz_block_no"] = block_no
+
+                rows.append(
+                    {
+                        "page_ref": page_ref,
+                        "image_index": image_index,
+                        "mime_type": MIME_BY_SUFFIX.get(suffix, "image/png"),
+                        "storage_path": str(target_path),
+                        "sha256": sha256(payload).hexdigest(),
+                        "width": int(block.get("width") or max(1, display_width)),
+                        "height": int(block.get("height") or max(1, display_height)),
+                        "bytes_size": len(payload),
+                        "metadata_json": metadata,
+                    }
+                )
+    finally:
+        document.close()
+
+    return rows
 
 
 def _component_bboxes(mask: Image.Image) -> list[tuple[int, int, int, int]]:
@@ -460,6 +390,84 @@ def _extract_left_strip_sketch_boxes(rendered: Image.Image) -> list[tuple[int, i
     return boxes
 
 
+def _normalized_pdf_block_text(value: Any) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int, int, int, int]]:
+    if rendered.width <= 0 or rendered.height <= 0:
+        return []
+
+    rect = getattr(page, "rect", None)
+    page_width = float(getattr(rect, "width", 0.0) or 0.0)
+    page_height = float(getattr(rect, "height", 0.0) or 0.0)
+    if page_width <= 0 or page_height <= 0:
+        return []
+
+    try:
+        blocks = page.get_text("blocks")
+    except Exception:
+        return []
+
+    starts: list[tuple[float, float]] = []
+    for block in blocks:
+        if not isinstance(block, (tuple, list)) or len(block) < 5:
+            continue
+        try:
+            x0 = float(block[0])
+            y0 = float(block[1])
+            y1 = float(block[3])
+        except (TypeError, ValueError):
+            continue
+        if x0 > 140:
+            continue
+
+        text = _normalized_pdf_block_text(block[4])
+        if not re.search(r"(?:^|\s)Pos\.\s*\d+\b", text, flags=re.IGNORECASE):
+            continue
+        starts.append((y0, y1))
+
+    starts.sort(key=lambda item: item[0])
+    deduped_starts: list[tuple[float, float]] = []
+    for y0, y1 in starts:
+        if deduped_starts and abs(y0 - deduped_starts[-1][0]) < 6:
+            prev_y0, prev_y1 = deduped_starts[-1]
+            deduped_starts[-1] = (prev_y0, max(prev_y1, y1))
+            continue
+        deduped_starts.append((y0, y1))
+
+    if not deduped_starts:
+        return []
+
+    scale_x = rendered.width / page_width
+    scale_y = rendered.height / page_height
+    crop_left = int(max(0, POSITION_LINE_ART_LEFT_PT * scale_x))
+    crop_right = int(min(rendered.width, POSITION_LINE_ART_RIGHT_PT * scale_x))
+    if crop_right - crop_left < POSITION_LINE_ART_MIN_WIDTH:
+        return []
+
+    boxes: list[tuple[int, int, int, int]] = []
+    for idx, (y0, y1) in enumerate(deduped_starts):
+        next_y0 = deduped_starts[idx + 1][0] if idx + 1 < len(deduped_starts) else None
+        block_bottom = (
+            next_y0 - POSITION_LINE_ART_BOTTOM_PAD_PT
+            if next_y0 is not None
+            else y1 + POSITION_LINE_ART_LAST_BLOCK_PT
+        )
+        block_bottom = min(page_height - 30.0, block_bottom)
+        block_top = max(0.0, y0 - POSITION_LINE_ART_TOP_PAD_PT)
+        if block_bottom <= block_top:
+            continue
+
+        crop_top = int(max(0, block_top * scale_y))
+        crop_bottom = int(min(rendered.height, block_bottom * scale_y))
+        if crop_bottom - crop_top < POSITION_LINE_ART_MIN_HEIGHT:
+            continue
+        boxes.append((crop_left, crop_top, crop_right, crop_bottom))
+
+    return boxes
+
+
 def _trim_and_pad_crop(crop: Image.Image) -> tuple[Image.Image, tuple[int, int, int, int]]:
     red, green, blue = crop.split()
     whiteness = ImageChops.darker(ImageChops.darker(red, green), blue)
@@ -499,16 +507,202 @@ def _crop_content_metrics(crop: Image.Image) -> dict[str, float]:
     }
 
 
-def _extract_blue_vector_crop_rows(
+def _line_art_metrics(crop: Image.Image) -> dict[str, float | int]:
+    mask = crop.convert("L").point(lambda px: 255 if px < 210 else 0)
+    pixels = mask.load()
+    width, height = mask.size
+    total = max(1, width * height)
+    dark = 0
+
+    min_horizontal_run = max(10, int(width * 0.08))
+    horizontal_pixels = 0
+    horizontal_runs = 0
+    max_horizontal_run = 0
+    for y in range(height):
+        run = 0
+        for x in range(width):
+            if pixels[x, y] > 0:
+                dark += 1
+                run += 1
+                continue
+            if run >= min_horizontal_run:
+                horizontal_runs += 1
+                horizontal_pixels += run
+                max_horizontal_run = max(max_horizontal_run, run)
+            run = 0
+        if run >= min_horizontal_run:
+            horizontal_runs += 1
+            horizontal_pixels += run
+            max_horizontal_run = max(max_horizontal_run, run)
+
+    min_vertical_run = max(10, int(height * 0.10))
+    vertical_pixels = 0
+    vertical_runs = 0
+    max_vertical_run = 0
+    for x in range(width):
+        run = 0
+        for y in range(height):
+            if pixels[x, y] > 0:
+                run += 1
+                continue
+            if run >= min_vertical_run:
+                vertical_runs += 1
+                vertical_pixels += run
+                max_vertical_run = max(max_vertical_run, run)
+            run = 0
+        if run >= min_vertical_run:
+            vertical_runs += 1
+            vertical_pixels += run
+            max_vertical_run = max(max_vertical_run, run)
+
+    return {
+        "line_art_dark_ratio": round(dark / total, 6),
+        "line_art_horizontal_ratio": round(horizontal_pixels / total, 6),
+        "line_art_horizontal_runs": horizontal_runs,
+        "line_art_max_horizontal_run_ratio": round(max_horizontal_run / max(1, width), 6),
+        "line_art_vertical_ratio": round(vertical_pixels / total, 6),
+        "line_art_vertical_runs": vertical_runs,
+        "line_art_max_vertical_run_ratio": round(max_vertical_run / max(1, height), 6),
+    }
+
+
+def _looks_like_position_line_art(
+    crop: Image.Image,
+    crop_metrics: dict[str, float],
+    line_metrics: dict[str, float | int],
+) -> bool:
+    if crop.width < POSITION_LINE_ART_MIN_WIDTH or crop.height < POSITION_LINE_ART_MIN_HEIGHT:
+        return False
+    if crop_metrics["content_nonwhite_ratio"] < 0.025:
+        return False
+    if float(line_metrics["line_art_dark_ratio"]) < 0.015:
+        return False
+
+    horizontal_runs = int(line_metrics["line_art_horizontal_runs"])
+    vertical_runs = int(line_metrics["line_art_vertical_runs"])
+    max_horizontal_ratio = float(line_metrics["line_art_max_horizontal_run_ratio"])
+    max_vertical_ratio = float(line_metrics["line_art_max_vertical_run_ratio"])
+
+    if vertical_runs >= 5 and max_vertical_ratio >= 0.24:
+        return True
+    if horizontal_runs >= 5 and max_horizontal_ratio >= 0.18 and vertical_runs >= 4:
+        return True
+    if horizontal_runs >= 8 and vertical_runs >= 6:
+        return True
+    return False
+
+
+def _technical_line_art_bbox(crop: Image.Image) -> tuple[int, int, int, int] | None:
+    gray = crop.convert("L")
+    pixels = gray.load()
+    width, height = gray.size
+    if width <= 0 or height <= 0:
+        return None
+
+    horizontal_coords: list[tuple[int, int]] = []
+    vertical_coords: list[tuple[int, int]] = []
+
+    # Technical drawings and dimensions contain long ruled segments. Header labels
+    # such as "Pos." or "1 Stck" do not, and full-width separators are filtered out.
+    min_horizontal_run = max(16, int(width * 0.08))
+    max_horizontal_run = max(min_horizontal_run + 1, int(width * 0.58))
+    for y in range(height):
+        run_start: int | None = None
+        for x in range(width):
+            is_content = pixels[x, y] < 245
+            if is_content and run_start is None:
+                run_start = x
+                continue
+            if is_content:
+                continue
+            if run_start is None:
+                continue
+            run = x - run_start
+            if min_horizontal_run <= run <= max_horizontal_run:
+                horizontal_coords.extend((xx, y) for xx in range(run_start, x))
+            run_start = None
+        if run_start is not None:
+            run = width - run_start
+            if min_horizontal_run <= run <= max_horizontal_run:
+                horizontal_coords.extend((xx, y) for xx in range(run_start, width))
+
+    min_vertical_run = max(16, int(height * 0.09))
+    max_vertical_run = max(min_vertical_run + 1, int(height * 0.85))
+    for x in range(width):
+        run_start: int | None = None
+        for y in range(height):
+            is_content = pixels[x, y] < 245
+            if is_content and run_start is None:
+                run_start = y
+                continue
+            if is_content:
+                continue
+            if run_start is None:
+                continue
+            run = y - run_start
+            if min_vertical_run <= run <= max_vertical_run:
+                vertical_coords.extend((x, yy) for yy in range(run_start, y))
+            run_start = None
+        if run_start is not None:
+            run = height - run_start
+            if min_vertical_run <= run <= max_vertical_run:
+                vertical_coords.extend((x, yy) for yy in range(run_start, height))
+
+    if not vertical_coords:
+        return None
+
+    coords = horizontal_coords + vertical_coords
+    xs = [point[0] for point in coords]
+    ys = [point[1] for point in coords]
+    vertical_ys = [point[1] for point in vertical_coords]
+
+    left = min(xs)
+    right = max(xs) + 1
+    # Top is intentionally based on vertical drawing strokes so table/header
+    # separators above the sketch cannot pull the crop upwards.
+    top = min(vertical_ys)
+    bottom = max(ys) + 1
+
+    pad_left = max(16, int(width * 0.045))
+    pad_right = max(28, int(width * 0.075))
+    pad_top = max(2, int(height * 0.01))
+    pad_bottom = max(18, int(height * 0.075))
+
+    return (
+        max(0, left - pad_left),
+        max(0, top - pad_top),
+        min(width, right + pad_right),
+        min(height, bottom + pad_bottom),
+    )
+
+
+def _looks_like_embedded_product_image(row: dict[str, Any]) -> bool:
+    try:
+        width = int(row.get("width") or 0)
+        height = int(row.get("height") or 0)
+        bytes_size = int(row.get("bytes_size") or 0)
+    except (TypeError, ValueError):
+        return False
+    if width <= 0 or height <= 0:
+        return False
+
+    area = width * height
+    ratio = max(width, height) / max(1, min(width, height))
+    if area < 45_000 and bytes_size < 20_000:
+        return False
+    if ratio >= 4.5 and min(width, height) <= 90 and bytes_size < 30_000:
+        return False
+    return True
+
+
+def _extract_vector_crop_rows(
     pdf_path: Path,
     output_dir: Path,
     existing_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    if fitz is None:
-        return []
-
     next_index_by_page: dict[int, int] = {}
     hashes_by_page: dict[int, set[str]] = {}
+    has_product_image_by_page: dict[int, bool] = {}
     for row in existing_rows:
         page_ref = int(row.get("page_ref") or 0)
         if page_ref <= 0:
@@ -518,6 +712,8 @@ def _extract_blue_vector_crop_rows(
         digest = str(row.get("sha256") or "")
         if digest:
             hashes_by_page.setdefault(page_ref, set()).add(digest)
+        if _looks_like_embedded_product_image(row):
+            has_product_image_by_page[page_ref] = True
 
     rows: list[dict[str, Any]] = []
     document = fitz.open(str(pdf_path))
@@ -528,24 +724,43 @@ def _extract_blue_vector_crop_rows(
             matrix = fitz.Matrix(VECTOR_RENDER_SCALE, VECTOR_RENDER_SCALE)
             pix = page.get_pixmap(matrix=matrix, alpha=False)
             rendered = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            bboxes = _extract_left_strip_sketch_boxes(rendered)
+            candidate_boxes = []
+            if not has_product_image_by_page.get(page_ref):
+                candidate_boxes = [
+                    (bbox, "vector_position_line_art") for bbox in _position_line_art_boxes(page, rendered)
+                ]
+            if not candidate_boxes:
+                candidate_boxes = [
+                    (bbox, "vector_strip_band") for bbox in _extract_left_strip_sketch_boxes(rendered)
+                ]
 
-            if not bboxes:
+            if not candidate_boxes:
                 continue
 
-            for left, top, right, bottom in bboxes:
-                crop = rendered.crop((left, top, right, bottom))
-                crop, trim_bbox = _trim_and_pad_crop(crop)
+            for (left, top, right, bottom), source in candidate_boxes:
+                raw_crop = rendered.crop((left, top, right, bottom))
+                refine_bbox = None
+                if source == "vector_position_line_art":
+                    refine_bbox = _technical_line_art_bbox(raw_crop)
+                    if refine_bbox is not None:
+                        raw_crop = raw_crop.crop(refine_bbox)
+
+                crop, trim_bbox = _trim_and_pad_crop(raw_crop)
                 if crop.width < 48 or crop.height < 64:
                     continue
                 crop_metrics = _crop_content_metrics(crop)
-                if crop_metrics["content_nonwhite_ratio"] < VECTOR_STRIP_MIN_NONWHITE_RATIO:
-                    continue
-                if (
-                    crop_metrics["content_dark_ratio"] > VECTOR_STRIP_MAX_DARK_RATIO
-                    and crop_metrics["content_colorful_ratio"] < 0.01
-                ):
-                    continue
+                line_metrics = _line_art_metrics(crop)
+                if source == "vector_position_line_art":
+                    if not _looks_like_position_line_art(crop, crop_metrics, line_metrics):
+                        continue
+                else:
+                    if crop_metrics["content_nonwhite_ratio"] < VECTOR_STRIP_MIN_NONWHITE_RATIO:
+                        continue
+                    if (
+                        crop_metrics["content_dark_ratio"] > VECTOR_STRIP_MAX_DARK_RATIO
+                        and crop_metrics["content_colorful_ratio"] < 0.01
+                    ):
+                        continue
 
                 buffer = BytesIO()
                 crop.save(buffer, format="PNG")
@@ -555,10 +770,11 @@ def _extract_blue_vector_crop_rows(
                     continue
 
                 trim_left, trim_top, trim_right, trim_bottom = trim_bbox
-                content_left = left + trim_left
-                content_top = top + trim_top
-                content_right = left + trim_right
-                content_bottom = top + trim_bottom
+                refine_left, refine_top = (refine_bbox[0], refine_bbox[1]) if refine_bbox is not None else (0, 0)
+                content_left = left + refine_left + trim_left
+                content_top = top + refine_top + trim_top
+                content_right = left + refine_left + trim_right
+                content_bottom = top + refine_top + trim_bottom
 
                 next_index = next_index_by_page.get(page_ref, 0) + 1
                 next_index_by_page[page_ref] = next_index
@@ -567,6 +783,19 @@ def _extract_blue_vector_crop_rows(
                 filename = f"page_{page_ref:03d}_img_{next_index:03d}.png"
                 target_path = output_dir / filename
                 target_path.write_bytes(data)
+                metadata = _crop_layout_metadata(
+                    content_left,
+                    content_top,
+                    content_right,
+                    content_bottom,
+                    canvas_width=rendered.width,
+                    canvas_height=rendered.height,
+                    source=source,
+                )
+                if refine_bbox is not None:
+                    metadata["line_art_refined_crop"] = True
+                    metadata["line_art_refine_bbox"] = list(refine_bbox)
+
                 rows.append(
                     {
                         "page_ref": page_ref,
@@ -577,16 +806,7 @@ def _extract_blue_vector_crop_rows(
                         "width": crop.width,
                         "height": crop.height,
                         "bytes_size": len(data),
-                        "metadata_json": _crop_layout_metadata(
-                            content_left,
-                            content_top,
-                            content_right,
-                            content_bottom,
-                            canvas_width=rendered.width,
-                            canvas_height=rendered.height,
-                            source="vector_strip_band",
-                        )
-                        | crop_metrics,
+                        "metadata_json": metadata | crop_metrics | line_metrics,
                     }
                 )
     finally:
@@ -602,73 +822,9 @@ def extract_pdf_images(pdf_path: Path, output_dir: Path) -> list[dict[str, Any]]
     output_dir.mkdir(parents=True, exist_ok=True)
     _clear_directory(output_dir)
 
-    reader = PdfReader(str(pdf_path))
-    rows: list[dict[str, Any]] = []
+    rows = _fitz_image_block_rows(pdf_path, output_dir)
 
-    for page_idx, page in enumerate(reader.pages, start=1):
-        page_width = float(getattr(page.mediabox, "width", 0) or 0)
-        page_height = float(getattr(page.mediabox, "height", 0) or 0)
-        image_objects = list(getattr(page, "images", None) or [])
-        image_by_name: dict[str, Any] = {}
-        for image in image_objects:
-            key = _normalize_image_name(image.name)
-            if key and key not in image_by_name:
-                image_by_name[key] = image
-
-        placements = _extract_page_image_placements(page, reader)
-        image_index = 0
-
-        for placement in placements:
-            image = image_by_name.get(placement["name"])
-            if image is None:
-                continue
-            payload = _build_image_payload(image, ctm=placement["ctm"])
-            data = payload["data"]
-            image_index += 1
-            filename = f"page_{page_idx:03d}_img_{image_index:03d}{payload['suffix']}"
-            target_path = output_dir / filename
-            target_path.write_bytes(data)
-            rows.append(
-                {
-                    "page_ref": page_idx,
-                    "image_index": image_index,
-                    "mime_type": payload["mime_type"],
-                    "storage_path": str(target_path),
-                    "sha256": sha256(data).hexdigest(),
-                    "width": payload["width"],
-                    "height": payload["height"],
-                    "bytes_size": len(data),
-                    "metadata_json": _ctm_layout_metadata(
-                        placement["ctm"],
-                        page_width=page_width,
-                        page_height=page_height,
-                    ),
-                }
-            )
-
-        # Fallback for PDFs where image placements could not be resolved.
-        if image_index == 0:
-            for fallback_idx, image in enumerate(image_objects, start=1):
-                payload = _build_image_payload(image, ctm=IDENTITY_CTM)
-                data = payload["data"]
-                filename = f"page_{page_idx:03d}_img_{fallback_idx:03d}{payload['suffix']}"
-                target_path = output_dir / filename
-                target_path.write_bytes(data)
-                rows.append(
-                    {
-                        "page_ref": page_idx,
-                        "image_index": fallback_idx,
-                        "mime_type": payload["mime_type"],
-                        "storage_path": str(target_path),
-                        "sha256": sha256(data).hexdigest(),
-                        "width": payload["width"],
-                        "height": payload["height"],
-                        "bytes_size": len(data),
-                        "metadata_json": {"layout_source": "fallback_page_images"},
-                    }
-                )
-
-    # Some PDFs draw product sketches as vectors; render and crop dominant blue drawing blocks.
-    rows.extend(_extract_blue_vector_crop_rows(pdf_path, output_dir, rows))
+    # Some PDFs draw product sketches as vectors; render and crop detectable line-art blocks.
+    rows.extend(_extract_vector_crop_rows(pdf_path, output_dir, rows))
 
     return rows

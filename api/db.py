@@ -998,6 +998,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         amount_lines=[dict(row) for row in amount_lines],
         line_items=line_item_list,
         images=image_list,
+        enforce_image_validation=True,
     )
 
     return {

@@ -198,10 +198,10 @@ Geplanter VenDoc-Export:
 
 ### Bildextraktion
 
-- Quelle: PDF Content-Stream (`Do` Operator).
-- Resource-XObjects werden nicht blind uebernommen.
-- Render-Transformation aus PDF-Matrix wird beruecksichtigt.
-- Vektorbasierte Ausschnitte koennen als Bildkandidaten extrahiert werden.
+- Quelle: PyMuPDF-Text-/Bildbloecke mit sichtbaren Layout-Koordinaten.
+- Kleine Header-/Logo-Fragmente werden verworfen.
+- Vektorbasierte Positionszeichnungen werden ueber gerenderte Line-Art-Ausschnitte als Bildkandidaten ergaenzt.
+- Die alte `pypdf`-Content-Stream-Fallbackstrecke wird nicht mehr verwendet.
 
 ### Bildzuordnung
 

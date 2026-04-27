@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 
@@ -43,9 +44,24 @@ def is_non_visual_line_item(item: dict[str, Any]) -> bool:
     lv_pos = _normalized_text(item.get("lv_pos"))
     if description in {"umfang", "lieferung", "montage", "fracht", "transport", "rabatt", "skonto"}:
         return True
+    if re.fullmatch(r"(?:€|eur)?\s*[-+]?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?", description):
+        return True
     if description.startswith("vorbemerk"):
         return True
     if description.startswith("az - ") or description.startswith("az-"):
+        return True
+    if description.startswith("modul ") or description.startswith("optional"):
+        return True
+    if description.startswith("aufpreis ") or description.startswith("mehrpreis "):
+        return True
+    if "bereits in grundposition enthalten" in description:
+        return True
+    if (
+        description.startswith("xx-lief-")
+        or "lieferung auf baustelle" in description
+        or "lkw-kran" in description
+        or "lkw kran" in description
+    ):
         return True
     if lv_pos == "umfang":
         return True

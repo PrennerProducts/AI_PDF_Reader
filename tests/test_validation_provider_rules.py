@@ -161,7 +161,164 @@ def test_shared_image_fallback_does_not_block_validation() -> None:
     )
 
     assert validation["status"] == "auto_accept"
+
+
+def test_sr_schauraum_service_modules_do_not_require_images() -> None:
+    line_items = [
+        {
+            "position_no": "1",
+            "description_short": "MODUL 1 – ON-PREM KI-PDF-READER & SQL-EXPORT",
+            "quantity": "1",
+            "unit_price": "1200.00",
+            "line_total": "1200.00",
+            "page_ref": 2,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+        {
+            "position_no": "3",
+            "description_short": "OPTIONAL: ON-PREM-INBETRIEBNAHME & ÜBERGABE VOR ORT",
+            "quantity": "1",
+            "unit_price": "800.00",
+            "line_total": "800.00",
+            "page_ref": 3,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Lupre AI Solutions",
+            "document_type": "angebot",
+            "document_number": "AN-2025-113",
+            "document_date": "2025-10-01",
+            "project_ref": "SR Schauraum",
+            "currency": "EUR",
+            "net_total": "2000.00",
+            "vat_total": "400.00",
+            "gross_total": "2400.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[{"id": 1, "page_ref": 1}],
+    )
+
+    assert validation["status"] == "auto_accept"
+    for item in line_items:
+        issue_codes = [issue.get("code") for issue in (item.get("validation_issues") or [])]
+        assert "missing_image_assignment" not in issue_codes
     assert validation["image_summary"]["assigned_duplicate_count"] == 0
+
+
+def test_enforced_image_validation_flags_empty_extraction_for_visual_items() -> None:
+    line_items = [
+        {
+            "position_no": "1",
+            "description_short": "Fenster 2-flg. DK-Stulp",
+            "quantity": "1",
+            "unit_price": "100.00",
+            "line_total": "100.00",
+            "page_ref": 2,
+            "is_alternative": False,
+            "image_ids": [],
+        }
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "SCHUCHTER Fenster GmbH",
+            "document_type": "angebot",
+            "document_number": "A260344",
+            "document_date": "2026-03-01",
+            "project_ref": "Test",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[],
+        enforce_image_validation=True,
+    )
+
+    issue_codes = [issue.get("code") for issue in (line_items[0].get("validation_issues") or [])]
+
+    assert validation["status"] == "review"
+    assert validation["line_item_summary"]["warning_count"] == 1
+    assert "missing_image_assignment" in issue_codes
+
+
+def test_non_visual_charge_and_delivery_lines_do_not_require_images() -> None:
+    line_items = [
+        {
+            "position_no": "1000",
+            "description_short": "XX-LIEF-BAUS-MKRA Lieferung auf Baustelle mit LKW-Kran",
+            "quantity": "1",
+            "unit_price": "300.00",
+            "line_total": "300.00",
+            "page_ref": 10,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+        {
+            "position_no": "005",
+            "description_short": "Aufpreis von 3-fach verriegelndes Wechselschloss Secury MR2",
+            "quantity": "1",
+            "unit_price": "260.12",
+            "line_total": "260.12",
+            "page_ref": 7,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+        {
+            "position_no": "013",
+            "description_short": "€ 11.010,23",
+            "quantity": "1",
+            "unit_price": "11010.23",
+            "line_total": "11010.23",
+            "page_ref": 15,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+        {
+            "position_no": "018A",
+            "description_short": "Paneel mit Up = 0,8W/m²K bereits in Grundposition enthalten",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "page_ref": 24,
+            "is_alternative": False,
+            "image_ids": [],
+        },
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Rekord Vomp GmbH",
+            "document_type": "angebot",
+            "document_number": "VAX60326",
+            "document_date": "2026-01-01",
+            "project_ref": "Test",
+            "currency": "EUR",
+            "net_total": "11570.35",
+            "vat_total": "2314.07",
+            "gross_total": "13884.42",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[{"id": 1, "page_ref": 1}],
+        enforce_image_validation=True,
+    )
+
+    assert validation["line_item_summary"]["error_count"] == 0
+    for item in line_items:
+        issue_codes = [issue.get("code") for issue in (item.get("validation_issues") or [])]
+        assert "missing_image_assignment" not in issue_codes
 
 
 def test_unmarked_duplicate_image_assignment_still_requires_review() -> None:

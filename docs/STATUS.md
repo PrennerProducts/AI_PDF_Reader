@@ -48,9 +48,13 @@ Aktuelle Anbieter-Templates:
 - `schuchter`
 - `sr_schauraum`
 
-Sample-Doku meldet:
+Aktueller Sample-Stand:
 
-- 39 gruene Angebots-PDFs.
+- 41 Angebots-/Import-PDFs im API-Corpus.
+- 38/41 Angebots-/Import-PDFs laufen aktuell auf `auto_accept`.
+- 3/41 bleiben wegen offener Bildzuordnung auf `review`.
+- 0/41 haben Pflichtfeldfehler.
+- 0/41 liefern leere Positionslisten.
 - 18 PDFs im Regression-Satz.
 - 21 zusaetzliche gruene Kandidaten.
 - Auftragsbestaetigungen separat unter `samples/pdfs/non_offer/`.
@@ -67,6 +71,10 @@ Umgesetzt:
 - Provider-Sonderregeln fuer komplexe Preislogiken.
 - Warnungen/Fehler pro Position.
 - Bildzuordnungswarnungen.
+- Bild- und Textextraktion laufen produktiv ueber PyMuPDF; die alte `pypdf`-CTM-Fallbackstrecke wurde entfernt.
+- Kleine Logo-/Headerfragmente werden bei der PyMuPDF-Extraktion verworfen.
+- Positionsbasierte Vektor-Line-Art-Ergaenzung fuer Schuchter-Zeichnungen ohne eingebettete Rasterbilder.
+- Schuchter-Line-Art wird innerhalb des Positionsblocks auf die technische Zeichnung mit Bemaszung verfeinert; Positionskopf und Mengenlabels werden aus dem Bildcrop entfernt.
 - Manuelles Markieren von Warnungen als geprueft.
 - Dokumentfreigabe nur bei `auto_accept` oder `manual_checked`.
 
@@ -74,16 +82,17 @@ Umgesetzt:
 
 Die UI unter `/ui` bietet:
 
+- Kompakte Operator-Leiste statt grossem PoC-Header.
 - Dokumentauswahl und Upload.
 - PDF-Vorschau.
-- Processing-Modus-Auswahl.
-- Cockpit mit Validierung.
-- Review-Tab mit Freigabe.
+- Parser-only Verarbeitung als sichtbarer Standard.
+- Uebersicht mit Validierung.
+- Workflow-Stepper: `Pruefung`, `Aufgaben`, `Positionen`, `Bilder`.
+- Freigabe im Aufgabenbereich.
+- Freigabe-Assistent mit konkreten Schritten vor der Freigabe.
 - Positionsliste mit Details.
 - Bildaudit und manuelle Bildzuordnung.
-- JSON/CSV Preview.
-- LLM-Run-Historie.
-- Parser-vs-LLM-Vergleich.
+- Diagnose-/Exportbereich ist eingeklappt und nicht Teil des Hauptflows.
 
 ## Aktuelle Verifikation
 
@@ -96,26 +105,34 @@ python -m pytest tests/test_template_regression.py tests/test_offer_corpus_smoke
 Ergebnis:
 
 ```text
-130 passed
+135 passed
 ```
 
 Zusaetzlich abgesichert:
 
-- Alle 39 Angebots-PDFs laufen ohne Bildpflicht bei Betrags-/Summenvalidierung auf `auto_accept`.
+- Finaler API-Corpuslauf fuer 41 Angebots-/Import-PDFs: 41 verarbeitet, 0 Fehler, 0 Pflichtfeldfehler, 0 leere Positionslisten, 3 Reviews wegen Bildzuordnung.
+- Offene Angebots-Reviews:
+  - `samples/pdfs/candidates/offers/alu_one/Angebot A2506340MC-1.pdf`: Pos. `003` ohne finales Bild.
+  - `samples/pdfs/candidates/offers/muigg/AN 251073.pdf`: Pos. `002`, `003` ohne finales Bild.
+  - `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260344.pdf`: 0 extrahierte Bilder, Pos. `1` bildpflichtig.
+- Voller API-Robustheitslauf ueber 88 PDFs: 87 verarbeitet, 1 Timeout bei `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/koch/49440_Auftragsbestätigung.pdf`.
 - Bekannte Rabatt-, Info- und Gruppenpositionen werden nicht mehr als harte Betragsfehler gewertet.
-- Bildfallback fuer gleiche Seite ist abgesichert: Wenn fokussierte Kandidaten keine brauchbare gleiche-Seite-Option enthalten, wird `image_ids_page_all` in die Bewertung aufgenommen.
+- Liefer-/Transport-/Kran-, Aufpreis-, Summen- und "bereits in Grundposition enthalten"-Zeilen loesen keine Bildpflicht mehr aus.
+- Bildzuordnung fuer gleiche Seite ist abgesichert: Wenn fokussierte Kandidaten keine brauchbare gleiche-Seite-Option enthalten, wird `image_ids_page_all` in die Bewertung aufgenommen.
+- Schuchter `A260172` wurde nach der Line-Art-Ergaenzung neu verarbeitet: 13 bereinigte Positionszeichnungen aus Vektor-Crops, 13/13 Positionen mit Bild, Validierung `auto_accept`.
+- `sr_schauraum` Service-/Softwaremodule werden nicht mehr als bildpflichtige Produktpositionen bewertet.
 
 Nicht vollstaendig lokal ausfuehrbar:
 
 - `python -m pytest tests -q` bricht auf dem Host ab, weil `fastapi` in der lokalen Python-Umgebung fehlt.
-- Im API-Container sind die Runtime-Abhaengigkeiten vorhanden; dort kompiliert `main.py`, `image_assignment.py`, `validation.py` und `db.py`.
+- Im API-Container sind die Runtime-Abhaengigkeiten vorhanden; dort kompiliert `main.py`, `extractor.py`, `image_assignment.py`, `validation.py` und `db.py`.
 - Der API-Container enthaelt aktuell kein `pytest`, daher wurde die neue Bildfallback-Regel zusaetzlich per direktem Runtime-Check geprueft.
 
 Live-Canary:
 
 - Stack laeuft und `GET /health` ist ok.
 - `./infra/api-canary.sh` verarbeitet alle 6 Provider-Testdokumente.
-- Ergebnis am 2026-04-27: `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp` liefern `validation=auto_accept`.
+- Ergebnis am 2026-04-27 nach PyMuPDF-Umstellung: `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp` liefern `validation=auto_accept`.
 
 ## VenDoc/MSSQL Stand
 
