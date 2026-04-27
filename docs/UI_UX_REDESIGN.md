@@ -82,6 +82,7 @@ Umfang:
 - Bilder nach Position und Konfliktstatus gruppieren. Status: erster V3-Stand mit Bildpruefkopf und priorisierter Galerie umgesetzt.
 - Freigabe als Abschluss-Check. Status: erster V3-Stand mit Abschlusslayout und Aufgabenliste umgesetzt.
 - Stepper/Tab-Leiste im Review-Header stabilisiert. Status: feste, helle Header-Navigation statt schwebender/transparenter Tabs.
+- PDF-Vorschau visuell integriert. Status: Browser-PDF-Toolbar wird ausgeblendet, eigene dunkle App-Controls fuer Seite, Zoom, Fit, Download und externes Oeffnen sind umgesetzt.
 
 ### Task 4: CSS-Bereinigung
 

@@ -807,6 +807,14 @@
       background: #f0edeb;
     }
 
+    .pdf-stage {
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
     .panel-body {
       padding: 14px;
       flex: 1 1 auto;
@@ -5623,13 +5631,18 @@
       --sr-line: rgba(60, 60, 67, 0.11);
       --sr-card: rgba(255, 255, 255, 0.92);
       --sr-canvas: #f5f5f7;
+      --sr-glass: rgba(255, 255, 255, 0.74);
+      --sr-hairline: rgba(255, 255, 255, 0.82);
+      --sr-shadow-soft: 0 18px 48px rgba(29, 29, 31, 0.08);
+      --sr-shadow-lifted: 0 28px 72px rgba(29, 29, 31, 0.12);
       max-width: none;
       padding: 16px;
       gap: 16px;
       background:
-        radial-gradient(circle at 18% -16%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0) 34%),
-        radial-gradient(circle at 92% -18%, rgba(230, 51, 41, 0.07), rgba(230, 51, 41, 0) 28%),
-        linear-gradient(180deg, #fbfbfd 0%, var(--sr-canvas) 48%, #f1f1f4 100%);
+        radial-gradient(circle at 16% -18%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0) 34%),
+        radial-gradient(circle at 88% -16%, rgba(230, 51, 41, 0.065), rgba(230, 51, 41, 0) 30%),
+        radial-gradient(circle at 50% 112%, rgba(29, 29, 31, 0.055), rgba(29, 29, 31, 0) 34%),
+        linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 46%, #eeeeF2 100%);
     }
 
     .app-v3 .app-shell {
@@ -5637,21 +5650,23 @@
       top: 12px;
       z-index: 50;
       display: grid;
-      grid-template-columns: minmax(230px, 0.38fr) minmax(520px, 1fr) minmax(160px, 0.22fr) 132px 42px;
-      grid-template-areas:
-        "brand controls actions logo advanced"
-        "status controls actions logo advanced";
+      grid-template-columns: minmax(320px, 0.34fr) minmax(560px, 1fr) minmax(170px, 0.22fr) 40px;
+      grid-template-areas: "brand controls actions advanced";
       align-items: center;
-      min-height: 92px;
-      padding: 14px 16px;
-      border-radius: 32px;
+      gap: 14px;
+      min-height: 76px;
+      padding: 12px 14px;
+      border-radius: 28px;
       color: var(--sr-ink);
-      border: 1px solid rgba(255, 255, 255, 0.84);
-      background: #ffffff;
+      border: 1px solid var(--sr-hairline);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.70)),
+        rgba(255, 255, 255, 0.72);
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.98),
-        0 18px 52px rgba(29, 29, 31, 0.08);
-      backdrop-filter: none;
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        inset 0 -1px 0 rgba(29, 29, 31, 0.035),
+        var(--sr-shadow-lifted);
+      backdrop-filter: blur(26px) saturate(1.18);
       overflow: visible;
       transform: none;
     }
@@ -5662,7 +5677,18 @@
     }
 
     .app-v3 .hero-head {
-      display: contents;
+      grid-area: brand;
+      display: grid;
+      grid-template-columns: 116px minmax(0, 1fr);
+      grid-template-areas: "logo copy";
+      align-items: center;
+      gap: 14px;
+      min-height: 52px;
+      padding: 8px 10px;
+      border-radius: 22px;
+      border: 1px solid rgba(60, 60, 67, 0.075);
+      background: rgba(255, 255, 255, 0.42);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
       max-height: none;
       margin: 0;
       opacity: 1;
@@ -5671,49 +5697,39 @@
     }
 
     .app-v3 .shell-brand {
-      grid-area: brand;
+      grid-area: copy;
       display: grid;
-      grid-template-columns: 44px minmax(0, 1fr);
       align-items: center;
-      column-gap: 12px;
+      gap: 3px;
       min-width: 0;
       padding: 0;
     }
 
     .app-v3 .shell-brand::before {
-      content: "SR";
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      border-radius: 15px;
-      color: #ffffff;
-      background: linear-gradient(180deg, #ff5a50, #e63329);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.34),
-        0 14px 28px rgba(230, 51, 41, 0.24);
-      font-size: 15px;
-      font-weight: 860;
-      letter-spacing: -0.04em;
+      display: none;
     }
 
     .app-v3 .shell-brand h1 {
       margin: 0;
       color: var(--sr-ink);
-      font-size: 21px;
+      font-size: 18px;
       line-height: 1.04;
       font-weight: 780;
-      letter-spacing: -0.055em;
+      letter-spacing: -0.045em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .app-v3 .shell-brand p {
-      margin: 3px 0 0;
+      margin: 0;
       max-width: none;
       color: var(--sr-muted);
-      font-size: 11px;
+      font-size: 10px;
       line-height: 1.24;
-      font-weight: 650;
+      font-weight: 720;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -5723,20 +5739,19 @@
       grid-area: logo;
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: flex-start;
       min-width: 0;
-      opacity: 0.94;
+      opacity: 0.96;
+      pointer-events: none;
     }
 
     .app-v3 .shell-logo .customer-brand {
-      width: 118px;
-      padding: 7px 9px;
-      border-radius: 18px;
-      border: 1px solid var(--sr-line);
-      background: #ffffff;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.96),
-        0 12px 26px rgba(29, 29, 31, 0.07);
+      width: 112px;
+      padding: 0;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
     .app-v3 .shell-logo .customer-logo {
@@ -5753,9 +5768,9 @@
     .app-v3 .shell-controls {
       grid-area: controls;
       display: grid;
-      grid-template-columns: minmax(380px, 1fr) minmax(250px, 0.48fr);
+      grid-template-columns: minmax(360px, 1fr) minmax(250px, 0.44fr);
       align-items: end;
-      gap: 12px;
+      gap: 10px;
     }
 
     .app-v3 .shell-controls .control-card {
@@ -5799,13 +5814,15 @@
       min-height: 44px;
       padding: 7px 12px;
       border-radius: 18px;
-      border: 1px solid var(--sr-line);
-      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 250, 252, 0.86)),
+        rgba(255, 255, 255, 0.82);
       color: #1d1d1f;
       font-size: 13px;
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.94),
-        0 10px 24px rgba(29, 29, 31, 0.045);
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 10px 24px rgba(29, 29, 31, 0.035);
     }
 
     .app-v3 .shell-controls input[type="file"] {
@@ -5858,7 +5875,9 @@
       font-size: 12px;
       font-weight: 780;
       white-space: nowrap;
-      box-shadow: 0 14px 30px rgba(29, 29, 31, 0.18);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 14px 30px rgba(29, 29, 31, 0.18);
     }
 
     .app-v3 .shell-actions .btn:hover {
@@ -5869,7 +5888,7 @@
 
     .app-v3 .shell-status {
       grid-area: status;
-      display: flex;
+      display: none;
       align-items: center;
       gap: 7px;
       min-width: 0;
@@ -5907,14 +5926,17 @@
       align-self: center;
       position: relative;
       z-index: 80;
-      width: 38px;
-      min-height: 38px;
+      width: 36px;
+      min-height: 36px;
       margin: 0;
       padding: 0;
       border-radius: 999px;
-      background: rgba(245, 245, 247, 0.76);
-      border: 1px solid var(--sr-line);
-      box-shadow: none;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(245, 245, 247, 0.72));
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 8px 18px rgba(29, 29, 31, 0.055);
       overflow: visible;
       backdrop-filter: blur(18px) saturate(1.2);
     }
@@ -5923,8 +5945,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       padding: 0;
       font-size: 0;
       cursor: pointer;
@@ -5966,19 +5988,22 @@
     }
 
     .app-v3 .workspace {
-      grid-template-columns: minmax(410px, 0.72fr) minmax(760px, 1.78fr);
+      grid-template-columns: minmax(300px, 0.72fr) minmax(420px, 1.78fr);
       gap: 16px;
     }
 
     .app-v3 .pdf-panel,
     .app-v3 .review-panel {
       border-radius: 30px;
-      border: 1px solid rgba(60, 60, 67, 0.10);
-      background: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 247, 249, 0.76)),
+        rgba(255, 255, 255, 0.74);
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.96),
-        0 20px 58px rgba(29, 29, 31, 0.075);
-      backdrop-filter: none;
+        inset 0 -1px 0 rgba(29, 29, 31, 0.035),
+        var(--sr-shadow-soft);
+      backdrop-filter: blur(20px) saturate(1.12);
       overflow: hidden;
     }
 
@@ -5986,8 +6011,10 @@
       min-height: 40px;
       padding: 12px 16px;
       color: rgba(29, 29, 31, 0.72);
-      background: #ffffff;
-      border-bottom-color: rgba(60, 60, 67, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(250, 250, 252, 0.58)),
+        rgba(255, 255, 255, 0.62);
+      border-bottom-color: rgba(60, 60, 67, 0.075);
       font-size: 11px;
       font-weight: 780;
       letter-spacing: 0.06em;
@@ -5999,69 +6026,249 @@
       display: none;
     }
 
-    .app-v3 .extraction-head {
-      position: sticky;
-      top: 0;
-      z-index: 20;
+    .app-v3 .pdf-head {
       display: grid;
-      grid-template-columns: minmax(180px, 0.24fr) minmax(0, 1fr);
+      grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
-      gap: 16px;
-      min-height: 0;
-      padding: 14px 16px;
+      gap: 12px;
+      min-height: 64px;
+      padding: 12px 12px 12px 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(250, 250, 252, 0.54)),
+        rgba(255, 255, 255, 0.58);
+    }
+
+    .app-v3 .pdf-head-title {
+      color: rgba(29, 29, 31, 0.62);
+      font-size: 11px;
+      font-weight: 820;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .app-v3 .pdf-controls {
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+      min-height: 42px;
+      padding: 4px;
+      border-radius: 999px;
       color: var(--sr-ink);
-      background: #ffffff;
-      border-bottom: 1px solid var(--sr-line);
-      box-shadow: 0 12px 26px rgba(29, 29, 31, 0.045);
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: rgba(255, 255, 255, 0.76);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 12px 28px rgba(29, 29, 31, 0.10);
+      overflow-x: auto;
+      scrollbar-width: none;
+      backdrop-filter: blur(22px) saturate(1.25);
+    }
+
+    .app-v3 .pdf-control-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      flex: 0 0 auto;
+      min-height: 36px;
+      padding: 2px;
+      border-radius: 999px;
+      background: rgba(118, 118, 128, 0.08);
+    }
+
+    .app-v3 .pdf-controls::-webkit-scrollbar {
+      display: none;
+    }
+
+    .app-v3 .pdf-control-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 999px;
+      color: rgba(29, 29, 31, 0.68);
+      background: transparent;
+      font-size: 17px;
+      font-weight: 820;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .app-v3 .pdf-control-btn:hover {
+      color: var(--sr-ink);
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .app-v3 .pdf-control-btn:disabled {
+      color: rgba(29, 29, 31, 0.24);
+      cursor: default;
+    }
+
+    .app-v3 .pdf-control-text {
+      min-width: 48px;
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+
+    .app-v3 .pdf-page-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      flex: 0 0 auto;
+      min-height: 32px;
+      padding: 0 10px;
+      border-radius: 999px;
+      color: rgba(29, 29, 31, 0.58);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .app-v3 .pdf-page-control input {
+      width: 38px;
+      height: 24px;
+      padding: 0 4px;
+      border: 0;
+      border-radius: 9px;
+      color: var(--sr-ink);
+      background: rgba(118, 118, 128, 0.10);
+      font: inherit;
+      text-align: center;
+      appearance: textfield;
+    }
+
+    .app-v3 .pdf-page-control input::-webkit-outer-spin-button,
+    .app-v3 .pdf-page-control input::-webkit-inner-spin-button {
+      margin: 0;
+      appearance: none;
+    }
+
+    .app-v3 .pdf-page-control input:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(230, 51, 41, 0.28);
+    }
+
+    .app-v3 .pdf-zoom-label {
+      min-width: 48px;
+      color: rgba(29, 29, 31, 0.68);
+      font-size: 12px;
+      font-weight: 760;
+      text-align: center;
+    }
+
+    .app-v3 .pdf-zoom-chip {
+      min-width: 50px;
+      padding: 0 12px;
+      color: #ffffff;
+      background: #1d1d1f;
+      font-size: 12px;
+      font-weight: 820;
+      box-shadow: 0 8px 16px rgba(29, 29, 31, 0.14);
+    }
+
+    .app-v3 .pdf-zoom-chip:hover {
+      color: #ffffff;
+      background: #2c2c2e;
+    }
+
+    .app-v3 .pdf-control-divider {
+      flex: 0 0 auto;
+      width: 1px;
+      height: 22px;
+      background: rgba(60, 60, 67, 0.12);
+    }
+
+    .app-v3 .pdf-stage {
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0) 34%),
+        linear-gradient(180deg, #ececf0, #e5e5ea);
+    }
+
+    .app-v3 #pdfFrame {
+      background: transparent;
+    }
+
+    .app-v3 .extraction-head {
+      position: relative;
+      top: auto;
+      z-index: 10;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
+      gap: 12px;
+      min-height: 0;
+      padding: 16px;
+      color: var(--sr-ink);
+      background:
+        linear-gradient(180deg, #ffffff, #fbfbfd),
+        #ffffff;
+      border-bottom: 1px solid rgba(60, 60, 67, 0.08);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 12px 28px rgba(29, 29, 31, 0.055);
       backdrop-filter: none;
       isolation: isolate;
     }
 
     .app-v3 .extraction-title {
-      display: grid;
-      align-content: center;
-      gap: 4px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
       min-width: 0;
     }
 
     .app-v3 .extraction-title strong {
       color: var(--sr-ink);
-      font-size: 22px;
+      font-size: 21px;
       font-weight: 780;
       letter-spacing: -0.055em;
       text-transform: none;
     }
 
     .app-v3 .extraction-title span {
-      color: var(--sr-muted);
-      font-size: 11px;
-      font-weight: 720;
-      letter-spacing: 0.045em;
-      text-align: left;
+      display: block;
+      color: rgba(29, 29, 31, 0.48);
+      font-size: 10px;
+      font-weight: 760;
+      letter-spacing: 0.09em;
+      line-height: 1.2;
+      text-transform: uppercase;
     }
 
-    .app-v3 .extract-tabs {
+    .app-v3 .flow-tabs {
+      position: relative;
+      z-index: 2;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 4px;
-      padding: 4px;
-      border: 1px solid rgba(60, 60, 67, 0.12);
-      border-radius: 22px;
-      background: #f5f5f7;
+      gap: 6px;
+      padding: 5px;
+      border: 1px solid rgba(60, 60, 67, 0.09);
+      border-radius: 24px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(245, 245, 247, 0.66)),
+        rgba(245, 245, 247, 0.72);
       box-shadow:
-        inset 0 1px 1px rgba(0, 0, 0, 0.035),
-        0 1px 0 rgba(255, 255, 255, 0.84);
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 10px 24px rgba(29, 29, 31, 0.040);
     }
 
-    .app-v3 .extract-tab {
+    .app-v3 .flow-tab {
+      position: relative;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
-      gap: 10px;
-      min-height: 54px;
-      padding: 10px 12px;
-      border: 0;
-      border-radius: 18px;
+      gap: 9px;
+      min-height: 46px;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+      border-radius: 19px;
       color: rgba(29, 29, 31, 0.62);
       background: transparent;
       box-shadow: none;
@@ -6070,28 +6277,43 @@
       text-transform: none;
     }
 
-    .app-v3 .extract-tab::before,
-    .app-v3 .extract-tab::after {
+    .app-v3 .flow-tab::before {
       display: none;
     }
 
-    .app-v3 .extract-tab:hover {
+    .app-v3 .flow-tab::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: -1px;
+      height: 3px;
+      border-radius: 999px;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .app-v3 .flow-tab:hover {
       color: var(--sr-ink);
       background: #ffffff;
       transform: none;
     }
 
-    .app-v3 .extract-tab.is-active {
-      color: #ffffff;
-      background: var(--sr-ink);
-      border-color: transparent;
+    .app-v3 .flow-tab.is-active {
+      color: var(--sr-ink);
+      background: #ffffff;
+      border-color: rgba(230, 51, 41, 0.20);
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.14),
-        0 10px 22px rgba(29, 29, 31, 0.16);
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 8px 18px rgba(230, 51, 41, 0.075);
     }
 
-    .app-v3 .tab-step,
-    .app-v3 .extract-tab.is-active .tab-step {
+    .app-v3 .flow-tab.is-active::after {
+      background: var(--sr-red);
+    }
+
+    .app-v3 .flow-step,
+    .app-v3 .flow-tab.is-active .flow-step {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -6104,12 +6326,12 @@
       color: rgba(29, 29, 31, 0.64);
     }
 
-    .app-v3 .extract-tab.is-active .tab-step {
-      color: #1d1d1f;
-      background: #ffffff;
+    .app-v3 .flow-tab.is-active .flow-step {
+      color: #ffffff;
+      background: var(--sr-red);
     }
 
-    .app-v3 .tab-copy {
+    .app-v3 .flow-copy {
       display: grid;
       gap: 1px;
       min-width: 0;
@@ -6117,41 +6339,79 @@
       text-transform: none;
     }
 
-    .app-v3 .tab-copy strong {
+    .app-v3 .flow-copy strong {
       color: inherit;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 760;
       letter-spacing: -0.01em;
       line-height: 1.1;
       text-transform: none;
     }
 
-    .app-v3 .tab-copy small {
+    .app-v3 .flow-copy small {
       color: rgba(29, 29, 31, 0.48);
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 650;
       letter-spacing: -0.005em;
       line-height: 1.15;
       text-transform: none;
     }
 
-    .app-v3 .extract-tab.is-active .tab-copy small,
-    .app-v3 .extract-tab.is-active .tab-copy strong {
-      color: #ffffff;
+    .app-v3 .flow-tab.is-active .flow-copy strong {
+      color: var(--sr-ink);
     }
 
-    .app-v3 .extract-tab.is-active .tab-badge {
-      color: #1d1d1f;
-      background: #ffffff;
-      border-color: transparent;
+    .app-v3 .flow-tab.is-active .flow-copy small {
+      color: rgba(29, 29, 31, 0.52);
+    }
+
+    .app-v3 .flow-badge {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      color: rgba(29, 29, 31, 0.50);
+      background: rgba(118, 118, 128, 0.12);
+      border: 1px solid rgba(60, 60, 67, 0.08);
+      font-size: 10px;
+      font-weight: 820;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .app-v3 .flow-tab.is-active .flow-badge {
+      color: var(--sr-red);
+      background: rgba(230, 51, 41, 0.08);
+      border-color: rgba(230, 51, 41, 0.14);
+    }
+
+    .app-v3 .review-panel > .extraction-head {
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%),
+        #ffffff;
+      background-image: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
+      overflow: hidden;
+    }
+
+    .app-v3 .review-panel > .extraction-head::before,
+    .app-v3 .review-panel > .extraction-head::after {
+      content: none;
+      display: none;
+    }
+
+    .app-v3 .review-panel > .extraction-head .extraction-title,
+    .app-v3 .review-panel > .extraction-head .flow-tabs {
+      position: relative;
+      z-index: 2;
+      margin: 0;
+      transform: none;
     }
 
     .app-v3 .review-panel .workflow-hint {
-      margin: 0 0 14px;
-      border-radius: 22px;
-      background: #ffffff;
-      border-color: rgba(60, 60, 67, 0.10);
-      box-shadow: 0 10px 24px rgba(29, 29, 31, 0.045);
+      display: none;
     }
 
     .app-v3 .review-hero,
@@ -6169,10 +6429,17 @@
 
     .app-v3 .extraction-panel .panel-body,
     .app-v3 .panel:nth-child(2) .panel-body {
+      position: relative;
+      z-index: 0;
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-top: 0;
+      overflow: auto;
       background: #f5f5f7 !important;
       background-image: none !important;
       background-size: auto !important;
       background-position: 0 0 !important;
+      padding-top: 16px;
     }
 
     .app-v3 .review-shell {
@@ -7267,18 +7534,25 @@
 
     @media (max-width: 1180px) {
       .app-v3 .app-shell {
-        grid-template-columns: minmax(0, 1fr) auto 42px;
+        grid-template-columns: minmax(0, 1fr) 40px;
         grid-template-areas:
-          "brand logo advanced"
-          "controls controls controls"
-          "actions actions actions"
-          "status status status";
+          "brand advanced"
+          "controls controls"
+          "actions actions";
         min-height: 0;
       }
 
       .app-v3 .shell-status {
         margin-left: 0;
         max-width: 100%;
+      }
+
+      .app-v3 .hero-head {
+        grid-template-columns: 104px minmax(0, 1fr);
+      }
+
+      .app-v3 .shell-logo .customer-brand {
+        width: 102px;
       }
     }
 
@@ -7288,29 +7562,61 @@
       }
 
       .app-v3 .app-shell {
-        grid-template-columns: minmax(0, 1fr) 42px;
+        grid-template-columns: minmax(0, 1fr) 40px;
         grid-template-areas:
           "brand advanced"
           "controls controls"
-          "actions actions"
-          "status status";
+          "actions actions";
       }
 
       .app-v3 .shell-logo {
+        display: flex;
+      }
+
+      .app-v3 .hero-head {
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .app-v3 .shell-logo .customer-brand {
+        width: 94px;
+      }
+
+      .app-v3 .shell-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .app-v3 .flow-tabs {
+        grid-template-columns: repeat(4, minmax(128px, 1fr));
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .app-v3 .flow-tabs::-webkit-scrollbar {
         display: none;
-      }
-
-      .app-v3 .shell-controls,
-      .app-v3 .extract-tabs {
-        grid-template-columns: 1fr;
-      }
-
-      .app-v3 .workspace {
-        grid-template-columns: 1fr;
       }
 
       .app-v3 .extraction-head {
         grid-template-columns: 1fr;
+      }
+
+      .app-v3 .pdf-head {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+
+      .app-v3 .pdf-controls {
+        justify-self: stretch;
+      }
+
+      .app-v3 .extraction-title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .app-v3 .extraction-title span {
+        text-align: left;
+        white-space: normal;
       }
 
       .app-v3 .review-hero,
@@ -7326,6 +7632,12 @@
 
       .app-v3 .image-review-summary {
         justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app-v3 .workspace {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -7477,36 +7789,60 @@
 
     <div class="workspace">
       <section class="panel pdf-panel">
-        <div class="panel-head">PDF</div>
-        <iframe id="pdfFrame" title="PDF Vorschau"></iframe>
+        <div class="panel-head pdf-head">
+          <div class="pdf-head-title">Original PDF</div>
+          <div class="pdf-controls" aria-label="PDF-Steuerung">
+            <span class="pdf-control-group">
+              <button class="pdf-control-btn" id="pdfPrevPageBtn" type="button" aria-label="Vorherige PDF-Seite">‹</button>
+              <label class="pdf-page-control" for="pdfPageInput">
+                <span class="sr-only">PDF-Seite</span>
+                <input id="pdfPageInput" type="number" min="1" value="1" inputmode="numeric" aria-label="PDF-Seite">
+                <span id="pdfPageCount">/ -</span>
+              </label>
+              <button class="pdf-control-btn" id="pdfNextPageBtn" type="button" aria-label="Nächste PDF-Seite">›</button>
+            </span>
+            <span class="pdf-control-group">
+              <button class="pdf-control-btn" id="pdfZoomOutBtn" type="button" aria-label="PDF verkleinern">−</button>
+              <button class="pdf-control-btn pdf-zoom-chip" id="pdfFitBtn" type="button" aria-label="PDF an Breite anpassen"><span id="pdfZoomLabel">Fit</span></button>
+              <button class="pdf-control-btn" id="pdfZoomInBtn" type="button" aria-label="PDF vergrößern">+</button>
+            </span>
+            <span class="pdf-control-group">
+              <button class="pdf-control-btn" id="pdfDownloadBtn" type="button" aria-label="PDF herunterladen">↓</button>
+              <button class="pdf-control-btn" id="pdfOpenBtn" type="button" aria-label="PDF in neuem Tab öffnen">↗</button>
+            </span>
+          </div>
+        </div>
+        <div class="pdf-stage">
+          <iframe id="pdfFrame" title="PDF Vorschau"></iframe>
+        </div>
       </section>
 
       <section class="panel extraction-panel review-panel">
-        <div class="panel-head extraction-head">
+        <div class="extraction-head">
           <div class="extraction-title">
             <strong>Prüfpfad</strong>
             <span>Status, Positionen, Bilder, Freigabe</span>
           </div>
-          <div class="extract-tabs" id="extractTabs" role="tablist" aria-label="Arbeitsablauf Dokumentenprüfung">
-            <button class="extract-tab is-active" id="tabBtnOverview" type="button" role="tab" aria-selected="true" aria-controls="tabPaneOverview" data-extract-tab="overview">
-              <span class="tab-step">01</span>
-              <span class="tab-copy"><strong>Start</strong><small>Status & Pflichtfelder</small></span>
-              <span class="tab-badge" id="tabBadgeOverview">-</span>
+          <div class="flow-tabs" id="extractTabs" role="tablist" aria-label="Arbeitsablauf Dokumentenprüfung">
+            <button class="flow-tab is-active" id="tabBtnOverview" type="button" role="tab" aria-selected="true" aria-controls="tabPaneOverview" data-extract-tab="overview">
+              <span class="flow-step">01</span>
+              <span class="flow-copy"><strong>Start</strong><small>Status & Pflichtfelder</small></span>
+              <span class="flow-badge" id="tabBadgeOverview">-</span>
             </button>
-            <button class="extract-tab" id="tabBtnItems" type="button" role="tab" aria-selected="false" aria-controls="tabPaneItems" data-extract-tab="items">
-              <span class="tab-step">02</span>
-              <span class="tab-copy"><strong>Positionen</strong><small>Mengen, Preise, Texte</small></span>
-              <span class="tab-badge" id="tabBadgeItems">0</span>
+            <button class="flow-tab" id="tabBtnItems" type="button" role="tab" aria-selected="false" aria-controls="tabPaneItems" data-extract-tab="items">
+              <span class="flow-step">02</span>
+              <span class="flow-copy"><strong>Positionen</strong><small>Mengen, Preise, Texte</small></span>
+              <span class="flow-badge" id="tabBadgeItems">0</span>
             </button>
-            <button class="extract-tab" id="tabBtnAudit" type="button" role="tab" aria-selected="false" aria-controls="tabPaneAudit" data-extract-tab="audit">
-              <span class="tab-step">03</span>
-              <span class="tab-copy"><strong>Bilder</strong><small>Finale Zuordnung</small></span>
-              <span class="tab-badge" id="tabBadgeAudit">0</span>
+            <button class="flow-tab" id="tabBtnAudit" type="button" role="tab" aria-selected="false" aria-controls="tabPaneAudit" data-extract-tab="audit">
+              <span class="flow-step">03</span>
+              <span class="flow-copy"><strong>Bilder</strong><small>Finale Zuordnung</small></span>
+              <span class="flow-badge" id="tabBadgeAudit">0</span>
             </button>
-            <button class="extract-tab" id="tabBtnReview" type="button" role="tab" aria-selected="false" aria-controls="tabPaneReview" data-extract-tab="review">
-              <span class="tab-step">04</span>
-              <span class="tab-copy"><strong>Freigabe</strong><small>Finale Entscheidung</small></span>
-              <span class="tab-badge" id="tabBadgeReview">0</span>
+            <button class="flow-tab" id="tabBtnReview" type="button" role="tab" aria-selected="false" aria-controls="tabPaneReview" data-extract-tab="review">
+              <span class="flow-step">04</span>
+              <span class="flow-copy"><strong>Freigabe</strong><small>Finale Entscheidung</small></span>
+              <span class="flow-badge" id="tabBadgeReview">0</span>
             </button>
           </div>
         </div>
@@ -7736,6 +8072,12 @@
       reviewFilter: "all",
       activeExtractTab: "overview",
       expandedItemKeys: new Set(),
+      pdf: {
+        page: 1,
+        pageCount: null,
+        zoom: "fit",
+        reloadToken: 0,
+      },
     };
 
     const ui = {
@@ -7765,6 +8107,16 @@
       clearDebugBtn: document.getElementById("clearDebugBtn"),
       debugLog: document.getElementById("debugLog"),
       pdfFrame: document.getElementById("pdfFrame"),
+      pdfPrevPageBtn: document.getElementById("pdfPrevPageBtn"),
+      pdfNextPageBtn: document.getElementById("pdfNextPageBtn"),
+      pdfPageInput: document.getElementById("pdfPageInput"),
+      pdfPageCount: document.getElementById("pdfPageCount"),
+      pdfZoomOutBtn: document.getElementById("pdfZoomOutBtn"),
+      pdfZoomInBtn: document.getElementById("pdfZoomInBtn"),
+      pdfZoomLabel: document.getElementById("pdfZoomLabel"),
+      pdfFitBtn: document.getElementById("pdfFitBtn"),
+      pdfDownloadBtn: document.getElementById("pdfDownloadBtn"),
+      pdfOpenBtn: document.getElementById("pdfOpenBtn"),
       reviewHero: document.getElementById("reviewHero"),
       reviewMetrics: document.getElementById("reviewMetrics"),
       approvalGuide: document.getElementById("approvalGuide"),
@@ -7820,6 +8172,7 @@
       llm_override: "LLM override",
       llm_only: "LLM only",
     };
+    const PDF_ZOOM_LEVELS = [75, 90, 100, 125, 150, 175, 200];
     const REVIEW_FIELD_LABELS = {
       supplier_name: "Lieferant",
       document_type: "Dokumenttyp",
@@ -7934,6 +8287,134 @@
 
     function clearNode(node) {
       while (node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    function finitePositiveInteger(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number <= 0) return null;
+      return Math.max(1, Math.round(number));
+    }
+
+    function clampPdfPage(page) {
+      const requested = finitePositiveInteger(page) || 1;
+      const pageCount = finitePositiveInteger(state.pdf.pageCount);
+      if (!pageCount) return requested;
+      return Math.min(Math.max(1, requested), pageCount);
+    }
+
+    function derivePdfPageCount(result) {
+      const directCandidates = [
+        result && result.page_count,
+        result && result.document && result.document.page_count,
+        result && result.totals && result.totals.page_count,
+        result && result.validation && result.validation.totals && result.validation.totals.page_count,
+      ];
+      for (const value of directCandidates) {
+        const count = finitePositiveInteger(value);
+        if (count) return count;
+      }
+      let maxPage = 0;
+      for (const collectionName of ["line_items", "amount_lines", "images"]) {
+        const collection = result && Array.isArray(result[collectionName]) ? result[collectionName] : [];
+        for (const entry of collection) {
+          const page = finitePositiveInteger(entry && entry.page_ref);
+          if (page) maxPage = Math.max(maxPage, page);
+        }
+      }
+      return maxPage || null;
+    }
+
+    function pdfDocumentUrl(documentId, options = {}) {
+      const params = new URLSearchParams();
+      params.set("toolbar", "0");
+      params.set("navpanes", "0");
+      params.set("scrollbar", "1");
+      params.set("page", String(clampPdfPage(options.page || state.pdf.page || 1)));
+      if (state.pdf.zoom === "fit") {
+        params.set("view", "FitH");
+      } else {
+        params.set("zoom", String(state.pdf.zoom));
+      }
+      const query = new URLSearchParams();
+      query.set("viewer_reload", String(state.pdf.reloadToken));
+      return `/document/${documentId}/file?${query.toString()}#${params.toString()}`;
+    }
+
+    function syncPdfControls() {
+      const page = clampPdfPage(state.pdf.page);
+      const pageCount = finitePositiveInteger(state.pdf.pageCount);
+      state.pdf.page = page;
+      if (ui.pdfPageInput) {
+        ui.pdfPageInput.value = String(page);
+        ui.pdfPageInput.max = pageCount ? String(pageCount) : "";
+      }
+      if (ui.pdfPageCount) ui.pdfPageCount.textContent = `/ ${pageCount || "-"}`;
+      if (ui.pdfPrevPageBtn) ui.pdfPrevPageBtn.disabled = !state.documentId || page <= 1;
+      if (ui.pdfNextPageBtn) ui.pdfNextPageBtn.disabled = !state.documentId || (pageCount ? page >= pageCount : false);
+      if (ui.pdfZoomOutBtn) ui.pdfZoomOutBtn.disabled = !state.documentId || state.pdf.zoom === PDF_ZOOM_LEVELS[0];
+      if (ui.pdfZoomInBtn) ui.pdfZoomInBtn.disabled = !state.documentId || state.pdf.zoom === PDF_ZOOM_LEVELS[PDF_ZOOM_LEVELS.length - 1];
+      if (ui.pdfZoomLabel) ui.pdfZoomLabel.textContent = state.pdf.zoom === "fit" ? "Fit" : `${state.pdf.zoom}%`;
+      if (ui.pdfDownloadBtn) ui.pdfDownloadBtn.disabled = !state.documentId;
+      if (ui.pdfOpenBtn) ui.pdfOpenBtn.disabled = !state.documentId;
+    }
+
+    function refreshPdfFrame({ forceReload = false } = {}) {
+      syncPdfControls();
+      if (!state.documentId || !ui.pdfFrame) return;
+      if (forceReload) state.pdf.reloadToken += 1;
+      const nextSrc = pdfDocumentUrl(state.documentId);
+      if (forceReload) {
+        const reloadToken = state.pdf.reloadToken;
+        ui.pdfFrame.src = "about:blank";
+        window.setTimeout(() => {
+          if (state.documentId && state.pdf.reloadToken === reloadToken) ui.pdfFrame.src = nextSrc;
+        }, 0);
+        return;
+      }
+      ui.pdfFrame.src = nextSrc;
+    }
+
+    function setPdfPageCountFromResult(result) {
+      state.pdf.pageCount = derivePdfPageCount(result);
+      state.pdf.page = clampPdfPage(state.pdf.page);
+      syncPdfControls();
+    }
+
+    function setPdfPage(page) {
+      state.pdf.page = clampPdfPage(page);
+      refreshPdfFrame({ forceReload: true });
+    }
+
+    function setPdfZoom(zoom) {
+      state.pdf.zoom = zoom;
+      refreshPdfFrame({ forceReload: true });
+    }
+
+    function stepPdfZoom(direction) {
+      if (state.pdf.zoom === "fit") {
+        setPdfZoom(direction > 0 ? 125 : 90);
+        return;
+      }
+      const currentIndex = PDF_ZOOM_LEVELS.indexOf(Number(state.pdf.zoom));
+      const fallbackIndex = PDF_ZOOM_LEVELS.findIndex((level) => level >= Number(state.pdf.zoom));
+      const index = currentIndex >= 0 ? currentIndex : Math.max(0, fallbackIndex);
+      const nextIndex = Math.min(Math.max(index + direction, 0), PDF_ZOOM_LEVELS.length - 1);
+      setPdfZoom(PDF_ZOOM_LEVELS[nextIndex]);
+    }
+
+    function openCurrentPdf({ download = false } = {}) {
+      if (!state.documentId) return;
+      const url = `/document/${state.documentId}/file`;
+      if (download) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `document-${state.documentId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return;
+      }
+      window.open(url, "_blank", "noopener");
     }
 
     function debugNow() {
@@ -10270,6 +10751,7 @@
       try {
         const result = await apiJson(`/result/${documentId}`);
         state.result = result;
+        setPdfPageCountFromResult(result);
         syncCurrentDocumentIntoList(result.document || {});
         setDocumentApprovalPills(result);
         state.compare = null;
@@ -10312,6 +10794,8 @@
         state.compare = null;
         state.fieldSources = {};
         state.expandedItemKeys = new Set();
+        state.pdf.pageCount = null;
+        syncPdfControls();
         setDocumentApprovalPills(null);
         updateWorkflowNavigation();
         renderReview(null);
@@ -10323,7 +10807,10 @@
     async function selectDocument(documentId) {
       state.documentId = documentId;
       ui.docSelect.value = String(documentId);
-      ui.pdfFrame.src = `/document/${documentId}/file#view=FitH`;
+      state.pdf.page = 1;
+      state.pdf.pageCount = null;
+      state.pdf.zoom = "fit";
+      refreshPdfFrame();
       await loadResult(documentId);
     }
 
@@ -10732,6 +11219,21 @@
       hideImageHoverPreview();
     });
 
+    ui.pdfPrevPageBtn.addEventListener("click", () => setPdfPage(state.pdf.page - 1));
+    ui.pdfNextPageBtn.addEventListener("click", () => setPdfPage(state.pdf.page + 1));
+    ui.pdfPageInput.addEventListener("change", () => setPdfPage(ui.pdfPageInput.value));
+    ui.pdfPageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        setPdfPage(ui.pdfPageInput.value);
+      }
+    });
+    ui.pdfZoomOutBtn.addEventListener("click", () => stepPdfZoom(-1));
+    ui.pdfZoomInBtn.addEventListener("click", () => stepPdfZoom(1));
+    ui.pdfFitBtn.addEventListener("click", () => setPdfZoom("fit"));
+    ui.pdfDownloadBtn.addEventListener("click", () => openCurrentPdf({ download: true }));
+    ui.pdfOpenBtn.addEventListener("click", () => openCurrentPdf());
+
     ui.processBtn.addEventListener("click", async () => {
       await processCurrent();
     });
@@ -10791,6 +11293,7 @@
     renderDocumentIssues(null);
     renderLlmRun(null);
     renderCompare(null);
+    syncPdfControls();
     addDebug("UI initialisiert.");
 
     loadDocuments().catch((error) => {
