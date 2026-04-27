@@ -506,6 +506,36 @@ def _dedupe_int_list(values: list[int]) -> list[int]:
     return result
 
 
+def _image_assignment_source(item: dict[str, Any]) -> str:
+    return str(item.get("image_assignment_source") or "").strip().lower()
+
+
+def _item_for_image_matching(item: dict[str, Any]) -> dict[str, Any]:
+    if _image_assignment_source(item) == "manual":
+        return item
+
+    # Automatic assignments are recalculated on every match run. Otherwise a
+    # previous bad heuristic result can become "final" input for the next run.
+    clone = dict(item)
+    clone["image_assignment_is_final"] = False
+    clone["image_ids"] = []
+    clone["image_ids_primary"] = []
+    return clone
+
+
+def _candidate_rank_bonus(candidate_index: int, *, image_assignment_is_final: bool) -> float:
+    if image_assignment_is_final:
+        return max(0.0, 0.24 - (candidate_index * 0.12))
+    return max(0.0, 0.56 - (candidate_index * 0.22))
+
+
+def _candidate_area_bonus(area: int, *, image_assignment_is_final: bool) -> float:
+    if area <= 0:
+        return 0.0
+    cap = 0.55 if image_assignment_is_final else 0.22
+    return min(cap, area / 420_000.0)
+
+
 def _candidate_images_for_item(
     item: dict[str, Any],
     image_by_id: dict[int, dict[str, Any]],
@@ -610,9 +640,9 @@ def _candidate_images_for_item(
                     page_bonus += 0.72
                 elif page_diff == 0:
                     page_bonus -= 0.22
-        area_bonus = min(0.60, area / 420_000.0) if area > 0 else 0.0
+        area_bonus = _candidate_area_bonus(area, image_assignment_is_final=image_assignment_is_final)
         primary_bonus = 0.20 if image_id in primary_ids else 0.0
-        rank_bonus = max(0.0, 0.24 - (candidate_index * 0.12))
+        rank_bonus = _candidate_rank_bonus(candidate_index, image_assignment_is_final=image_assignment_is_final)
         score = page_bonus + area_bonus + primary_bonus + rank_bonus + decorative_penalty + repeated_penalty
         scored.append((score, page_candidate_rank(page_ref, image_page), image))
 
@@ -687,8 +717,8 @@ def _heuristic_match_for_item(
                     score += 0.74
                 elif page_diff == 0:
                     score -= 0.22
-        score += min(0.55, area / 420_000.0) if area > 0 else 0.0
-        score += max(0.0, 0.24 - (candidate_index * 0.12))
+        score += _candidate_area_bonus(area, image_assignment_is_final=image_assignment_is_final)
+        score += _candidate_rank_bonus(candidate_index, image_assignment_is_final=image_assignment_is_final)
         if image_id in primary_ids:
             score += 0.20
         if image.get("is_probably_decorative"):
@@ -699,7 +729,7 @@ def _heuristic_match_for_item(
             {
                 "image_id": image_id,
                 "score": round(score, 4),
-                "reason": "heuristic(page+area+decorative+primary)",
+                "reason": "heuristic(page+layout_rank+area+decorative+primary)",
                 "_page_rank": page_candidate_rank(page_ref, image_page),
             }
         )
@@ -1544,8 +1574,9 @@ def match_images(
 
     items_out: list[dict[str, Any]] = []
     for item in line_items[:max_items]:
-        candidates = _candidate_images_for_item(item, image_by_id, max_candidates=max_candidates)
-        heuristic = _heuristic_match_for_item(item, candidates, allow_multiple=allow_multiple)
+        matching_item = _item_for_image_matching(item)
+        candidates = _candidate_images_for_item(matching_item, image_by_id, max_candidates=max_candidates)
+        heuristic = _heuristic_match_for_item(matching_item, candidates, allow_multiple=allow_multiple)
         heuristic_selected = list(heuristic.get("selected_image_ids") or [])
 
         vlm_result: dict[str, Any] | None = None

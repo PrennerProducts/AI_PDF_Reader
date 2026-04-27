@@ -132,6 +132,31 @@ Akzeptanz:
 
 ## P1 - Produktion
 
+### P1-000 UI/UX Redesign zur Operator-App
+
+Status: in Arbeit
+
+Ziel:
+
+- Die UI von einer PoC-/Admin-Oberflaeche zu einer modernen, gefuehrten Operator-App umbauen.
+
+Tasks:
+
+- UX-Zielbild in `docs/UI_UX_REDESIGN.md` pflegen. Status: erledigt.
+- Neue App-Shell ohne sichtbare PoC-Altlasten. Status: V3-Command-Bar mit stabilem Header, kleinem Schauraum-Logo und Admin-Menue umgesetzt.
+- Gefuehrter Flow `Start -> Positionen -> Bilder -> Freigabe`.
+- Overview als Entscheidungsscreen neu komponieren. Status: erster V3-Stand umgesetzt, Statusfarben auf ruhige Akzente reduziert.
+- Positionen und Bilder als Review-Screens optimieren. Status: Positionen und Bilder erster V3-Stand umgesetzt.
+- Freigabe als finalen Abschluss-Screen gestalten. Status: erster V3-Stand umgesetzt.
+- Alte CSS-Schichten konsolidieren und entfernen. Status: `app-v2`-Schicht, Header-Collapse-Logik und V3-Collapse-Selektoren entfernt.
+
+Akzeptanz:
+
+- Ein Mitarbeiter erkennt sofort aktives Dokument, Status und naechsten Schritt.
+- Technische Diagnose ist nicht Teil des Hauptflows.
+- Upload/Verarbeitung/Freigabe sind ohne Erklaerung bedienbar.
+- UI bleibt auf Desktop und kleineren Screens nutzbar.
+
 ### P1-001 Auth und Rollen
 
 Status: offen
@@ -284,6 +309,9 @@ Umgesetzt:
 - LLM-/Debug-/Preview-Aktionen aus dem Hauptflow entfernt und in Diagnosebereich verschoben.
 - Quellen-/LLM-Tab aus sichtbarer Navigation entfernt.
 - Tab-Leiste als Workflow-Stepper `Pruefung -> Aufgaben -> Positionen -> Bilder` mit Status-Badges und Hilfetext umgebaut.
+- Extraktions-Tabs in den Panel-Header verschoben und auf `Uebersicht`, `Freigabe`, `Positionen`, `Bilder` reduziert.
+- PDF-Auswahl startet Upload und Parser-Verarbeitung automatisch; der sichtbare `Verarbeiten`-Button bleibt als manueller Re-Run.
+- Schauraum-Logo in der kompakten Topbar sichtbar gemacht.
 - Freigabe-Assistent mit konkreten Vor-Freigabe-Schritten eingebaut.
 - Schritt-Aktionen springen direkt zu Aufgaben, Positionen, Bildern oder Freigabe.
 

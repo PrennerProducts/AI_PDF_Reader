@@ -10,7 +10,7 @@ from image_assignment import (
     metadata_image_assignment,
     metadata_review_state,
 )
-from main import _candidate_images_for_item
+from main import _candidate_images_for_item, _heuristic_match_for_item, _item_for_image_matching
 
 
 def test_focused_image_ids_spreads_assignments_across_page() -> None:
@@ -227,3 +227,61 @@ def test_candidate_images_keep_persisted_final_assignment_across_pages() -> None
     candidates = _candidate_images_for_item(item, image_by_id, max_candidates=4)
 
     assert [candidate["id"] for candidate in candidates] == [21]
+
+
+def test_heuristic_image_match_prefers_layout_candidate_over_larger_lower_image() -> None:
+    item = {
+        "page_ref": 2,
+        "image_assignment_is_final": False,
+        "image_next_page_allowed": False,
+    }
+    candidates = [
+        {
+            "id": 9586,
+            "page_ref": 2,
+            "width": 254,
+            "height": 161,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+        {
+            "id": 9587,
+            "page_ref": 2,
+            "width": 358,
+            "height": 300,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+    ]
+
+    match = _heuristic_match_for_item(item, candidates, allow_multiple=False)
+
+    assert match["selected_image_ids"] == [9586]
+
+
+def test_automatic_image_assignment_is_not_final_input_for_next_match() -> None:
+    item = {
+        "page_ref": 2,
+        "image_ids": [9587],
+        "image_ids_primary": [9587],
+        "image_assignment_is_final": True,
+        "image_assignment_source": "heuristic",
+    }
+
+    matching_item = _item_for_image_matching(item)
+
+    assert matching_item["image_assignment_is_final"] is False
+    assert matching_item["image_ids"] == []
+    assert matching_item["image_ids_primary"] == []
+
+
+def test_manual_image_assignment_stays_final_input_for_next_match() -> None:
+    item = {
+        "page_ref": 2,
+        "image_ids": [9587],
+        "image_ids_primary": [9587],
+        "image_assignment_is_final": True,
+        "image_assignment_source": "manual",
+    }
+
+    assert _item_for_image_matching(item) is item

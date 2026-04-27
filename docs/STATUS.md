@@ -82,12 +82,16 @@ Umgesetzt:
 
 Die UI unter `/ui` bietet:
 
+- Laufendes UI/UX-Redesign ist in `docs/UI_UX_REDESIGN.md` dokumentiert; die V3-Command-Bar, der gefuehrte Pruefpfad, die Review-Screens und das Admin-Menue haben einen ersten modernen Stand.
 - Kompakte Operator-Leiste statt grossem PoC-Header.
 - Dokumentauswahl und Upload.
 - PDF-Vorschau.
 - Parser-only Verarbeitung als sichtbarer Standard.
 - Uebersicht mit Validierung.
 - Workflow-Stepper: `Pruefung`, `Aufgaben`, `Positionen`, `Bilder`.
+- Extraktions-Tabs liegen im Panel-Header und sind auf `Uebersicht`, `Freigabe`, `Positionen`, `Bilder` reduziert.
+- PDF-Auswahl startet Upload und Verarbeitung automatisch; sichtbarer Verarbeitungsbutton dient als Re-Run.
+- Schauraum-Logo ist in der kompakten Topbar sichtbar.
 - Freigabe im Aufgabenbereich.
 - Freigabe-Assistent mit konkreten Schritten vor der Freigabe.
 - Positionsliste mit Details.
