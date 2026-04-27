@@ -514,20 +514,42 @@ def _candidate_images_for_item(
 ) -> list[dict[str, Any]]:
     if is_non_visual_line_item(item):
         return []
-    candidate_ids: list[int] = []
-    for key in ("image_candidate_ids", "image_ids", "image_ids_page_all"):
+
+    def _ids_from_item(key: str) -> list[int]:
         raw = item.get(key)
         if not isinstance(raw, list):
-            continue
+            return []
         current_ids: list[int] = []
         for value in raw:
             parsed = _to_int_safe(value)
             if parsed is not None:
                 current_ids.append(parsed)
-        current_ids = _dedupe_int_list(current_ids)
-        if current_ids:
-            candidate_ids = current_ids
-            break
+        return _dedupe_int_list(current_ids)
+
+    image_assignment_is_final = bool(item.get("image_assignment_is_final"))
+    candidate_ids: list[int] = []
+    if image_assignment_is_final:
+        for key in ("image_candidate_ids", "image_ids", "image_ids_page_all"):
+            current_ids = _ids_from_item(key)
+            if current_ids:
+                candidate_ids = current_ids
+                break
+    else:
+        primary_ids_for_matching = _dedupe_int_list(
+            _ids_from_item("image_candidate_ids") + _ids_from_item("image_ids")
+        )
+        page_ref_for_matching = _to_int_safe(item.get("page_ref"))
+        has_same_page_viable_primary = any(
+            (
+                _to_int_safe(image_by_id.get(image_id, {}).get("page_ref")) == page_ref_for_matching
+                and is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+            )
+            for image_id in primary_ids_for_matching
+        )
+        page_all_ids = _ids_from_item("image_ids_page_all")
+        candidate_ids = primary_ids_for_matching
+        if not candidate_ids or (page_all_ids and not has_same_page_viable_primary):
+            candidate_ids = _dedupe_int_list(candidate_ids + page_all_ids)
     if not candidate_ids:
         return []
 
@@ -535,7 +557,6 @@ def _candidate_images_for_item(
     next_page_allowed = bool(item.get("image_next_page_allowed"))
     prefers_next_page = bool(item.get("image_prefers_next_page"))
     primary_ids_raw = item.get("image_ids_primary")
-    image_assignment_is_final = bool(item.get("image_assignment_is_final"))
     primary_ids = set()
     if image_assignment_is_final:
         primary_ids = {

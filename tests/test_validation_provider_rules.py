@@ -115,6 +115,101 @@ def test_alu_one_az_item_is_not_treated_as_visual_image_requirement() -> None:
     assert az_item["validation_status"] == "auto_accept"
 
 
+def test_shared_image_fallback_does_not_block_validation() -> None:
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Entholzer",
+            "document_type": "angebot",
+            "document_number": "12600422.00",
+            "document_date": "2026-02-03",
+            "project_ref": "Bernsteiner",
+            "currency": "EUR",
+            "net_total": "200.00",
+            "vat_total": "40.00",
+            "gross_total": "240.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=[
+            {
+                "position_no": "1",
+                "description_short": "Fenster dreh-kipp",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+                "image_ids": [77],
+                "image_assignment_reason": "heuristic_default",
+                "image_assignment_source": "heuristic",
+            },
+            {
+                "position_no": "2",
+                "description_short": "Fenster dreh-kipp",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+                "image_ids": [77],
+                "image_assignment_reason": "shared_image_no_viable_alternative",
+                "image_assignment_source": "heuristic_shared",
+            },
+        ],
+        images=[{"id": 77, "page_ref": 1}],
+    )
+
+    assert validation["status"] == "auto_accept"
+    assert validation["image_summary"]["assigned_duplicate_count"] == 0
+
+
+def test_unmarked_duplicate_image_assignment_still_requires_review() -> None:
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Entholzer",
+            "document_type": "angebot",
+            "document_number": "12600422.00",
+            "document_date": "2026-02-03",
+            "project_ref": "Bernsteiner",
+            "currency": "EUR",
+            "net_total": "200.00",
+            "vat_total": "40.00",
+            "gross_total": "240.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=[
+            {
+                "position_no": "1",
+                "description_short": "Fenster dreh-kipp",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+                "image_ids": [77],
+            },
+            {
+                "position_no": "2",
+                "description_short": "Fenster dreh-kipp",
+                "quantity": "1",
+                "unit_price": "100.00",
+                "line_total": "100.00",
+                "page_ref": 1,
+                "is_alternative": False,
+                "image_ids": [77],
+            },
+        ],
+        images=[{"id": 77, "page_ref": 1}],
+    )
+
+    assert validation["status"] == "review"
+    assert validation["image_summary"]["assigned_duplicate_count"] == 1
+    assert any(issue.get("code") == "duplicate_image_assignments" for issue in validation["document_issues"])
+
+
 def test_entholzer_system_header_is_informational() -> None:
     validation = build_document_validation(
         document={

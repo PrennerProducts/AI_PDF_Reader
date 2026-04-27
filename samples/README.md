@@ -44,7 +44,7 @@ pdftotext -layout "samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 A
 ```
 
 ## Why these samples matter
-- Different supplier templates: Rieder, Entholzer, NeWo, Rekord Vomp, SR-Schauraum, alu-one, Koch, Muigg, Schachermayer, Schlotterer
+- Different supplier templates: Rieder, Entholzer, NeWo, Rekord Vomp, SR-Schauraum, alu-one, Koch, Muigg, Schachermayer, Schuchter, Schlotterer
 - Different table styles for line items and totals
 - Alternative positions, zero-value items, and VAT blocks
 - Good base set for deterministic parser regression

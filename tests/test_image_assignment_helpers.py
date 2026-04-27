@@ -173,6 +173,38 @@ def test_candidate_images_prefer_same_page_visual_over_next_page_carryover() -> 
     assert [candidate["id"] for candidate in candidates] == [11]
 
 
+def test_candidate_images_use_page_all_when_primary_candidates_miss_same_page_visual() -> None:
+    item = {
+        "page_ref": 1,
+        "image_candidate_ids": [21],
+        "image_ids_page_all": [11],
+        "image_assignment_is_final": False,
+        "image_next_page_allowed": True,
+    }
+    image_by_id = {
+        11: {
+            "id": 11,
+            "page_ref": 1,
+            "width": 480,
+            "height": 900,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+        21: {
+            "id": 21,
+            "page_ref": 2,
+            "width": 900,
+            "height": 900,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+    }
+
+    candidates = _candidate_images_for_item(item, image_by_id, max_candidates=4)
+
+    assert [candidate["id"] for candidate in candidates] == [11]
+
+
 def test_candidate_images_keep_persisted_final_assignment_across_pages() -> None:
     item = {
         "page_ref": 1,

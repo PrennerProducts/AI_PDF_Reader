@@ -8,6 +8,9 @@ AMOUNT_PATTERN = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
 ROW_WITH_AMOUNTS_RE = re.compile(
     rf"^(?P<position>\d+)\s+(?P<body>.+?)\s+(?P<unit_price>{AMOUNT_PATTERN})\s+(?P<line_total>{AMOUNT_PATTERN})$"
 )
+ROW_WITH_LINE_TOTAL_RE = re.compile(
+    rf"^(?P<position>\d+)\s+(?P<body>.+?)\s+(?P<line_total>{AMOUNT_PATTERN})$"
+)
 ROW_NO_AMOUNTS_RE = re.compile(r"^(?P<position>\d+)\s+(?P<body>.+)$")
 BODY_RE = re.compile(r"^(?:(?P<customer_pos>.+?)\s+)?(?P<qty>\d+)\s+(?P<description>[A-Za-zÄÖÜäöüß].+)$")
 
@@ -73,6 +76,14 @@ def _parse_row(line: str) -> dict[str, str] | None:
         unit_price_raw = normalize_line(match.group("unit_price"))
         line_total_raw = normalize_line(match.group("line_total"))
     else:
+        match = ROW_WITH_LINE_TOTAL_RE.match(line)
+        if match:
+            position = match.group("position")
+            body = match.group("body")
+            line_total_raw = normalize_line(match.group("line_total"))
+            unit_price_raw = line_total_raw
+
+    if not match:
         match = ROW_NO_AMOUNTS_RE.match(line)
         if not match:
             return None
@@ -85,6 +96,8 @@ def _parse_row(line: str) -> dict[str, str] | None:
 
     customer_pos_raw = body_match.group("customer_pos")
     customer_pos = normalize_line(customer_pos_raw) if customer_pos_raw else None
+    if customer_pos and "," in customer_pos:
+        return None
     description = normalize_line(body_match.group("description"))
     if not description:
         return None

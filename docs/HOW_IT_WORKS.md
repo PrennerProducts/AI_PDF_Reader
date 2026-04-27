@@ -1,122 +1,274 @@
-# Wie das System funktioniert (Ist-Stand)
+# Wie das System funktioniert
+
+Stand: 2026-04-27
 
 ## Uebersicht
-Das System laeuft On-Prem und verarbeitet Angebots-PDFs in einer API-Pipeline.
-Der aktuelle Stand ist produktionsnah fuer PoC/QA, mit Upload, Verarbeitung, Ergebnisausgabe, Export und Test-UI.
+
+Das System laeuft On-Prem und verarbeitet Angebots- und Auftragsbestaetigungs-PDFs in einer API-Pipeline. Die interne Persistenz liegt in Postgres. Fuer VenDoc ist ein zusaetzlicher MSSQL-Writer geplant, der freigegebene Dokumente in die externe Datenbank `SRTemp` schreibt.
 
 ## Komponenten
-1. API (`api/main.py`)
-- Upload, Verarbeitung, Ergebnis- und Export-Endpunkte
-- Web-Workbench unter `/ui`
 
-2. Parser/Extractor (`api/parser.py`, `api/structured_parser.py`, `api/extractor.py`)
-- Template-Erkennung (Rieder, Entholzer, NeWo)
-- Kopfdaten, Summenzeilen, Positionen
-- Bildextraktion inkl. Render-Transformationen
+### API
 
-3. LLM Enrichment (`api/llm.py`, optional)
-- Ollama-Aufruf fuer strukturierte Feld-Extraktion im JSON-Format
-- Wird in `POST /process` ueber `process_mode` gesteuert
-- Modi:
-  - `parser_only`
-  - `hybrid_fill` (parser-first)
-  - `llm_override`
-  - `llm_only`
+Dateien:
 
-4. Postgres (`api/db.py`, `api/migrations/*.sql`)
-- Persistenz fuer Dokumentkopf, Betragszeilen, Positionen, Bilder
+- `api/main.py`
+- `api/db.py`
+- `api/exporter.py`
 
-5. Storage (`data/`)
-- `uploads/`: Original-PDFs
-- `logs/extracted_text/`: Textdumps je Dokument
-- `logs/extracted_images/`: extrahierte Bilder je Dokument
-- `logs/llm/`: LLM-Run-Dumps je Lauf (`document_<id>_<run_id>.json`) + `document_<id>.json` als latest
-- `exports/`: erzeugte Exportdateien
+Aufgaben:
 
-## API-Workflow
-1. `POST /upload`
-- Speichert PDF unter `/data/uploads/...`
-- Legt Datensatz in `documents` an (`status=uploaded`)
+- Upload.
+- Processing.
+- Result/Preview/Export.
+- Review und Freigabe.
+- Bildzuordnung.
+- LLM/VLM-Hilfsendpunkte.
+- UI-Auslieferung.
 
-2. `POST /process/{document_id}`
-- Setzt `status=processing`
-- Extrahiert PDF-Text mit `pypdf` (`\f` als Seiten-Trenner)
-- Extrahiert Bilder aus echten `Do`-Placements im Content-Stream
-- Wendet Render-Transformation aus der PDF-Matrix an (z. B. Flip)
-- Parsed Kopfdaten, Summenzeilen, Positionen
-- Optionaler LLM-Schritt je `process_mode`
-- Schreibt pro Lauf einen LLM-Dump mit:
-  - `parser_snapshot_before`
-  - `parser_snapshot_after`
-  - `changes` (Feld, old/new, applied)
-- Schreibt Daten in `documents`, `document_amount_lines`, `line_items`, `document_images`
-- Setzt `status=processed` oder `failed`
+Hinweis:
 
-3. `GET /result/{document_id}`
-- Liefert normalisierte Gesamtstruktur:
-  - `document`
-  - `amount_lines`
-  - `line_items`
-  - `images`
+- `api/main.py` ist aktuell gross und sollte fuer Production in Router aufgeteilt werden.
 
-4. `GET /preview/{document_id}?format=json|csv`
-- Liefert JSON/CSV direkt als Response
-- Schreibt keine Export-Datei
+### Parser und Extraktion
 
-5. `GET /export/{document_id}?format=json|csv|sql&include_images_base64=...`
-- Erzeugt Exportinhalt
-- Schreibt Datei nach `/data/exports`
-- Gibt Inhalt direkt als Download-Response zurueck
+Dateien:
 
-6. `GET /ui`
-- Side-by-side Testoberflaeche (Original-PDF, Extraction, Bilder, Preview-Modal)
-- Modus-Auswahl fuer Process (`parser_only`, `hybrid_fill`, `llm_override`, `llm_only`)
-- LLM-Run Tabelle (Parser vs LLM + applied ja/nein)
-- LLM latest/history als JSON-Modal
-- Parser-vs-LLM Vergleich als separater Lauf (Button `Parser vs LLM`, Endpoint `GET /compare/{document_id}`)
-- Optionaler Bild-Matching-PoC: `POST /match-images/{document_id}` (heuristic/vlm/hybrid)
+- `api/parser.py`
+- `api/structured_parser.py`
+- `api/extractor.py`
+- `api/template_*.py`
+
+Aufgaben:
+
+- Template-Erkennung.
+- Kopfdaten.
+- Summen.
+- Positionen.
+- PDF-Text.
+- PDF-Bilder.
+- Seitenreferenzen.
+
+Aktuelle Template-Anbieter:
+
+- `alu_one`
+- `entholzer`
+- `koch`
+- `muigg`
+- `newo`
+- `rekord_vomp`
+- `rieder`
+- `schachermayer`
+- `schlotterer`
+- `schuchter`
+- `sr_schauraum`
+
+### LLM/VLM
+
+Dateien:
+
+- `api/llm.py`
+- `api/image_matcher.py`
+
+LLM wird optional genutzt fuer:
+
+- Kopffelder/Summen ergaenzen.
+- Parser-vs-LLM-Vergleich.
+- LLM-only Fallback.
+
+VLM wird optional genutzt fuer:
+
+- Bildkandidaten zu Positionen ranken.
+
+Produktionshinweis:
+
+- Auf CPU-only Servern sollen `LLM_ENABLED=false` und `VLM_ENABLED=false` als Startmodus genutzt werden.
+- Parser-only muss der stabile Basispfad sein.
+
+### Postgres
+
+Tabellen:
+
+- `documents`
+- `document_amount_lines`
+- `line_items`
+- `document_images`
+- `schema_migrations`
+
+Geplant:
+
+- `vendoc_export_jobs`
+- optional `document_corrections` oder Audit-Tabelle fuer manuelle Feldkorrekturen.
+
+### Storage
+
+Verzeichnisse:
+
+- `data/uploads`: Original-PDFs.
+- `data/logs/extracted_text`: Textdumps.
+- `data/logs/extracted_images`: extrahierte Bilder.
+- `data/logs/llm`: LLM-Runs.
+- `data/exports`: erzeugte JSON/CSV/SQL-Dateien.
+
+## Workflow
+
+### 1. Upload
+
+`POST /upload`
+
+- PDF wird unter `/data/uploads` gespeichert.
+- Dokument wird in Postgres mit `status=uploaded` angelegt.
+
+### 2. Processing
+
+`POST /process/{document_id}`
+
+Schritte:
+
+1. Status auf `processing`.
+2. PDF-Text extrahieren.
+3. PDF-Bilder aus echten Render-Placements extrahieren.
+4. Parser-Template erkennen.
+5. Kopfdaten, Summen und Positionen extrahieren.
+6. Optional LLM-Felder ergaenzen.
+7. Daten in Postgres schreiben.
+8. Bildzuordnung berechnen.
+9. Status auf `processed` oder `failed`.
+
+Aktuelle Grenze:
+
+- Processing laeuft synchron im HTTP-Request.
+- Fortschritt liegt in-memory.
+- Fuer Production soll daraus ein persistenter Background Job werden.
+
+### 3. Validierung
+
+`GET /result/{document_id}`
+
+Beim Ergebnisabruf wird Validierung aufgebaut:
+
+- Pflichtfelder.
+- Empfohlene Felder.
+- Summenkonsistenz.
+- Positionsfelder.
+- Seitenreferenzen.
+- Bildzuordnung.
+- Provider-Sonderregeln.
+- Freigabe-Eignung.
+
+Statuswerte:
+
+- `auto_accept`: keine offenen Fehler/Warnungen.
+- `manual_checked`: Warnungen wurden manuell geprueft.
+- `review`: offene Warnungen.
+- `reject`: offene Fehler.
+
+### 4. Review
+
+In der UI kann der Anwender:
+
+- Auffaellige Positionen filtern.
+- Bildkandidaten pruefen.
+- Ein finales Bild setzen.
+- Bewusst "kein Bild" setzen.
+- Warnungen als manuell geprueft markieren.
+- Dokument freigeben.
+
+### 5. Export
+
+Aktuell:
+
+- JSON.
+- CSV.
+- SQL fuer das interne App-Schema.
+
+Noch nicht umgesetzt:
+
+- Direkter VenDoc-MSSQL-Write.
+
+Geplanter VenDoc-Export:
+
+1. Dokument muss verarbeitet sein.
+2. Dokument muss freigegeben sein.
+3. Mapping wird als Dry-Run pruefbar.
+4. Live-Write schreibt Header und Positionen in einer Transaktion.
+5. Export-Journal speichert Erfolg oder Fehler.
 
 ## Bildextraktion und Bild-Mapping
-### Bildextraktion v2
-- Quelle: PDF Content-Stream (`Do` Operator), nicht mehr nur Resource-Liste
-- Vorteil: nur wirklich gezeichnete Bilder werden extrahiert
-- Transformationen aus CTM werden auf das Bild angewendet (z. B. vertikal drehen/spiegeln)
 
-### Mapping Position -> Bild
-- `line_items.page_ref` wird beim Parsing gesetzt
-- Mapping ist aktuell `recall-first`:
-  - Kandidaten von aktueller Seite + Nachbarseiten
-  - dekorative Bilder werden nur heuristisch gefiltert
-- Felder pro Position:
-  - `image_ids`: Kandidatenliste
-  - `image_count`: Anzahl Kandidaten
-  - `image_ids_primary`: erster primaerer Kandidat
-  - `image_ids_page_all`: alle Bilder der Seite (Transparenz)
-  - `image_count_page_all`: Anzahl aller Seitenbilder
+### Bildextraktion
 
-## Datenmodell (Kurz)
-1. `documents`
-- Dokumentkopf, Summen, Status, Confidence, Pfade
+- Quelle: PDF Content-Stream (`Do` Operator).
+- Resource-XObjects werden nicht blind uebernommen.
+- Render-Transformation aus PDF-Matrix wird beruecksichtigt.
+- Vektorbasierte Ausschnitte koennen als Bildkandidaten extrahiert werden.
 
-2. `document_amount_lines`
-- Summen-/Rabatt-/USt-Zeilen
+### Bildzuordnung
 
-3. `line_items`
-- Positionen inkl. Mengen, Preisen, Seite, Confidence, Metadaten
+Felder pro Position:
 
-4. `document_images`
-- Bilder inkl. Seite, Index, Pfad, Hash, Groesse
+- `image_ids`: finale Bildzuordnung.
+- `image_ids_primary`: primaeres Bild.
+- `image_candidate_ids`: Kandidaten.
+- `image_ids_page_all`: alle Bilder derselben Seite.
+- `image_assignment_source`: Quelle der Entscheidung.
+- `image_assignment_reason`: Grund der Entscheidung.
 
-## UI / QA-Workbench
-Die UI unter `/ui` bietet:
-- Dokumentauswahl und Re-Processing
-- PDF-Viewer links, strukturierte Extraction rechts
-- Positionen mit Bildkandidaten
-- Bild-Thumbnails inkl. Metadaten
-- JSON/CSV Preview im Modal (Copy/Download)
-- Separate JSON/CSV Downloads
+Aktuelle Grenze:
+
+- Bildzuordnung ist heuristisch.
+- Fachliche Bildpflicht je Provider/Positionstyp muss noch schaerfer konfigurierbar werden.
+
+## UI
+
+Die UI ist aktuell eine Single-File-App unter `api/ui/index.html`.
+
+Vorhanden:
+
+- Upload.
+- Dokumentliste.
+- Processing.
+- PDF-Viewer.
+- Cockpit.
+- Review.
+- Positionen.
+- Bilder.
+- Preview/Download.
+- LLM-Historie.
+- Freigabe.
+
+Fuer Production geplant:
+
+- Review-Queue als Hauptscreen.
+- Batch-Upload und Batch-Processing.
+- VenDoc-Exportstatus.
+- Feldkorrekturen.
+- Rollen und Berechtigungen.
+
+## VenDoc-Zielarchitektur
+
+Interne App:
+
+- Postgres bleibt fuehrend fuer Verarbeitung, Review, Freigabe und Audit.
+
+Externe Ziel-DB:
+
+- Microsoft SQL Server.
+- Datenbank `SRTemp`.
+- Tabellen:
+  - `dbo.vendoc_import_headers`
+  - `dbo.vendoc_import_positions`
+
+Regel:
+
+- VenDoc-Writer ist ein Zusatzmodul, kein Ersatz fuer Postgres.
+- Live-Write nur nach Freigabe.
+- Jeder Write wird in Postgres protokolliert.
 
 ## Bekannte Grenzen
-1. Bildzuordnung ist heuristisch, noch nicht objektgenau (Bounding-Box fehlt).
-2. Parser ist template-spezifisch und muss fuer neue Layouts erweitert werden.
-3. Validierungsflags (Pflichtfelder, Summenkonsistenz je Regelset) sind noch als eigener Arbeitsschritt offen.
+
+1. VenDoc-MSSQL-Writer fehlt noch.
+2. Authentifizierung fehlt noch.
+3. Processing ist noch nicht als persistenter Job umgesetzt.
+4. Feldkorrekturen in der UI fehlen noch.
+5. Neue Angebotsdokumente muessen kontrolliert in Kandidaten und Regression einsortiert werden.

@@ -6,7 +6,7 @@ from template_headers import first_match
 
 AMOUNT_PATTERN = r"[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
 POSITION_ROW_RE = re.compile(
-    rf"(?m)^\s*(?P<position>(?:[0-9]{{3}}(?:\.[0-9]+)?|[Zz][0-9]{{2}}))\s+"
+    rf"(?m)^\s*(?P<position>(?:[0-9]{{3}}(?:\.[0-9]+)?|[A-Za-z]{{1,3}}[0-9]{{2}}(?:\.[0-9]+)?))\s+"
     rf"(?P<qty>[0-9]+,[0-9]{{2}})\s+(?P<unit>Stk\.)\s+"
     rf"(?P<description>.+?)\s+"
     rf"(?P<unit_price>{AMOUNT_PATTERN})\s+"
@@ -34,7 +34,9 @@ MONTHS = {
 
 
 def detect(normalized_lower: str) -> bool:
-    return "angebot nr." in normalized_lower and "muigg.at" in normalized_lower
+    if "muigg.at" not in normalized_lower:
+        return False
+    return "angebot nr." in normalized_lower or "auftragsbestätigung" in normalized_lower
 
 
 def count_positions(text: str) -> int:
@@ -89,7 +91,14 @@ def _extract_lv_pos(block_text: str) -> str | None:
 
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
     document_number = headers.get("document_number") or _normalize_document_number(
-        first_match([r"ANGEBOT\s+Nr\.\s*([0-9 .]+)"], normalized_text, flags=re.IGNORECASE)
+        first_match(
+            [
+                r"ANGEBOT\s+Nr\.\s*([0-9 .]+)",
+                r"AUFTRAGSBESTÄTIGUNG\s+([0-9 .]+)",
+            ],
+            normalized_text,
+            flags=re.IGNORECASE,
+        )
     )
     document_date = headers.get("document_date") or _normalize_date(
         first_match(

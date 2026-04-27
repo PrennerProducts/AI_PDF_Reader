@@ -1,6 +1,6 @@
 # Regression Set
 
-Stand: 2026-04-01
+Stand: 2026-04-27
 
 ## Canonical Offer Regression PDFs
 
@@ -71,6 +71,14 @@ Stand: 2026-04-01
 ### Schachermayer
 - `samples/pdfs/candidates/offers/schachermayer/SCH Offert 225009480.PDF`
 
+### Schuchter
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260079.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260151.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260343.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260344.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260396.pdf`
+
 ### Schlotterer
 - `samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf`
 - `samples/pdfs/candidates/offers/schlotterer/Angebot_schlotterer3.pdf`
@@ -78,6 +86,8 @@ Stand: 2026-04-01
 ## Non-Offer Material
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/`
 - `samples/pdfs/non_offer/grafik_technik/`
+- Neue Muigg-ABs: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/muigg/`
+- Neue technische SR-Schauraum-Detailansichten: `samples/pdfs/non_offer/grafik_technik/sr_schauraum/`
 
 ## Duplicates
 - `samples/pdfs/duplicates/hashed_imports/`

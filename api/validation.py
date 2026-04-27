@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,15 @@ def _to_decimal(value: Any) -> Decimal | None:
     try:
         return Decimal(cleaned)
     except (InvalidOperation, ValueError):
+        return None
+
+
+def _to_int(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
         return None
 
 
@@ -133,17 +143,26 @@ def _provider_key(document: dict[str, Any]) -> str:
 def _is_informational_item(provider_key: str, item: dict[str, Any]) -> bool:
     description = _normalized_text(item.get("description_short"))
     lv_pos = _normalized_text(item.get("lv_pos"))
+    position_no = _normalized_text(item.get("position_no"))
     unit_price = _to_decimal(item.get("unit_price"))
     line_total = _to_decimal(item.get("line_total"))
 
     if provider_key == "alu_one":
-        return description == "vorbemerkungen"
+        return (
+            description == "vorbemerkungen"
+            or description.startswith("info ")
+            or (line_total == Decimal("0") and bool(re.fullmatch(r"\d{2}\.\d{2}\.\d{2}", description)))
+        )
     if provider_key == "entholzer":
         return lv_pos == "system" and unit_price is None and line_total is None
     if provider_key == "newo":
         return description.startswith("diese position")
     if provider_key == "rekord_vomp":
         return lv_pos == "umfang" or "summe-umfang" in description or "summe-rahmen" in description
+    if provider_key == "schlotterer":
+        return description == "auftragsinfo"
+    if provider_key == "schuchter":
+        return bool(re.fullmatch(r"\d+[a-z]", position_no)) and unit_price is None and line_total is None
     return False
 
 
@@ -176,7 +195,7 @@ def _component_check_mode(provider_key: str, amount_lines: list[dict[str, Any]])
         if line_type not in {"discount", "surcharge"} and any(term in label_raw for term in COMPLEX_PRICING_TERMS):
             embedded_complexity = True
 
-    if provider_key in {"entholzer", "rekord_vomp", "rieder"}:
+    if provider_key in {"entholzer", "rekord_vomp", "rieder", "schlotterer"}:
         return "heuristic", "provider_complex_pricing"
     if discount_count > 0 or surcharge_count > 0 or subtotal_count > 1 or embedded_complexity:
         return "heuristic", "complex_pricing_breakdown"
@@ -230,6 +249,12 @@ def _item_status_from_issue_sets(
     return status
 
 
+def _allows_shared_image_assignment(item: dict[str, Any]) -> bool:
+    reason = _normalized_text(item.get("image_assignment_reason"))
+    source = _normalized_text(item.get("image_assignment_source"))
+    return reason == "shared_image_no_viable_alternative" or source.endswith("_shared")
+
+
 def build_document_validation(
     *,
     document: dict[str, Any],
@@ -241,6 +266,7 @@ def build_document_validation(
     required_fields, recommended_fields = _build_required_field_summary(document)
     provider_key = _provider_key(document)
     document_type = _normalized_text(document.get("document_type"))
+    component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
 
     if document_type not in {"angebot", "auftragsbestaetigung"}:
         document_issues.append(
@@ -459,7 +485,13 @@ def build_document_validation(
                     )
                 )
 
-        if quantity is not None and unit_price is not None and line_total is not None and not is_informational_item:
+        if (
+            component_check_mode == "strict"
+            and quantity is not None
+            and unit_price is not None
+            and line_total is not None
+            and not is_informational_item
+        ):
             expected_line_total = (quantity * unit_price).quantize(SUM_TOLERANCE)
             if abs(line_total - expected_line_total) > SUM_TOLERANCE:
                 issues.append(
@@ -496,9 +528,22 @@ def build_document_validation(
             if position_no not in image_to_positions[image_id]:
                 image_to_positions[image_id].append(position_no)
 
-    duplicate_image_assignments = {
-        image_id: position_nos for image_id, position_nos in image_to_positions.items() if len(position_nos) > 1
-    }
+    duplicate_image_assignments: dict[int, list[str]] = {}
+    for image_id, position_nos in image_to_positions.items():
+        if len(position_nos) <= 1:
+            continue
+        duplicate_items = [
+            item
+            for item in line_items
+            if image_id in [
+                parsed
+                for parsed in (_to_int(value) for value in (item.get("image_ids") or []))
+                if parsed is not None
+            ]
+        ]
+        if any(_allows_shared_image_assignment(item) for item in duplicate_items):
+            continue
+        duplicate_image_assignments[image_id] = position_nos
     if duplicate_image_assignments:
         duplicate_summary = ", ".join(
             f"#{image_id} -> Pos. {', '.join(position_nos[:3])}{' +' + str(len(position_nos) - 3) if len(position_nos) > 3 else ''}"
@@ -614,7 +659,6 @@ def build_document_validation(
         elif line_type == "surcharge":
             surcharge_sum += amount
 
-    component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
     computed_net_from_components = (component_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
     totals_summary["non_alternative_line_item_sum"] = non_alternative_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["component_included_line_item_sum"] = component_item_sum.quantize(SUM_TOLERANCE)

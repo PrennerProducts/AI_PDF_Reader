@@ -8,22 +8,26 @@ Provider key: `schuchter`
 - `samples/pdfs/candidates/offers/schuchter/`
 
 ## Known corpus today
-- No offer PDFs yet
+- Offer candidates:
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260079.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260151.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260343.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260344.pdf`
+- `samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260396.pdf`
 - Existing non-offer references:
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/26020.pdf`
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/26021.pdf`
 - `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/26028.pdf`
 
 ## Next steps
-1. Put 1 to 3 canonical offer PDFs into `samples/pdfs/regression/offers/schuchter/`.
-2. Put extra variants into `samples/pdfs/candidates/offers/schuchter/`.
-3. Replace the placeholder detector and parsing logic in `api/template_schuchter.py`.
-4. Add exact expectations for the new provider to `tests/test_offer_corpus_smoke.py`.
-5. Add a stronger canonical regression to `tests/test_template_regression.py`.
-6. Update `samples/OFFER_PROVIDER_MATRIX.md` after the provider is green.
+1. Pick 1 to 3 canonical Schuchter PDFs and promote them to `samples/pdfs/regression/offers/schuchter/` once the regression set is intentionally expanded.
+2. Add a stronger canonical regression to `tests/test_template_regression.py` when a representative PDF is promoted.
+3. Keep future Schuchter variants in `samples/pdfs/candidates/offers/schuchter/` until they add real layout coverage.
+4. Run the corpus tests after each new Schuchter PDF.
 
 ## Verification
 ```bash
-python -m pytest tests/test_template_regression.py tests/test_offer_corpus_smoke.py -q
+python -m pytest tests/test_template_regression.py tests/test_offer_corpus_smoke.py tests/test_non_offer_corpus_smoke.py -q
 ./infra/api-canary.sh
 ```

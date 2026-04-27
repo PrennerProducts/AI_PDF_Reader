@@ -1,126 +1,170 @@
 # Projektstatus
 
-## Zuletzt aktualisiert
-2026-02-26
+Stand: 2026-04-27
 
-## Erledigt
-1. Docker-Compose Basis fuer API, Ollama und Postgres steht.
-2. API-Stub mit Health-Endpunkt laeuft.
-3. Feature- und Abnahme-Notizen sind angelegt.
-4. 3 echte Kunden-PDFs wurden ins Repo uebernommen (`samples/pdfs/`).
-5. Textdumps fuer Parser-Tests sind erzeugt (`samples/text/`).
-6. Erste Analyse fuer ERP-relevante Felder ist dokumentiert (`features/PROJ-4-sample-pdf-analysis-v1.md`).
-7. Docker-Smoke-Test erfolgreich:
-- `docker compose up -d` startet `api`, `ollama`, `db`
-- API Healthcheck `GET /health` liefert `200`
-- Ollama `GET /api/tags` erreichbar
-- Postgres antwortet auf Testquery (`select 1`)
-8. AP1 Infra-Bereinigung:
-- Port/Doku konsistent auf Host-Port `11435`
-- GPU-Passthrough im Compose aktiviert
-- GPU im Ollama-Container verifiziert (`/dev/nvidia*` vorhanden)
-9. Parser-Start umgesetzt:
-- Neues Modul `api/parser.py` (Template-Erkennung + Basisfeld-Extraktion)
-- Neuer Dev-Endpunkt `POST /dev/parse-text` in `api/main.py`
-- Smoke-Test gegen 3 Sample-Textdumps erfolgreich (Rieder/Entholzer/NeWo erkannt)
-10. Ollama betriebsbereit mit Modell:
-- `qwen2.5:7b-instruct` erfolgreich gepullt
-- `/api/tags` listet das Modell
-- Test-Generate erfolgreich (`response: OK`)
-11. Upload + DB-Migrationen umgesetzt:
-- Neues DB-Layer-Modul `api/db.py`
-- Migrationen `api/migrations/001..005` fuer `documents`, `document_amount_lines`, `line_items`, `document_images`, Indizes
-- Auto-Migration beim API-Startup
-- Neuer Endpoint `POST /upload` mit Dateispeicherung nach `/data/uploads` und Insert in `documents`
-- Neuer Endpoint `GET /documents`
-- End-to-End-Test erfolgreich mit Sample-PDF (Dokument in DB + Datei im Upload-Volume)
-12. Processing v1 umgesetzt:
-- Neuer Endpoint `POST /process/{document_id}`
-- PDF-Text-Extraktion via `pypdf` (`api/extractor.py`)
-- Textdump nach `/data/logs/extracted_text/document_<id>.txt`
-- Parser-Ergebnis wird in `documents` gespeichert (Lieferant, Nummer, Datum, Projekt, Summen, Confidence, Status)
-- Erfolgreich mit Dokument 1 (Rieder), 2 (NeWo) und 3 (Entholzer) getestet
-13. Ergebnisabruf umgesetzt:
-- Neuer Endpoint `GET /result/{document_id}`
-- Persistenz/Readout fuer `line_items`, `document_amount_lines`, `document_images`
-14. Template-Parser erweitert:
-- `structured_parser.py` mit supplier-spezifischen Heuristiken fuer Rieder, NeWo und Entholzer
-- Robustere Summenzeilen-Erkennung inkl. Fallback fuer Netto/USt/Brutto
-15. Export v1 umgesetzt:
-- Neuer Endpoint `GET /export/{document_id}?format=json|csv|sql`
-- Exporte werden nach `/data/exports` geschrieben und als Response ausgegeben
-- SQL-Export erzeugt ERP-nahe Inserts fuer `documents`, `document_amount_lines`, `line_items`, `document_images`
-16. Bildextraktion + Base64-Export:
-- Beim Processing werden eingebettete PDF-Bilder extrahiert und in `document_images` gespeichert
-- Bilddateien liegen unter `/data/logs/extracted_images/document_<id>/`
-- JSON-Export kann Bilder als Base64 enthalten (`include_images_base64=true`)
-17. Seiten-Mapping fuer Positionen:
-- `line_items.page_ref` wird beim Parsing pro Position gefuellt
-- Ergebnis liefert je Position `image_ids` und `image_count` (Bilder derselben Seite)
-- CSV-Export enthaelt `page_ref`, `image_count`, `image_ids`
-18. Web-Workbench fuer Abnahme/QA:
-- Neuer UI-Endpunkt `GET /ui`
-- Side-by-side Ansicht fuer PDF, Headerfelder, Betragszeilen, Positionen und Bilder
-- Modal-Preview fuer JSON/CSV direkt in der UI (ohne neuen Browser-Tab)
-- Direkte Streams fuer Originaldatei und Bilder:
-  - `GET /document/{document_id}/file`
-  - `GET /document/{document_id}/image/{image_id}`
-- Neuer API-Preview-Endpunkt:
-  - `GET /preview/{document_id}?format=json|csv`
-19. Bildzuordnung v2 (Heuristik):
-- `line_items.image_ids`/`image_count` zeigen jetzt primaer gemappte Bilder pro Position (statt alle Seitenbilder)
-- Deko-Bilder werden heuristisch gefiltert (Duplikat-Hash, sehr klein in Flaeche/Bytes)
-- Transparenz bleibt erhalten via `image_ids_page_all` und `image_count_page_all`
-- Recall-first Mapping: pro Position werden mehrere Kandidaten geliefert (`current page` + Nachbarseiten), inkl. `image_ids_primary`
-20. Bildextraktion v2 (Rotation + echte Placements):
-- Bilder werden nur noch ueber tatsaechliche `Do`-Placements aus dem Content-Stream extrahiert (nicht mehr alle Resource-XObjects je Seite)
-- Render-Transformation aus PDF-Matrix wird angewendet (u. a. vertikaler Flip bei negativem `d`)
-- Ergebnis: deutlich weniger falsch zugeordnete Bilder und korrigierte Ausrichtung in der Vorschau
-21. Doku-Refresh (Ist-Stand):
-- `docs/HOW_IT_WORKS.md` auf realen Implementierungsstand gebracht
-- `docs/PLAN.md` auf naechste Arbeitspakete ab aktuellem Stand umgestellt
-- `docs/API.md` als kompakte API/Feld-Referenz neu angelegt
-22. LLM-Integration (Ollama) in Processing:
-- Neuer Modulpfad `api/llm.py` fuer JSON-basierte Feldextraktion via Ollama
-- `POST /process/{document_id}` hat jetzt `use_llm` und `llm_override`
-- Parser-first Merge: LLM fuellt standardmaessig nur fehlende Felder, Override optional
-- LLM-Lauf wird je Dokument als Dump gespeichert (`/data/logs/llm/document_<id>.json`)
-23. LLM-Processing v2 (Modi + Run-Transparenz):
-- `POST /process/{document_id}` mit `process_mode` (`parser_only`, `hybrid_fill`, `llm_override`, `llm_only`)
-- Backward-Compatibility fuer alte Query-Parameter bleibt erhalten
-- Pro Lauf eigener Dump (`document_<id>_<run_id>.json`) + latest Alias
-- Neue API fuer LLM-Runs:
-  - `GET /llm-runs/{document_id}`
-  - `GET /llm-runs/{document_id}/latest`
-  - `GET /llm-runs/{document_id}/run/{run_id}`
-- UI erweitert:
-  - Modus-Selector statt LLM-Toggles
-  - LLM-Run Tabelle mit `old/new/applied`
-  - Buttons fuer `LLM Run JSON` und `LLM History`
-24. Parser-vs-LLM Vergleich:
-- Neuer Endpoint `GET /compare/{document_id}` (separater Parser-/LLM-Lauf, kein DB-Write)
-- Feldvergleich inkl. `same/different/missing` Summary
-- UI-Button `Parser vs LLM` mit JSON-Preview des Vergleichs
-25. Bild-Matching PoC (VLM):
-- Neuer Endpoint `POST /match-images/{document_id}` mit Strategien `heuristic|vlm|hybrid`
-- Heuristik-Ranking bleibt als Fallback erhalten
-- Vision-LLM nutzt Ollama Multimodal (`VLM_ENABLED`, `OLLAMA_VLM_MODEL`)
+## Kurzfazit
 
-## Teilweise erledigt
-1. Parser:
-- Aktuell Skeleton/Regex-Basis; template-spezifische Positions- und Summenparser sind noch auszubauen.
+Die App ist ein fortgeschrittener PoC mit funktionaler Verarbeitung, Validierung, UI-Review und Exporten. Fuer Produktionsreife fehlt vor allem der echte VenDoc-MSSQL-Schreibpfad, ein Export-Journal, Zugriffsschutz und robuste Job-Verarbeitung. Der Live-Canary ist aktuell wieder gruen.
 
-## Offen
-1. Validierungsregeln im Code
-2. Tests/Regression auf Sample-PDFs
-3. Praeziseres Objekt-Mapping Position <-> Bild (derzeit seitenbasiert)
+## Aktuell umgesetzt
 
-## Risiken
-1. Unterschiedliche Dokumentlayouts je Lieferant (template-spezifische Parser noetig)
-2. Summen-/Rabattlogik pro Vorlage unterschiedlich
-3. Unklare ERP-Feldregeln koennen Rework verursachen
+### Infrastruktur
 
-## Naechste 3 Schritte
-1. Validierungsflags (Summenkonsistenz, Pflichtfelder, Alternativpositionen) im Result mitgeben.
-2. Testsuite fuer die 3 Sample-PDFs aufbauen (Parser + Export + Bildzuordnung).
-3. Export-Mapping mit Kunde gegen ERP-Zieltabellen finalisieren (Pflichtfelder, Alternativpositionen, 0,00-Positionen).
+- Docker Compose fuer API, Postgres und Ollama.
+- CPU-only Compose-Datei fuer Server ohne NVIDIA-GPU.
+- Persistente Volumes fuer Postgres, Uploads, Exporte und Logs.
+- Auto-Migrationen fuer Postgres beim API-Start.
+- Live-Canary-Skript `./infra/api-canary.sh`.
+
+### API und Workflow
+
+- Upload: `POST /upload`.
+- Dokumentliste: `GET /documents`.
+- Verarbeitung: `POST /process/{document_id}`.
+- Fortschritt: `GET /progress/{document_id}`.
+- Ergebnis: `GET /result/{document_id}`.
+- Reset: `POST /reset/{document_id}`.
+- Vorschau und Export: `GET /preview`, `GET /export`.
+- Original-PDF- und Bildstreaming.
+- LLM-Run-Historie und Parser-vs-LLM-Vergleich.
+- Bild-Matching per Heuristik/VLM.
+- Manuelle Bildzuordnung.
+- Manuelle Positionspruefung.
+- Dokumentfreigabe.
+
+### Parser und Korpus
+
+Aktuelle Anbieter-Templates:
+
+- `alu_one`
+- `entholzer`
+- `koch`
+- `muigg`
+- `newo`
+- `rekord_vomp`
+- `rieder`
+- `schachermayer`
+- `schlotterer`
+- `schuchter`
+- `sr_schauraum`
+
+Sample-Doku meldet:
+
+- 39 gruene Angebots-PDFs.
+- 18 PDFs im Regression-Satz.
+- 21 zusaetzliche gruene Kandidaten.
+- Auftragsbestaetigungen separat unter `samples/pdfs/non_offer/`.
+- Neu einsortiert: 6 Schuchter-Angebote, 4 Muigg-Auftragsbestaetigungen und 4 technische SR-Schauraum-Detailansichten.
+
+### Validierung und Review
+
+Umgesetzt:
+
+- Pflichtfelder auf Dokumentebene.
+- Empfohlene Felder.
+- Netto + USt = Brutto.
+- Positionssummen und Komponentencheck.
+- Provider-Sonderregeln fuer komplexe Preislogiken.
+- Warnungen/Fehler pro Position.
+- Bildzuordnungswarnungen.
+- Manuelles Markieren von Warnungen als geprueft.
+- Dokumentfreigabe nur bei `auto_accept` oder `manual_checked`.
+
+### UI
+
+Die UI unter `/ui` bietet:
+
+- Dokumentauswahl und Upload.
+- PDF-Vorschau.
+- Processing-Modus-Auswahl.
+- Cockpit mit Validierung.
+- Review-Tab mit Freigabe.
+- Positionsliste mit Details.
+- Bildaudit und manuelle Bildzuordnung.
+- JSON/CSV Preview.
+- LLM-Run-Historie.
+- Parser-vs-LLM-Vergleich.
+
+## Aktuelle Verifikation
+
+Lokal ausgefuehrt:
+
+```bash
+python -m pytest tests/test_template_regression.py tests/test_offer_corpus_smoke.py tests/test_offer_validation_smoke.py tests/test_non_offer_corpus_smoke.py tests/test_provider_offer_provisional.py tests/test_validation_provider_rules.py tests/test_exporter_approval.py tests/test_image_assignment_rebalance.py tests/test_image_preview_helpers.py -q
+```
+
+Ergebnis:
+
+```text
+130 passed
+```
+
+Zusaetzlich abgesichert:
+
+- Alle 39 Angebots-PDFs laufen ohne Bildpflicht bei Betrags-/Summenvalidierung auf `auto_accept`.
+- Bekannte Rabatt-, Info- und Gruppenpositionen werden nicht mehr als harte Betragsfehler gewertet.
+- Bildfallback fuer gleiche Seite ist abgesichert: Wenn fokussierte Kandidaten keine brauchbare gleiche-Seite-Option enthalten, wird `image_ids_page_all` in die Bewertung aufgenommen.
+
+Nicht vollstaendig lokal ausfuehrbar:
+
+- `python -m pytest tests -q` bricht auf dem Host ab, weil `fastapi` in der lokalen Python-Umgebung fehlt.
+- Im API-Container sind die Runtime-Abhaengigkeiten vorhanden; dort kompiliert `main.py`, `image_assignment.py`, `validation.py` und `db.py`.
+- Der API-Container enthaelt aktuell kein `pytest`, daher wurde die neue Bildfallback-Regel zusaetzlich per direktem Runtime-Check geprueft.
+
+Live-Canary:
+
+- Stack laeuft und `GET /health` ist ok.
+- `./infra/api-canary.sh` verarbeitet alle 6 Provider-Testdokumente.
+- Ergebnis am 2026-04-27: `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp` liefern `validation=auto_accept`.
+
+## VenDoc/MSSQL Stand
+
+Dragan hat bestaetigt:
+
+- Datenbank: `SRTemp`
+- Tabellen:
+  - `dbo.vendoc_import_headers`
+  - `dbo.vendoc_import_positions`
+- SQL-Zugriff wird durch CIBEX eingerichtet.
+- Zugriffsdaten fehlen aktuell noch.
+- Ein Datensatz mit Bildern soll vorbereitet werden.
+- Einige Spalten sind laut Dragan anders oder noch nicht final; Detailabstimmung folgt nach Zugriff.
+
+Im Code noch nicht umgesetzt:
+
+- MSSQL-Verbindung.
+- VenDoc-Mapping.
+- Export-Journal.
+- VenDoc-Dry-Run.
+- VenDoc-Live-Write.
+- UI-Anzeige fuer VenDoc-Exportstatus.
+
+## Wichtige offene Punkte
+
+P0:
+
+- VenDoc-MSSQL-Dry-Run und Live-Write.
+- Export-Journal und stabile externe UUIDs.
+- Freigabe-Gate fuer VenDoc-Export.
+- Re-Import-/Dublettenregel.
+
+P1:
+
+- Authentifizierung und Rollen.
+- Processing als persistente Background Jobs.
+- Feldkorrekturen in der UI.
+- Betriebs-Readiness: Healthchecks, Backups, Logs, TLS, Secrets.
+
+P2:
+
+- Review-Queue und Batch-Workflow.
+- Neue Angebotsdokumente in Korpus und Parser einarbeiten.
+- Bildworkflow fachlich schaerfen.
+
+## Naechste 5 Schritte
+
+1. VenDoc-Dry-Run-Mapping ohne DB-Zugriff implementieren.
+2. `vendoc_export_jobs` Migration und Exportstatus bauen.
+3. UI um VenDoc-Preview/Exportstatus erweitern.
+4. Nach CIBEX-Zugang echten MSSQL-Write aktivieren.
+5. Neue Angebots-PDFs aufnehmen und Parser/Regression erweitern.

@@ -1,6 +1,10 @@
-# KI-PDF-Reader On-Prem PoC
+# KI-PDF-Reader On-Prem
 
-## Quickstart (Infra v1)
+Stand: 2026-04-27
+
+On-Prem-App fuer Angebots-PDFs: Upload, Parser, Bildextraktion, Validierung, Review/Freigabe und Export. Ziel fuer den Produktivbetrieb ist ein direkter VenDoc-Import in eine externe MSSQL-Datenbank `SRTemp`.
+
+## Quickstart
 
 ```bash
 cd infra
@@ -8,9 +12,22 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-## Ubuntu Server ohne NVIDIA-GPU
+Pruefen:
 
-Für CPU-only Server:
+```bash
+curl http://localhost:8000/health
+./infra/api-canary.sh
+```
+
+UI:
+
+```text
+http://localhost:8000/ui
+```
+
+## CPU-only Server
+
+Fuer Ubuntu-Server ohne NVIDIA-GPU:
 
 ```bash
 cd infra
@@ -18,113 +35,137 @@ cp .env.cpu.example .env
 docker compose -f docker-compose.cpu.yml up -d --build
 ```
 
-Empfohlener Startmodus auf dem Server:
+Empfohlener Startmodus:
+
 - `LLM_ENABLED=false`
 - `VLM_ENABLED=false`
-- zuerst `parser_only` live prüfen
+- zuerst `parser_only` live pruefen
 
-Danach prüfen:
-
-```bash
-curl http://localhost:8000/health
-./infra/api-canary.sh
-```
-
-## One-Terminal Live Mode
+## Live Mode
 
 ```bash
 ./infra/dev-watch.sh
 ```
 
-Starts/recreates the stack, runs quick health checks, then streams all container logs in one terminal.
+Startet/recreated den Stack, prueft Healthchecks und streamt Container-Logs.
 
-## Live API Canary
+## API Canary
 
 ```bash
 ./infra/api-canary.sh
 ```
 
-Runs a fixed provider canary set against the live API stack and fails fast if supplier, document number, date, position count, or validation status drift.
+Verarbeitet einen festen Provider-Satz gegen die laufende API und prueft Lieferant, Belegnummer, Datum, Positionenzahl und Validierungsstatus.
 
-## New Provider Scaffold
+Aktueller Hinweis:
+
+- Die API laeuft.
+- Der Canary verarbeitet alle Dokumente.
+- Stand 2026-04-27: alle 6 Canary-Provider liefern `validation=auto_accept`.
+
+## Aktueller Funktionsumfang
+
+- PDF Upload.
+- Parser fuer mehrere Angebotsanbieter.
+- Auftragsbestaetigungen als Non-Offer-Korpus.
+- PDF-Text- und Bildextraktion.
+- Heuristische Bildzuordnung.
+- Optional LLM/VLM ueber Ollama.
+- Validierung von Pflichtfeldern, Summen, Positionen und Bildern.
+- UI-Workbench mit Review, Freigabe und manueller Bildzuordnung.
+- JSON/CSV Export.
+- SQL Export fuer das interne App-Schema.
+
+Noch nicht umgesetzt:
+
+- Echter VenDoc-MSSQL-Writer.
+- Export-Journal fuer VenDoc.
+- Auth/Rollen.
+- Persistente Background Jobs.
+- Feldkorrekturen in der UI.
+
+## VenDoc-Ziel
+
+Dragan hat in der MSSQL-Importdatenbank vorbereitet:
+
+- Datenbank: `SRTemp`
+- Tabellen:
+  - `dbo.vendoc_import_headers`
+  - `dbo.vendoc_import_positions`
+
+Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin wird der VenDoc-Export zuerst als Dry-Run-Mapping vorbereitet.
+
+## Wichtige API-Endpunkte
+
+- `GET /health`
+- `GET /ui`
+- `POST /upload`
+- `GET /documents?limit=20`
+- `POST /process/{document_id}?process_mode=parser_only|hybrid_fill|llm_override|llm_only`
+- `GET /progress/{document_id}`
+- `GET /result/{document_id}`
+- `POST /documents/{document_id}/line-items/{line_item_id}/assign-image`
+- `DELETE /documents/{document_id}/line-items/{line_item_id}/assign-image`
+- `POST /documents/{document_id}/line-items/{line_item_id}/review-check`
+- `DELETE /documents/{document_id}/line-items/{line_item_id}/review-check`
+- `POST /documents/{document_id}/approval`
+- `DELETE /documents/{document_id}/approval`
+- `GET /preview/{document_id}?format=json|csv`
+- `GET /export/{document_id}?format=json|csv|sql&include_images_base64=true|false`
+- `POST /match-images/{document_id}?strategy=heuristic|vlm|hybrid`
+- `GET /compare/{document_id}`
+- `GET /llm-runs/{document_id}`
+- `POST /dev/parse-text`
+
+Geplant:
+
+- `POST /vendoc/export/{document_id}?dry_run=true|false`
+- `GET /vendoc/export-jobs/{document_id}`
+- `GET /vendoc/health`
+
+## Neue Provider oder neue PDFs
+
+Provider-Scaffold:
 
 ```bash
 ./infra/new-provider.sh muster_anbieter "Muster Anbieter GmbH"
 ```
 
-Creates the template module, sample folders, onboarding note, and registry entry for a new provider.
+Neue Angebots-PDFs zuerst nach:
 
-## Verify
-
-```bash
-curl http://localhost:8000/health
-curl http://localhost:11435/api/tags
+```text
+samples/pdfs/candidates/offers/<anbieter>/
 ```
 
-## GPU Check (Host)
+Danach Tests und Provider-Matrix aktualisieren.
+
+## Tests
+
+Wichtige Checks:
 
 ```bash
-nvidia-smi
+python -m pytest tests/test_template_regression.py -q
+python -m pytest tests/test_offer_corpus_smoke.py -q
+python -m pytest tests/test_non_offer_corpus_smoke.py -q
+python -m pytest tests/test_validation_provider_rules.py -q
+python -m pytest tests/test_exporter_approval.py -q
+./infra/api-canary.sh
 ```
 
-## Pull model
+## Dokumentation
 
-```bash
-docker exec -it pdr-ollama ollama pull qwen2.5:7b-instruct
-```
-
-## Current focus
-1. Validierungsflags im Result (Pflichtfelder, Summenkonsistenz, Auffaelligkeiten)
-2. Regressionstests fuer die 3 Sample-PDFs (Parser, Export, Bildmapping)
-3. ERP-Zielmapping finalisieren (Pflichtfelder, Alternativpositionen, 0,00-Positionen)
-
-## API (current)
-- `GET /health`
-- `GET /ui` (Web-Workbench fuer PDF + Extraction Vergleich)
-- `POST /upload` (multipart form-data, field `file`)
-- `POST /process/{document_id}?process_mode=parser_only|hybrid_fill|llm_override|llm_only`
-- `GET /compare/{document_id}` (Parser vs LLM Feldvergleich)
-- `POST /match-images/{document_id}?strategy=heuristic|vlm|hybrid`
-- `GET /llm-runs/{document_id}?limit=20`
-- `GET /llm-runs/{document_id}/latest`
-- `GET /llm-runs/{document_id}/run/{run_id}`
-- `GET /documents?limit=20`
-- `GET /result/{document_id}`
-- `GET /preview/{document_id}?format=json|csv` (Preview ohne Export-Datei)
-- `GET /document/{document_id}/file` (inline PDF stream)
-- `GET /document/{document_id}/image/{image_id}` (inline image stream)
-- `GET /export/{document_id}?format=json|csv|sql&include_images_base64=true|false`
-- `POST /dev/parse-text`
-
-## DB migrations
-- SQL migrations are located in `api/migrations/`.
-- Migrations are applied automatically on API startup.
-- Applied versions are tracked in table `schema_migrations`.
-
-## LLM settings
-- `LLM_ENABLED=true|false`
-- `LLM_TIMEOUT_SECONDS=120`
-- `LLM_MAX_TEXT_CHARS=8000`
-- `OLLAMA_BASE_URL` and `OLLAMA_MODEL` are used for Ollama inference.
-- `VLM_ENABLED=true|false` (Bild-Matching mit Vision-LLM)
-- `OLLAMA_VLM_MODEL` (z. B. `qwen2.5vl:7b`)
-- `VLM_TIMEOUT_SECONDS=90`
-
-## Processing modes
-- `parser_only`: nur parser/extractor
-- `hybrid_fill`: parser-first, LLM fuellt nur fehlende Felder
-- `llm_override`: parser + LLM, LLM darf Felder ueberschreiben
-- `llm_only`: nur LLM fuer Kopffelder/Summen (Positionen/Bilder bleiben parserbasiert)
-
-## Documentation
 - `docs/README.md`
 - `docs/PLAN.md`
 - `docs/STATUS.md`
+- `docs/PRODUCTION_READINESS.md`
+- `docs/TASKS.md`
 - `docs/HOW_IT_WORKS.md`
 - `docs/API.md`
+- `docs/VENDOC_MSSQL_ACCESS_NOTES.md`
 - `docs/PROVIDER_ONBOARDING.md`
 
-## Data dirs
+## Datenverzeichnisse
+
 - `data/uploads`
 - `data/exports`
 - `data/logs`

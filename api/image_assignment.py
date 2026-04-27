@@ -323,12 +323,13 @@ def rebalance_unique_primary_image_assignments(
                     minimum_score=minimum_score,
                 )
                 if alt_image_id is None:
-                    if _selected_primary_image_id(match_item) is not None:
-                        changed = True
-                    match_item["selected_image_ids"] = []
-                    match_item["selected_primary_image_id"] = None
-                    match_item["selection_source"] = "unmatched"
-                    match_item["selection_reason"] = "unique_image_resolution_no_viable_alternative"
+                    match_item["selected_image_ids"] = [image_id]
+                    match_item["selected_primary_image_id"] = image_id
+                    previous_source = str(match_item.get("selection_source") or "").strip()
+                    match_item["selection_source"] = (
+                        f"{previous_source}_shared" if previous_source else "shared_image"
+                    )
+                    match_item["selection_reason"] = "shared_image_no_viable_alternative"
                     continue
 
                 if _selected_primary_image_id(match_item) != alt_image_id:

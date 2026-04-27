@@ -1,123 +1,279 @@
-# API Referenz (Ist-Stand)
+# API Referenz
+
+Stand: 2026-04-27
 
 ## Basis
+
 - API: `http://localhost:8000`
-- Swagger/OpenAPI: `GET /openapi.json` (via FastAPI)
+- UI: `GET /ui`
+- OpenAPI JSON: `GET /openapi.json`
 
-## Endpunkte
-1. `GET /health`
-- Healthcheck der API
+## Dokumente
 
-2. `GET /`
-- Basis-Info zur laufenden API
+### `POST /upload`
 
-3. `POST /upload`
-- Multipart Upload
-- Form-Field: `file` (PDF)
+Laedt ein PDF hoch.
 
-4. `GET /documents?limit=20`
-- Listet zuletzt angelegte Dokumente
+- Multipart Form Field: `file`
+- Nur `.pdf` wird akzeptiert.
+- Legt einen Datensatz in `documents` mit `status=uploaded` an.
 
-5. `POST /process/{document_id}`
-- Startet Parsing- und Extraktionspipeline fuer ein Dokument
-- Query-Parameter:
-  - `process_mode=parser_only|hybrid_fill|llm_override|llm_only` (empfohlen)
-  - Backward-compat: `use_llm` + `llm_override` werden weiter akzeptiert
+### `GET /documents?limit=20`
 
-6. `GET /llm-runs/{document_id}?limit=20`
-- Listet LLM-Runs eines Dokuments (neueste zuerst)
+Listet zuletzt angelegte Dokumente.
 
-7. `GET /llm-runs/{document_id}/latest`
-- Liefert den neuesten LLM-Run inkl. Feld-Diffs (`changes`)
+### `GET /document/{document_id}/file`
 
-8. `GET /llm-runs/{document_id}/run/{run_id}`
-- Liefert einen bestimmten LLM-Run
+Streamt das Original-PDF inline.
 
-9. `GET /compare/{document_id}`
-- Fuehrt Parser und LLM separat aus (ohne DB-Write) und liefert Feldvergleich:
-  - `parser_snapshot`
-  - `llm_snapshot`
-  - `comparison[*]` mit `field`, `parser_value`, `llm_value`, `status`
-  - `summary` mit Zaehlern (`same`, `different`, `missing_*`)
+### `POST /reset/{document_id}?delete_logs=true`
 
-10. `POST /match-images/{document_id}`
-- Bild-Matching pro Position mit Strategien:
-  - `strategy=heuristic`
-  - `strategy=vlm`
-  - `strategy=hybrid` (VLM + Fallback)
-- Query-Parameter:
-  - `max_candidates` (default `4`)
-  - `max_items` (default `60`)
-  - `allow_multiple=true|false`
-  - `vlm_min_confidence` (default `0.55`)
+Loescht extrahierte Ergebnisse eines Dokuments.
 
-11. `GET /result/{document_id}`
-- Komplettes Ergebnisobjekt:
-  - `document`
-  - `amount_lines`
-  - `line_items`
-  - `images`
+- Upload-Datei bleibt erhalten.
+- Optional werden Text-, Bild- und LLM-Logs geloescht.
+- Dokument wird wieder auf `uploaded` gesetzt.
 
-12. `GET /preview/{document_id}?format=json|csv`
-- JSON/CSV Vorschau als direkte Response
-- kein Datei-Write nach `data/exports`
+## Verarbeitung
 
-13. `GET /export/{document_id}?format=json|csv|sql&include_images_base64=true|false`
-- Liefert Download-Response
-- schreibt Exportdatei nach `data/exports`
+### `POST /process/{document_id}`
 
-14. `GET /document/{document_id}/file`
-- Streamt das Original-PDF inline
+Startet die Extraktionspipeline.
 
-15. `GET /document/{document_id}/image/{image_id}`
-- Streamt ein extrahiertes Bild inline
+Query-Parameter:
 
-16. `GET /ui`
-- Browser-Workbench fuer QA/Test
+- `process_mode=parser_only|hybrid_fill|llm_override|llm_only`
+- Backward-compatible: `use_llm` und `llm_override`
 
-17. `POST /dev/parse-text`
-- Dev-Helfer: parser-only gegen freien Text
+Modi:
+
+- `parser_only`: nur Parser und Extraktor.
+- `hybrid_fill`: Parser zuerst, LLM fuellt fehlende Kopffelder/Summen.
+- `llm_override`: Parser zuerst, LLM darf Kopffelder/Summen ueberschreiben.
+- `llm_only`: LLM extrahiert Kopf, Summen und Positionen; Bilder bleiben aus der PDF-Extraktion.
+
+### `GET /progress/{document_id}`
+
+Liefert den aktuellen Processing-Fortschritt.
+
+Hinweis: Der Fortschritt ist aktuell in-memory und damit noch nicht produktionsrobust.
+
+### `GET /result/{document_id}`
+
+Liefert das normalisierte Ergebnis:
+
+- `document`
+- `amount_lines`
+- `line_items`
+- `images`
+- `validation`
+
+## Review und Freigabe
+
+### `POST /documents/{document_id}/line-items/{line_item_id}/assign-image`
+
+Setzt ein finales Bild fuer eine Position.
+
+Body:
+
+```json
+{"image_id": 123}
+```
+
+### `DELETE /documents/{document_id}/line-items/{line_item_id}/assign-image`
+
+Markiert bewusst, dass eine Position kein finales Bild hat.
+
+### `POST /documents/{document_id}/line-items/{line_item_id}/review-check`
+
+Markiert offene Warnungen einer Position als manuell geprueft.
+
+### `DELETE /documents/{document_id}/line-items/{line_item_id}/review-check`
+
+Setzt die manuelle Positionspruefung zurueck.
+
+### `POST /documents/{document_id}/approval`
+
+Gibt ein Dokument frei.
+
+Regel:
+
+- Dokument muss `status=processed` haben.
+- Validierung muss `auto_accept` oder `manual_checked` sein.
+
+Body:
+
+```json
+{
+  "reviewer_name": "Name",
+  "note": "Optionale Freigabenotiz"
+}
+```
+
+### `DELETE /documents/{document_id}/approval`
+
+Setzt die Dokumentfreigabe zurueck.
+
+## Export und Preview
+
+### `GET /preview/{document_id}?format=json|csv`
+
+Liefert JSON/CSV direkt als Response.
+
+- Kein Datei-Write nach `data/exports`.
+
+### `GET /export/{document_id}?format=json|csv|sql&include_images_base64=true|false`
+
+Liefert Download-Response und schreibt Datei nach `data/exports`.
+
+Wichtig:
+
+- Der aktuelle `sql` Export ist ein Export fuer das interne App-Schema.
+- Er ist noch kein VenDoc/MSSQL-Import.
+
+## Bilder
+
+### `GET /document/{document_id}/image/{image_id}`
+
+Streamt ein extrahiertes Bild inline.
+
+- Nicht browserfaehige Bildformate werden serverseitig als PNG-Vorschau ausgeliefert, wenn moeglich.
+
+### `POST /match-images/{document_id}`
+
+Berechnet Bild-Matching pro Position.
+
+Query-Parameter:
+
+- `strategy=heuristic|vlm|hybrid`
+- `max_candidates`
+- `max_items`
+- `allow_multiple`
+- `vlm_min_confidence`
+
+## LLM und Vergleich
+
+### `GET /llm-runs/{document_id}?limit=20`
+
+Listet LLM-Runs eines Dokuments.
+
+### `GET /llm-runs/{document_id}/latest`
+
+Liefert den neuesten LLM-Run.
+
+### `GET /llm-runs/{document_id}/run/{run_id}`
+
+Liefert einen bestimmten LLM-Run.
+
+### `GET /compare/{document_id}`
+
+Fuehrt Parser und LLM separat aus und liefert einen Feldvergleich ohne DB-Write.
+
+## Dev
+
+### `POST /dev/parse-text`
+
+Parser-only gegen freien Text.
+
+## Geplante VenDoc-Endpunkte
+
+Noch nicht implementiert:
+
+- `POST /vendoc/export/{document_id}?dry_run=true|false`
+- `GET /vendoc/export-jobs/{document_id}`
+- `GET /vendoc/export-jobs/{document_id}/latest`
+- `GET /vendoc/health`
+
+Regel fuer Live-Export:
+
+- Nur `processed` und `approved` Dokumente duerfen live in MSSQL geschrieben werden.
 
 ## Wichtige Result-Felder
+
+### `document`
+
+- `id`
+- `supplier_name`
+- `document_type`
+- `offer_reference`
+- `document_number`
+- `document_date`
+- `project_ref`
+- `currency`
+- `net_total`
+- `vat_total`
+- `gross_total`
+- `parse_confidence`
+- `approval_status`
+- `reviewed_by`
+- `reviewed_at`
+- `approval_note`
+- `status`
+
 ### `line_items[*]`
+
+- `id`
+- `position_no`
+- `lv_pos`
+- `is_alternative`
+- `quantity`
+- `unit`
+- `width_mm`
+- `height_mm`
+- `description_short`
+- `description_long`
+- `unit_price`
+- `line_total`
 - `page_ref`
+- `confidence`
 - `image_ids`
 - `image_ids_primary`
-- `image_ids_page_all`
+- `image_candidate_ids`
 - `image_count`
-- `image_count_page_all`
+- `validation_status`
+- `validation_issues`
+- `review_checked`
 
 ### `images[*]`
-- `page_ref`, `image_index`
-- `mime_type`, `storage_path`
-- `sha256`, `bytes_size`, `width`, `height`
-- `is_probably_decorative`, `is_repeated_across_pages`
 
-### `POST /process` Response (LLM-relevant)
-- `process_mode_requested`
-- `process_mode_effective`
-- `llm_requested`
-- `llm_enabled_env`
-- `llm_used`
-- `llm_override`
-- `llm_status`
-- `llm_model`
-- `llm_error`
-- `llm_run_id`
-- `llm_change_count`
-- `llm_change_total`
-- `llm_dump_path`
+- `id`
+- `page_ref`
+- `image_index`
+- `mime_type`
+- `storage_path`
+- `sha256`
+- `bytes_size`
+- `width`
+- `height`
+- `is_probably_decorative`
+- `is_repeated_across_pages`
+- `is_assigned`
+- `assigned_line_item_ids`
+- `assigned_position_nos`
+
+### `validation`
+
+- `status=auto_accept|manual_checked|review|reject`
+- `issue_count`
+- `error_count`
+- `warning_count`
+- `required_fields`
+- `recommended_fields`
+- `document_issues`
+- `totals`
+- `line_item_summary`
+- `image_summary`
+- `approval`
 
 ## Beispiel-Calls
+
 ```bash
 curl -sS http://localhost:8000/health
 curl -sS "http://localhost:8000/documents?limit=10"
-curl -sS -X POST "http://localhost:8000/process/1?process_mode=hybrid_fill"
-curl -sS http://localhost:8000/llm-runs/1/latest
-curl -sS "http://localhost:8000/llm-runs/1?limit=10"
-curl -sS http://localhost:8000/compare/1
-curl -sS -X POST "http://localhost:8000/match-images/1?strategy=hybrid"
+curl -sS -X POST "http://localhost:8000/process/1?process_mode=parser_only"
+curl -sS http://localhost:8000/progress/1
 curl -sS http://localhost:8000/result/1
+curl -sS -X POST "http://localhost:8000/match-images/1?strategy=heuristic"
 curl -sS "http://localhost:8000/preview/1?format=json"
 curl -sS "http://localhost:8000/export/1?format=csv"
 ```

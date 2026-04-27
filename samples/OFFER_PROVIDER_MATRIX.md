@@ -1,14 +1,14 @@
 # Offer Provider Matrix
 
-Stand: 2026-04-01
+Stand: 2026-04-27
 
 ## Corpus Summary
 
-- Angebots-PDFs gesamt: `33`
-- Aktuell gruene Angebots-PDFs: `33`
+- Angebots-PDFs gesamt: `39`
+- Aktuell gruene Angebots-PDFs: `39`
 - Noch offene neue Angebotslayouts: `0`
 - Regression-Satz: `18` PDFs
-- Zusätzliche grüne Kandidaten: `15` PDFs
+- Zusätzliche grüne Kandidaten: `21` PDFs
 
 ## Provider Status
 
@@ -21,9 +21,9 @@ Stand: 2026-04-01
 | `rekord_vomp` | 3 | 0 | stabil | VAX-Korpus ist jetzt eigener Anbieter und grün |
 | `sr_schauraum` | 1 | 0 | stabil | kein akuter Parserblocker |
 | `koch` | 1 | 2 | stabil | 3 Angebots-PDFs mit eigenem Template und gruenem Korpus |
-| `muigg` | 1 | 2 | stabil | Varianten in Klammern und Unterpositionen sind jetzt abgedeckt |
+| `muigg` | 1 | 2 | stabil | Varianten in Klammern, Unterpositionen und neue ABs sind jetzt abgedeckt |
 | `schachermayer` | 1 | 1 | stabil | tabellarische Offert-Layouts plus Kommissionsfallback laufen gruen |
-| `schuchter` | 0 | 0 | vorlaeufig | Angebots-/AB-Header jetzt parserseitig vorbereitet, echte Angebots-PDFs fehlen weiter |
+| `schuchter` | 0 | 6 | stabil | sechs echte Angebots-PDFs plus vorhandene AB-Varianten laufen gruen |
 | `schlotterer` | 1 | 2 | stabil | drei echte Angebots-PDFs plus vorhandene ABs liefern jetzt gruene Ergebnisse |
 
 ## Green Provider Set
@@ -69,12 +69,20 @@ Stand: 2026-04-01
 - Regression: `samples/pdfs/regression/offers/muigg/`
 - Kandidaten: `samples/pdfs/candidates/offers/muigg/`
 - Parserstatus: alle `3` Angebots-PDFs grün, inklusive Varianten in Klammern und `001.1`-Unterpositionen
+- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/muigg/`
+- AB-Status: `4` neue Auftragsbestätigungen werden provider-spezifisch erkannt und positioniert
 
 ### Schachermayer
 - Regression: `samples/pdfs/regression/offers/schachermayer/`
 - Kandidaten: `samples/pdfs/candidates/offers/schachermayer/`
 - AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schachermayer/`
 - Parserstatus: beide Offerte-PDFs plus die AB-Trennung sind jetzt sauber eingeordnet
+
+### Schuchter
+- Kandidaten: `samples/pdfs/candidates/offers/schuchter/`
+- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/`
+- Parserstatus: `6` echte Angebots-PDFs plus vorhandene ABs laufen gruen
+- Hinweis: einige Schuchter-Angebote enthalten Positionsgruppen ohne Preiszeile; diese bleiben als Positionen erhalten und werden nicht aus dem Korpus gefiltert
 
 ### Schlotterer
 - Regression: `samples/pdfs/regression/offers/schlotterer/`
@@ -84,10 +92,7 @@ Stand: 2026-04-01
 
 ## Pending Provider Set
 
-### Schuchter
-- AB: `samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schuchter/`
-- Aktueller Stand: `3` Auftragsbestätigungen, noch kein Angebots-PDF
-- Parserstatus: vorhandene ABs werden provider-spezifisch erkannt und positioniert; Angebotskoepfe werden jetzt ebenfalls detektiert, aber noch ohne echte Angebots-PDFs validiert
+Kein akuter Provider-Blocker im aktuellen Angebotskorpus.
 
 ## Test Commands
 
@@ -95,6 +100,7 @@ Gruener Gesamtkorpus:
 
 ```bash
 python -m pytest tests/test_offer_corpus_smoke.py -q
+python -m pytest tests/test_offer_validation_smoke.py -q
 ```
 
 Starke Regressionen der kanonischen Layouts:
@@ -117,6 +123,6 @@ python -m pytest tests/test_non_offer_corpus_smoke.py -q
 
 ## Next Provider Watchlist
 
-1. `schuchter`
-2. `koch` AB-Layouts
-3. `newo` AB-Layouts
+1. weitere neue Anbieter-/Layoutvarianten aus Danielas naechstem Paket
+2. Anbieter mit komplexer Bildpflicht
+3. AB-Layouts nur dort erweitern, wo sie fachlich in VenDoc importiert werden sollen

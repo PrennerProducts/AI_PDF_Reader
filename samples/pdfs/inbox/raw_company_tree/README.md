@@ -23,6 +23,7 @@ Regel:
   - `candidates/offers/<anbieter>/`
   - `non_offer/auftrag_auftragsbestaetigung/<anbieter>/`
   - `non_offer/grafik_technik/<anbieter>/`
+- Zielnamen folgen dem Schema `<anbieter>__<dokumenttyp>__<nummer_oder_ref>.pdf`.
 
 Nicht mitkopieren:
 - doppelte Dateien, wenn du sie schon erkannt hast
