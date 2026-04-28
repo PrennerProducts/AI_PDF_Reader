@@ -190,6 +190,8 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
 
         position_no = match.group(1)
         quantity_raw = match.group(2)
+        page_ref = page_ref_from_offset(normalized_text, match.start())
+        page_end_ref = page_ref_from_offset(normalized_text, max(match.start(), block_end - 1))
         block_joined = "\n".join(block_lines)
         width_raw = None
         height_raw = None
@@ -223,7 +225,9 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "description_long": description_long,
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
-                "page_ref": page_ref_from_offset(normalized_text, match.start()),
+                "page_ref": page_ref,
+                "page_end_ref": page_end_ref,
+                "spans_page_break": page_end_ref > page_ref,
             }
         )
 

@@ -115,7 +115,7 @@ def test_alu_one_az_item_is_not_treated_as_visual_image_requirement() -> None:
     assert az_item["validation_status"] == "auto_accept"
 
 
-def test_shared_image_fallback_does_not_block_validation() -> None:
+def test_shared_image_fallback_blocks_validation() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "Entholzer",
@@ -160,7 +160,10 @@ def test_shared_image_fallback_does_not_block_validation() -> None:
         images=[{"id": 77, "page_ref": 1}],
     )
 
-    assert validation["status"] == "auto_accept"
+    assert validation["status"] == "reject"
+    assert validation["error_count"] >= 1
+    assert validation["image_summary"]["assigned_duplicate_count"] == 1
+    assert any(issue.get("code") == "duplicate_image_assignments" for issue in validation["document_issues"])
 
 
 def test_sr_schauraum_service_modules_do_not_require_images() -> None:
@@ -321,7 +324,7 @@ def test_non_visual_charge_and_delivery_lines_do_not_require_images() -> None:
         assert "missing_image_assignment" not in issue_codes
 
 
-def test_unmarked_duplicate_image_assignment_still_requires_review() -> None:
+def test_unmarked_duplicate_image_assignment_blocks_validation() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "Entholzer",
@@ -362,7 +365,7 @@ def test_unmarked_duplicate_image_assignment_still_requires_review() -> None:
         images=[{"id": 77, "page_ref": 1}],
     )
 
-    assert validation["status"] == "review"
+    assert validation["status"] == "reject"
     assert validation["image_summary"]["assigned_duplicate_count"] == 1
     assert any(issue.get("code") == "duplicate_image_assignments" for issue in validation["document_issues"])
 

@@ -249,12 +249,6 @@ def _item_status_from_issue_sets(
     return status
 
 
-def _allows_shared_image_assignment(item: dict[str, Any]) -> bool:
-    reason = _normalized_text(item.get("image_assignment_reason"))
-    source = _normalized_text(item.get("image_assignment_source"))
-    return reason == "shared_image_no_viable_alternative" or source.endswith("_shared")
-
-
 def build_document_validation(
     *,
     document: dict[str, Any],
@@ -542,8 +536,6 @@ def build_document_validation(
                 if parsed is not None
             ]
         ]
-        if any(_allows_shared_image_assignment(item) for item in duplicate_items):
-            continue
         duplicate_image_assignments[image_id] = position_nos
     if duplicate_image_assignments:
         duplicate_summary = ", ".join(
@@ -553,7 +545,7 @@ def build_document_validation(
         document_issues.append(
             _make_issue(
                 code="duplicate_image_assignments",
-                severity="warning",
+                severity="error",
                 field="image_ids",
                 message=f"Mindestens ein finales Bild ist mehrfach zugeordnet ({duplicate_summary}).",
             )
@@ -584,7 +576,7 @@ def build_document_validation(
             item_issues.append(
                 _make_issue(
                     code="duplicate_image_assignment",
-                    severity="warning",
+                    severity="error",
                     field="image_ids",
                     message=f"Bild mehrfach zugeordnet: {duplicate_descriptions}.",
                 )

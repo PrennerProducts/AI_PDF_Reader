@@ -16,6 +16,8 @@ from image_assignment import (
     metadata_dict,
     metadata_image_assignment,
     metadata_review_state,
+    page_visual_slot_image_id,
+    spare_carryover_image_ids,
 )
 from validation import build_document_validation
 
@@ -825,6 +827,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         item["image_count_page_all"] = 0
         item["image_next_page_allowed"] = False
         item["image_prefers_next_page"] = False
+        item["image_auto_match_allowed"] = True
         assignment_meta = metadata_image_assignment(item, valid_image_ids)
         review_meta = metadata_review_state(item)
         item["_image_assignment_meta"] = assignment_meta
@@ -837,6 +840,11 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         item["review_checked_at"] = review_meta.get("checked_at")
         item["review_checked_reason"] = review_meta.get("reason")
         page_ref = _to_int(item.get("page_ref"))
+        page_end_ref = _to_int((metadata_dict(item) or {}).get("page_end_ref"))
+        if page_ref is not None and (page_end_ref is None or page_end_ref < page_ref):
+            page_end_ref = page_ref
+        item["page_end_ref"] = page_end_ref
+        item["spans_page_break"] = bool(page_ref is not None and page_end_ref is not None and page_end_ref > page_ref)
         if page_ref is None:
             continue
         items_by_page.setdefault(page_ref, []).append(idx)
@@ -845,20 +853,66 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         all_page_image_ids = all_ids_by_page.get(page_ref, [])
         current_candidates = candidate_ids_by_page.get(page_ref, [])
         next_candidates = candidate_ids_by_page.get(page_ref + 1, [])
+        prev_candidates = candidate_ids_by_page.get(page_ref - 1, [])
+        prev_item_indexes = items_by_page.get(page_ref - 1, [])
+        next_item_indexes = items_by_page.get(page_ref + 1, [])
 
         sorted_item_indexes = sorted(item_indexes, key=lambda idx: _line_item_sort_key(line_item_list[idx]))
         visual_item_indexes = [idx for idx in sorted_item_indexes if not is_non_visual_line_item(line_item_list[idx])]
         visual_item_order = {idx: order for order, idx in enumerate(visual_item_indexes)}
         last_visual_item_idx = visual_item_indexes[-1] if visual_item_indexes else None
-        item_count = len(sorted_item_indexes)
+        visual_item_count = len(visual_item_indexes)
+        prev_visual_item_count = len(
+            [
+                idx
+                for idx in sorted(prev_item_indexes, key=lambda idx: _line_item_sort_key(line_item_list[idx]))
+                if not is_non_visual_line_item(line_item_list[idx])
+            ]
+        )
+        next_visual_item_count = len(
+            [
+                idx
+                for idx in sorted(next_item_indexes, key=lambda idx: _line_item_sort_key(line_item_list[idx]))
+                if not is_non_visual_line_item(line_item_list[idx])
+            ]
+        )
         current_viable_page_ids = [
             image_id
             for image_id in current_candidates
             if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
         ]
+        next_viable_page_ids = [
+            image_id
+            for image_id in next_candidates
+            if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+        ]
+        prev_viable_page_ids = [
+            image_id
+            for image_id in prev_candidates
+            if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+        ]
+        incoming_carryover_ids = (
+            spare_carryover_image_ids(current_viable_page_ids, next_page_visual_item_count=visual_item_count)
+            if prev_visual_item_count > len(prev_viable_page_ids)
+            else []
+        )
+        own_current_viable_page_ids = current_viable_page_ids[len(incoming_carryover_ids) :]
+        current_page_needs_carryover = bool(visual_item_indexes and len(own_current_viable_page_ids) < visual_item_count)
+        carryover_neighbor_ids = (
+            spare_carryover_image_ids(next_viable_page_ids, next_page_visual_item_count=next_visual_item_count)
+            if current_page_needs_carryover
+            else []
+        )
         for item_offset, item_idx in enumerate(sorted_item_indexes):
             item = line_item_list[item_idx]
-            allow_next_page_candidates = item_idx == last_visual_item_idx
+            visual_item_offset = visual_item_order.get(item_idx)
+            slot_image_id = page_visual_slot_image_id(own_current_viable_page_ids, visual_item_offset)
+            item_page_end_ref = _to_int(item.get("page_end_ref"))
+            spans_to_next_page = bool(item_page_end_ref is not None and item_page_end_ref > page_ref)
+            allow_next_page_candidates = bool(
+                carryover_neighbor_ids
+                and (spans_to_next_page or item_idx == last_visual_item_idx)
+            )
             item["image_next_page_allowed"] = allow_next_page_candidates
             if is_non_visual_line_item(item):
                 item["image_ids"] = []
@@ -868,6 +922,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 item["image_candidate_count"] = 0
                 item["image_ids_page_all"] = all_page_image_ids
                 item["image_count_page_all"] = len(all_page_image_ids)
+                item["image_auto_match_allowed"] = False
                 item["image_assignment_source"] = "unmatched"
                 item["image_assignment_reason"] = "non_visual_line_item"
                 continue
@@ -876,20 +931,23 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             has_assignment_decision = bool(assignment_meta.get("has_decision"))
 
             focused_current = focused_image_ids(
-                current_candidates,
-                item_count=item_count,
-                item_index=item_offset,
+                own_current_viable_page_ids,
+                item_count=max(1, visual_item_count),
+                item_index=visual_item_offset if visual_item_offset is not None else item_offset,
                 max_candidates=4,
             )
             viable_current = [
+                slot_image_id
+            ] if slot_image_id is not None else []
+            manual_candidate_current = [
                 image_id
                 for image_id in focused_current
-                if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+                if image_id != slot_image_id and is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
             ]
             focused_neighbor = focused_image_ids(
-                next_candidates if allow_next_page_candidates else [],
-                item_count=item_count,
-                item_index=item_offset,
+                carryover_neighbor_ids if allow_next_page_candidates else [],
+                item_count=max(1, visual_item_count),
+                item_index=visual_item_offset if visual_item_offset is not None else item_offset,
                 max_candidates=3,
             )
             viable_neighbor = [
@@ -900,24 +958,23 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             focused_fallback = focused_image_ids(
                 _dedupe_ints(
                     all_page_image_ids
-                    + (all_ids_by_page.get(page_ref + 1, []) if allow_next_page_candidates else [])
+                    + (carryover_neighbor_ids if allow_next_page_candidates else [])
                 ),
-                item_count=item_count,
-                item_index=item_offset,
+                item_count=max(1, visual_item_count),
+                item_index=visual_item_offset if visual_item_offset is not None else item_offset,
                 max_candidates=3,
             )
-            visual_item_offset = visual_item_order.get(item_idx)
             prefers_next_page = bool(
                 allow_next_page_candidates
                 and visual_item_offset is not None
-                and visual_item_offset >= len(current_viable_page_ids)
+                and slot_image_id is None
                 and viable_neighbor
             )
             item["image_prefers_next_page"] = prefers_next_page
             if prefers_next_page:
-                candidate_ids = _dedupe_ints(viable_neighbor + focused_current + focused_neighbor + focused_fallback)
+                candidate_ids = _dedupe_ints(viable_neighbor + manual_candidate_current + focused_neighbor + focused_fallback)
             else:
-                candidate_ids = _dedupe_ints(focused_current + focused_neighbor + focused_fallback)
+                candidate_ids = _dedupe_ints(viable_current + manual_candidate_current + focused_neighbor + focused_fallback)
 
             if persisted_image_ids:
                 final_ids = persisted_image_ids
@@ -932,7 +989,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 item["image_assignment_source"] = "page_neighbor_fallback"
                 item["image_assignment_reason"] = "overflow_to_next_page_visual"
             elif viable_current:
-                final_ids = viable_current[:2] if len(viable_current) > 1 and item_count <= len(current_candidates) else viable_current[:1]
+                final_ids = viable_current[:1]
                 item["image_assignment_source"] = "page_layout"
                 item["image_assignment_reason"] = "same_page_image_distribution"
             elif viable_neighbor and allow_next_page_candidates:
@@ -942,10 +999,11 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             else:
                 final_ids = []
                 item["image_assignment_source"] = "unmatched"
-                if viable_neighbor or focused_fallback:
-                    item["image_assignment_reason"] = "same_page_candidates_missing"
+                if focused_fallback or manual_candidate_current:
+                    item["image_assignment_reason"] = "no_unique_image_slot"
                 else:
                     item["image_assignment_reason"] = "no_candidate_images"
+                item["image_auto_match_allowed"] = False
 
             item["image_ids"] = final_ids
             item["image_count"] = len(final_ids)

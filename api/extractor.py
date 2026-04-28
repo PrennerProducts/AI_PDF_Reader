@@ -250,6 +250,30 @@ def _overlap_len(a0: int, a1: int, b0: int, b1: int) -> int:
     return max(0, min(a1, b1) - max(a0, b0))
 
 
+def _bbox_area(box: tuple[int, int, int, int]) -> int:
+    left, top, right, bottom = box
+    return max(0, right - left) * max(0, bottom - top)
+
+
+def _bbox_overlap_ratio(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
+    overlap_x = _overlap_len(a[0], a[2], b[0], b[2])
+    overlap_y = _overlap_len(a[1], a[3], b[1], b[3])
+    intersection = overlap_x * overlap_y
+    smallest = min(_bbox_area(a), _bbox_area(b))
+    if intersection <= 0 or smallest <= 0:
+        return 0.0
+    return intersection / smallest
+
+
+def _has_significant_bbox_overlap(
+    box: tuple[int, int, int, int],
+    others: list[tuple[int, int, int, int]],
+    *,
+    min_ratio: float = 0.35,
+) -> bool:
+    return any(_bbox_overlap_ratio(box, other) >= min_ratio for other in others)
+
+
 def _should_merge_bboxes(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
     a_left, a_top, a_right, a_bottom = a
     b_left, b_top, b_right, b_bottom = b
@@ -661,7 +685,18 @@ def _technical_line_art_bbox(crop: Image.Image) -> tuple[int, int, int, int] | N
     # Top is intentionally based on vertical drawing strokes so table/header
     # separators above the sketch cannot pull the crop upwards.
     top = min(vertical_ys)
-    bottom = max(ys) + 1
+    vertical_bottom = max(vertical_ys)
+    vertical_span = max(1, vertical_bottom - top)
+    lower_context = max(48, int(vertical_span * 0.45), int(width * 0.20))
+    # Text below the sketch, for example a following "Alternative:" heading, can
+    # contain underlines that look like technical horizontal rules. Keep only
+    # horizontal/dimension strokes close to the vertical drawing span.
+    bottom_candidates = [
+        y
+        for _x, y in coords
+        if y <= vertical_bottom + lower_context
+    ]
+    bottom = (max(bottom_candidates) if bottom_candidates else vertical_bottom) + 1
 
     pad_left = max(16, int(width * 0.045))
     pad_right = max(28, int(width * 0.075))
@@ -725,17 +760,27 @@ def _extract_vector_crop_rows(
             pix = page.get_pixmap(matrix=matrix, alpha=False)
             rendered = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
             candidate_boxes = []
+            position_boxes: list[tuple[int, int, int, int]] = []
             if not has_product_image_by_page.get(page_ref):
-                candidate_boxes = [
-                    (bbox, "vector_position_line_art") for bbox in _position_line_art_boxes(page, rendered)
-                ]
+                position_boxes = _position_line_art_boxes(page, rendered)
+                candidate_boxes.extend((bbox, "vector_position_line_art") for bbox in position_boxes)
+
+                # Rekord pages can start a position at the bottom of one page
+                # while the actual sketch is rendered near the top of the next
+                # page. In that case no "Pos." anchor exists on the sketch page,
+                # so the left-strip detector must supplement the position-based
+                # boxes instead of being only a fallback.
+                for bbox in _extract_left_strip_sketch_boxes(rendered):
+                    if _has_significant_bbox_overlap(bbox, position_boxes):
+                        continue
+                    candidate_boxes.append((bbox, "vector_strip_band"))
             if not candidate_boxes:
-                candidate_boxes = [
-                    (bbox, "vector_strip_band") for bbox in _extract_left_strip_sketch_boxes(rendered)
-                ]
+                candidate_boxes.extend((bbox, "vector_strip_band") for bbox in _extract_left_strip_sketch_boxes(rendered))
 
             if not candidate_boxes:
                 continue
+
+            candidate_boxes.sort(key=lambda item: (item[0][1], item[0][0], item[1]))
 
             for (left, top, right, bottom), source in candidate_boxes:
                 raw_crop = rendered.crop((left, top, right, bottom))

@@ -207,6 +207,21 @@ def focused_image_ids(
     return selected
 
 
+def page_visual_slot_image_id(image_ids: list[int], visual_item_index: int | None) -> int | None:
+    ids = dedupe_int_list([value for value in image_ids if isinstance(value, int) and value > 0])
+    if visual_item_index is None or visual_item_index < 0 or visual_item_index >= len(ids):
+        return None
+    return ids[visual_item_index]
+
+
+def spare_carryover_image_ids(next_page_image_ids: list[int], *, next_page_visual_item_count: int) -> list[int]:
+    ids = dedupe_int_list([value for value in next_page_image_ids if isinstance(value, int) and value > 0])
+    spare_count = len(ids) - max(0, next_page_visual_item_count)
+    if spare_count <= 0:
+        return []
+    return ids[:spare_count]
+
+
 def _match_item_candidate_ids(match_item: dict[str, Any]) -> list[int]:
     raw = match_item.get("candidate_image_ids")
     if not isinstance(raw, list):
@@ -329,25 +344,46 @@ def rebalance_unique_primary_image_assignments(
             keeper_index = max(item_indexes, key=_keeper_key)
             reserved_unique_ids.add(image_id)
 
+            proposed_alternatives: dict[int, int] = {}
+            proposed_reserved_ids = set(reserved_unique_ids)
+            unresolved_indexes: list[int] = []
             for item_index in item_indexes:
                 if item_index == keeper_index:
                     continue
                 match_item = match_items[item_index]
                 alt_image_id = _best_alternative_image_id(
                     match_item,
-                    blocked_ids=reserved_unique_ids,
+                    blocked_ids=proposed_reserved_ids,
                     minimum_score=minimum_score,
                 )
                 if alt_image_id is None:
-                    match_item["selected_image_ids"] = [image_id]
-                    match_item["selected_primary_image_id"] = image_id
+                    unresolved_indexes.append(item_index)
+                    continue
+                proposed_alternatives[item_index] = alt_image_id
+                proposed_reserved_ids.add(alt_image_id)
+
+            if unresolved_indexes:
+                # A duplicated automatic image is worse than no final image: it
+                # can silently export the wrong product sketch to VenDoc. Leave
+                # the affected positions open so validation and the UI force a
+                # manual decision.
+                reserved_unique_ids.discard(image_id)
+                for item_index in item_indexes:
+                    match_item = match_items[item_index]
+                    if _selected_primary_image_id(match_item) is None:
+                        continue
+                    match_item["selected_image_ids"] = []
+                    match_item["selected_primary_image_id"] = None
                     previous_source = str(match_item.get("selection_source") or "").strip()
                     match_item["selection_source"] = (
-                        f"{previous_source}_shared" if previous_source else "shared_image"
+                        f"{previous_source}_manual_required" if previous_source else "manual_required"
                     )
-                    match_item["selection_reason"] = "shared_image_no_viable_alternative"
-                    continue
+                    match_item["selection_reason"] = "duplicate_image_requires_manual_review"
+                    changed = True
+                continue
 
+            for item_index, alt_image_id in proposed_alternatives.items():
+                match_item = match_items[item_index]
                 if _selected_primary_image_id(match_item) != alt_image_id:
                     changed = True
                 match_item["selected_image_ids"] = [alt_image_id]

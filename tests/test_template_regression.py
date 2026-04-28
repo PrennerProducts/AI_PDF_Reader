@@ -113,6 +113,13 @@ def test_rekord_vomp_regression() -> None:
     assert len(items) == 14
     assert items[0]["description_short"] == "2tlg. Element bestehend aus:"
     assert items[1]["quantity_raw"] == "2"
+    item_by_pos = {item["position_no"]: item for item in items}
+    assert item_by_pos["8"]["page_ref"] == 7
+    assert item_by_pos["8"]["page_end_ref"] == 8
+    assert item_by_pos["8"]["spans_page_break"] is True
+    assert item_by_pos["11"]["page_ref"] == 9
+    assert item_by_pos["11"]["page_end_ref"] == 10
+    assert item_by_pos["11"]["spans_page_break"] is True
     assert items[-1]["lv_pos"] == "Lieferung"
     assert items[-1]["line_total_raw"] == "578,59"
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]

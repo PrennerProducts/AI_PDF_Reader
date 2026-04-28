@@ -10403,6 +10403,7 @@
       if (value === "page_fallback") return "Seitenfallback";
       if (value === "persisted_assignment") return "Persistiert";
       if (value === "unmatched") return "Keine Zuordnung";
+      if (value === "manual_required" || value.endsWith("_manual_required")) return "Manuelle Prüfung";
       return value.replaceAll("_", " ");
     }
 

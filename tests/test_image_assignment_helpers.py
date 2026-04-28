@@ -259,6 +259,31 @@ def test_heuristic_image_match_prefers_layout_candidate_over_larger_lower_image(
     assert match["selected_image_ids"] == [9586]
 
 
+def test_heuristic_image_match_keeps_candidates_but_blocks_unsafe_auto_match() -> None:
+    item = {
+        "page_ref": 2,
+        "image_assignment_is_final": False,
+        "image_next_page_allowed": False,
+        "image_auto_match_allowed": False,
+    }
+    candidates = [
+        {
+            "id": 9586,
+            "page_ref": 2,
+            "width": 254,
+            "height": 161,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        }
+    ]
+
+    match = _heuristic_match_for_item(item, candidates, allow_multiple=False)
+
+    assert match["selected_image_ids"] == []
+    assert match["scores"][0]["image_id"] == 9586
+    assert match["auto_match_allowed"] is False
+
+
 def test_automatic_image_assignment_is_not_final_input_for_next_match() -> None:
     item = {
         "page_ref": 2,

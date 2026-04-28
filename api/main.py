@@ -737,7 +737,8 @@ def _heuristic_match_for_item(
     score_rows.sort(key=lambda row: (-row["score"], row["_page_rank"], row["image_id"]))
     selected_image_ids: list[int] = []
     minimum_assignment_score = 0.25
-    if score_rows and score_rows[0]["score"] >= minimum_assignment_score:
+    auto_match_allowed = item.get("image_auto_match_allowed") is not False
+    if auto_match_allowed and score_rows and score_rows[0]["score"] >= minimum_assignment_score:
         selected_image_ids = [score_rows[0]["image_id"]]
         if allow_multiple and len(score_rows) > 1:
             top = score_rows[0]["score"]
@@ -752,6 +753,7 @@ def _heuristic_match_for_item(
     return {
         "selected_image_ids": selected_image_ids,
         "scores": score_rows,
+        "auto_match_allowed": auto_match_allowed,
     }
 
 
@@ -830,6 +832,10 @@ def _build_line_item_rows(extracted_text: str, template: str) -> list[dict]:
             "unit_price_raw": item.get("unit_price_raw"),
             "line_total_raw": item.get("line_total_raw"),
         }
+        page_end_ref = _to_int_safe(item.get("page_end_ref"))
+        if page_end_ref is not None:
+            metadata["page_end_ref"] = page_end_ref
+            metadata["spans_page_break"] = bool(item.get("spans_page_break"))
         confidence = Decimal("0.85") if line_total is not None else Decimal("0.70")
         rows.append(
             {
@@ -1624,7 +1630,10 @@ def match_images(
         final_selected = _dedupe_int_list([_to_int_safe(image_id) for image_id in final_selected if _to_int_safe(image_id) is not None])
         if not final_selected:
             final_source = "unmatched"
-            final_reason = "no_confident_candidate" if candidates else "no_candidate_images"
+            if matching_item.get("image_auto_match_allowed") is False and candidates:
+                final_reason = str(matching_item.get("image_assignment_reason") or "no_unique_image_slot")
+            else:
+                final_reason = "no_confident_candidate" if candidates else "no_candidate_images"
 
         candidate_summaries = [
             {
@@ -1646,6 +1655,7 @@ def match_images(
                 "position_no": item.get("position_no"),
                 "lv_pos": item.get("lv_pos"),
                 "page_ref": _to_int_safe(item.get("page_ref")),
+                "image_auto_match_allowed": matching_item.get("image_auto_match_allowed") is not False,
                 "description_short": item.get("description_short"),
                 "candidate_image_ids": [
                     image_id for image_id in (_to_int_safe(image.get("id")) for image in candidates) if image_id is not None

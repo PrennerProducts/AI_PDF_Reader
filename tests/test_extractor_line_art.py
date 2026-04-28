@@ -69,6 +69,26 @@ def test_technical_line_art_bbox_removes_position_header() -> None:
     assert bbox[3] > 220
 
 
+def test_technical_line_art_bbox_ignores_following_alternative_heading() -> None:
+    image = Image.new("RGB", (360, 760), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((70, 60, 140, 250), outline="black", width=3)
+    draw.line((70, 60, 140, 250), fill="black", width=2)
+    draw.line((140, 60, 70, 250), fill="black", width=2)
+    draw.line((55, 275, 160, 275), fill="black", width=2)
+    draw.text((82, 284), "1000", fill="black")
+    draw.line((190, 60, 190, 250), fill="black", width=2)
+    draw.text((202, 130), "2500", fill="black")
+    draw.line((60, 625, 250, 625), fill="black", width=2)
+    draw.text((60, 645), "Alternative:", fill="red")
+    draw.line((60, 667, 165, 667), fill="red", width=2)
+
+    bbox = _technical_line_art_bbox(image)
+
+    assert bbox is not None
+    assert bbox[3] < 380
+
+
 def test_schuchter_vector_line_art_extracts_position_crops(tmp_path: Path) -> None:
     pdf_path = ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf"
     if not pdf_path.exists():
@@ -82,3 +102,27 @@ def test_schuchter_vector_line_art_extracts_position_crops(tmp_path: Path) -> No
     ]
 
     assert len(line_art_rows) == 13
+
+
+def test_rekord_continuation_page_sketches_are_extracted(tmp_path: Path) -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX60326.pdf"
+    if not pdf_path.exists():
+        return
+
+    rows = extract_pdf_images(pdf_path, tmp_path / "images")
+    line_art_rows = [
+        row
+        for row in rows
+        if (row.get("metadata_json") or {}).get("layout_source")
+        in {"vector_position_line_art", "vector_strip_band"}
+    ]
+
+    page_8_rows = [row for row in line_art_rows if row.get("page_ref") == 8]
+    page_10_rows = [row for row in line_art_rows if row.get("page_ref") == 10]
+
+    assert len(line_art_rows) == 12
+    assert [row["metadata_json"]["layout_source"] for row in page_8_rows] == [
+        "vector_strip_band",
+        "vector_position_line_art",
+    ]
+    assert [row["metadata_json"]["layout_source"] for row in page_10_rows] == ["vector_strip_band"]
