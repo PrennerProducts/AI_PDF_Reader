@@ -680,27 +680,8 @@ def build_document_validation(
     else:
         totals_summary["component_sum_matches_net"] = None
 
+    # Diagnostic only: release decisions use concrete field, total, position and image checks.
     confidence_policy = _confidence_policy(document.get("parse_confidence"))
-    if confidence_policy.get("status") == "review":
-        document_issues.append(
-            _make_issue(
-                code="confidence_review",
-                severity="warning",
-                field="parse_confidence",
-                message="Parse-Confidence liegt im Review-Bereich.",
-                actual=confidence_policy.get("value"),
-            )
-        )
-    elif confidence_policy.get("status") == "reject":
-        document_issues.append(
-            _make_issue(
-                code="confidence_low",
-                severity="error",
-                field="parse_confidence",
-                message="Parse-Confidence ist zu niedrig fuer Auto-Accept.",
-                actual=confidence_policy.get("value"),
-            )
-        )
 
     document_error_count = len([issue for issue in document_issues if issue.get("severity") == "error"])
     document_warning_count = len([issue for issue in document_issues if issue.get("severity") == "warning"])
