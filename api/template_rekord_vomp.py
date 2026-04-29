@@ -13,6 +13,16 @@ from template_headers import (
 
 POSITION_RE = re.compile(r"(?m)^Pos\.\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:[.,][0-9]+)?)\s+St[üu]ck(?:\b|(?=[A-ZÄÖÜ]))")
 RAM_RE = re.compile(r"RAM:\s*([0-9.,]+)\s*mm\s*x\s*([0-9.,]+)\s*mm", flags=re.IGNORECASE)
+COMPACT_RAM_RE = re.compile(
+    r"RAM:\s*(?:Element)?\s*([0-9]{3,5}(?:,[0-9]+)?)"
+    r"(?:\s*mm)?[^0-9\n]{0,80}?x\s*([0-9]{3,5}(?:,[0-9]+)?)"
+    r"(?:\s*mm|[^0-9\n]{0,60}?mm)",
+    flags=re.IGNORECASE,
+)
+STOCKLICHTE_RAM_RE = re.compile(
+    r"([0-9]{3,5}(?:,[0-9]+)?)\s+Stocklichte\s*RAM:\s*([0-9]{3,5}(?:,[0-9]+)?)",
+    flags=re.IGNORECASE,
+)
 ARCH_POS_RE = re.compile(r"Arch\.-Pos\.:\s*(.+)", flags=re.IGNORECASE)
 TOTAL_LINE_RE = re.compile(
     r"Gesamt\s+[0-9]+(?:[.,][0-9]+)?\s*(?:St[üu]ck|PA|lfm|m²)?\s*:?\s+\(?"
@@ -108,6 +118,26 @@ def _extract_total_from_block(block_text: str) -> str | None:
     return None
 
 
+def _extract_ram_dimensions(block_text: str) -> tuple[str | None, str | None]:
+    match = RAM_RE.search(block_text)
+    if match:
+        return match.group(1), match.group(2)
+
+    # PyMuPDF sometimes interleaves Rekord sketch labels with the RAM line, e.g.
+    # "RAM:Element1000außenmmRALx 2300laut mmKollektion".
+    match = COMPACT_RAM_RE.search(block_text)
+    if match:
+        return match.group(1), match.group(2)
+
+    # Door positions can merge "Stocklichte Höhe" into the RAM line. The rendered
+    # height still appears immediately before the merged "StocklichteRAM" token.
+    match = STOCKLICHTE_RAM_RE.search(block_text)
+    if match:
+        return match.group(2), match.group(1)
+
+    return None, None
+
+
 def _prepare_compact_text(text: str) -> str:
     normalized = normalize_text(text)
     prepared = STRUCTURE_MARKER_RE.sub(r"\n\1", normalized)
@@ -193,12 +223,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         page_ref = page_ref_from_offset(normalized_text, match.start())
         page_end_ref = page_ref_from_offset(normalized_text, max(match.start(), block_end - 1))
         block_joined = "\n".join(block_lines)
-        width_raw = None
-        height_raw = None
-        ram_match = RAM_RE.search(block_joined)
-        if ram_match:
-            width_raw = ram_match.group(1)
-            height_raw = ram_match.group(2)
+        width_raw, height_raw = _extract_ram_dimensions(block_joined)
 
         line_total_raw = _extract_total_from_block(block_joined)
         quantity_value = _parse_eu_decimal(quantity_raw)

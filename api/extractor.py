@@ -37,6 +37,10 @@ POSITION_LINE_ART_LAST_BLOCK_PT = 170.0
 POSITION_LINE_ART_MIN_WIDTH = 80
 POSITION_LINE_ART_MIN_HEIGHT = 60
 FITZ_IMAGE_SOURCE = "fitz_image_block"
+POSITION_BLOCK_ANCHOR_RE = re.compile(
+    r"(?:^|\s)Pos\.\s*\d+(?:[a-z])?(?:\.\d+)?\b",
+    flags=re.IGNORECASE,
+)
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -418,6 +422,15 @@ def _normalized_pdf_block_text(value: Any) -> str:
     return " ".join(str(value or "").split())
 
 
+def _has_position_block_anchor(text: str) -> bool:
+    for match in POSITION_BLOCK_ANCHOR_RE.finditer(text):
+        prefix = text[max(0, match.start() - 4) : match.start()].lower()
+        if prefix.endswith("zu "):
+            continue
+        return True
+    return False
+
+
 def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int, int, int, int]]:
     if rendered.width <= 0 or rendered.height <= 0:
         return []
@@ -447,7 +460,7 @@ def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int
             continue
 
         text = _normalized_pdf_block_text(block[4])
-        if not re.search(r"(?:^|\s)Pos\.\s*\d+\b", text, flags=re.IGNORECASE):
+        if not _has_position_block_anchor(text):
             continue
         starts.append((y0, y1))
 

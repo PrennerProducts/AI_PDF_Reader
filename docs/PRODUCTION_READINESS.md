@@ -1,6 +1,6 @@
 # Production-Readiness-Plan
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 ## Definition von produktionsreif
 
@@ -31,15 +31,15 @@ Hinweis: Der volle Host-Testlauf braucht eine korrekt installierte lokale Python
 
 ## Checkliste P0
 
-- [ ] VenDoc-Mapping als Dry-Run.
+- [x] VenDoc-Mapping als Dry-Run.
 - [ ] VenDoc-Live-Write in `SRTemp`.
-- [ ] Export-Journal `vendoc_export_jobs`.
-- [ ] Stabile externe UUIDs fuer Dokument und Positionen.
+- [x] Export-Journal `vendoc_export_jobs`.
+- [x] Stabile externe UUIDs fuer Dokument und Positionen.
 - [ ] Re-Export-Regel implementiert.
-- [ ] Freigabe-Gate fuer VenDoc-Export.
+- [x] Freigabe-Gate fuer VenDoc-Export auf API-Ebene.
 - [ ] MSSQL-Fehler sauber in UI/API sichtbar.
 - [x] Live-Canary fachlich gruen.
-- [ ] Doku fuer CIBEX-Zugang und Env-Variablen aktuell.
+- [x] Doku fuer CIBEX-Zugang und Env-Variablen aktuell.
 
 ## Checkliste P1
 
@@ -71,7 +71,7 @@ Der Datenbankzugang fehlt noch. Bis dahin kann nur Mapping/Dry-Run gebaut werden
 
 Massnahme:
 
-- VenDoc-Dry-Run zuerst implementieren.
+- VenDoc-Dry-Run ist implementiert und kann ohne MSSQL-Zugang genutzt werden.
 - Connection-Test-Endpunkt erst nach Zugang aktiv testen.
 
 ### VenDoc-Feldregeln

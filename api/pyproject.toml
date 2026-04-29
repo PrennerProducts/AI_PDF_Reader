@@ -48,4 +48,5 @@ py-modules = [
   "template_schuchter",
   "template_sr_schauraum",
   "validation",
+  "vendoc_exporter",
 ]

@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "api"))
 from image_assignment import (
     focused_image_ids,
     image_layout_sort_key,
+    is_non_visual_line_item,
     metadata_image_assignment,
     metadata_review_state,
 )
@@ -87,6 +88,18 @@ def test_metadata_review_state_reads_checked_flag() -> None:
     assert state["checked"] is True
     assert state["checked_at"] == "2026-03-25T13:22:09Z"
     assert state["reason"] == "ui_manual_review"
+
+
+def test_image_required_false_marks_item_non_visual() -> None:
+    item = {
+        "description_short": "Neopor Platte,",
+        "metadata_json": {
+            "image_required": False,
+            "referenced_lv_pos": "57.05.21.A",
+        },
+    }
+
+    assert is_non_visual_line_item(item) is True
 
 
 def test_image_layout_sort_key_prefers_visual_page_order() -> None:

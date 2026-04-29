@@ -566,6 +566,120 @@ def update_document_approval_state(
     return dict(row) if row else None
 
 
+def insert_vendoc_export_job(
+    *,
+    document_id: int,
+    external_document_id: str,
+    dry_run: bool,
+    status: str,
+    target_server: str | None,
+    target_database: str | None,
+    line_item_count: int,
+    warning_count: int,
+    error_count: int,
+    error_text: str | None,
+    approval_status: str | None,
+    reviewed_by: str | None,
+    reviewed_at: Any | None,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    payload_json = json.dumps(payload, ensure_ascii=True, default=str)
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO vendoc_export_jobs (
+                document_id,
+                external_document_id,
+                dry_run,
+                status,
+                target_server,
+                target_database,
+                line_item_count,
+                warning_count,
+                error_count,
+                error_text,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                payload_json
+            )
+            VALUES (%s, %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            RETURNING
+                id,
+                document_id,
+                external_document_id,
+                dry_run,
+                status,
+                target_server,
+                target_database,
+                line_item_count,
+                warning_count,
+                error_count,
+                error_text,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                payload_json,
+                created_at,
+                updated_at;
+            """,
+            (
+                document_id,
+                external_document_id,
+                dry_run,
+                status,
+                target_server,
+                target_database,
+                line_item_count,
+                warning_count,
+                error_count,
+                error_text,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                payload_json,
+            ),
+        ).fetchone()
+    return dict(row)
+
+
+def list_vendoc_export_jobs(document_id: int, limit: int = 20) -> list[dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                document_id,
+                external_document_id,
+                dry_run,
+                status,
+                target_server,
+                target_database,
+                line_item_count,
+                warning_count,
+                error_count,
+                error_text,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                payload_json,
+                created_at,
+                updated_at
+            FROM vendoc_export_jobs
+            WHERE document_id = %s
+            ORDER BY id DESC
+            LIMIT %s;
+            """,
+            (document_id, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_latest_vendoc_export_job(document_id: int) -> dict[str, Any] | None:
+    rows = list_vendoc_export_jobs(document_id, limit=1)
+    return rows[0] if rows else None
+
+
 def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list[int]]) -> int:
     normalized: dict[int, dict[str, Any]] = {}
     for line_item_id, image_ids in assignments.items():
@@ -984,6 +1098,12 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 final_ids = []
                 item["image_assignment_source"] = item.get("image_assignment_source") or "unmatched"
                 item["image_assignment_reason"] = item.get("image_assignment_reason") or "stored_no_assignment"
+                if item.get("image_assignment_source") == "unmatched" and item.get("image_assignment_reason") in {
+                    "no_candidate_images",
+                    "no_confident_candidate",
+                    "no_unique_image_slot",
+                }:
+                    item["image_auto_match_allowed"] = False
             elif prefers_next_page and viable_neighbor:
                 final_ids = viable_neighbor[:1]
                 item["image_assignment_source"] = "page_neighbor_fallback"

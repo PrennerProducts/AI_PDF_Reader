@@ -1,6 +1,6 @@
 # API Referenz
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 ## Basis
 
@@ -131,6 +131,37 @@ Wichtig:
 - Der aktuelle `sql` Export ist ein Export fuer das interne App-Schema.
 - Er ist noch kein VenDoc/MSSQL-Import.
 
+## VenDoc
+
+### `POST /vendoc/export/{document_id}?dry_run=true|false`
+
+Erzeugt ein VenDoc-Mapping fuer das Dokument und schreibt einen Eintrag in `vendoc_export_jobs`.
+
+Dry-Run:
+
+- baut `header`, `positions`, `warnings`, `errors` und `summary`.
+- liest das primaere Positionsbild als Base64, wenn vorhanden.
+- benoetigt keinen MSSQL-Zugriff.
+- ist auch vor Dokumentfreigabe nutzbar.
+
+Live-Export:
+
+- ist nur bei `document.status=processed` und `approval_status=approved` erlaubt.
+- liefert fuer nicht freigegebene Dokumente HTTP `409`.
+- bleibt aktuell mit HTTP `503`/`501` gesperrt, bis CIBEX-Zugriff und MSSQL-Writer verfuegbar sind.
+
+### `GET /vendoc/export-jobs/{document_id}?limit=20&include_payload=false`
+
+Listet VenDoc-Exportversuche und Dry-Runs eines Dokuments.
+
+### `GET /vendoc/export-jobs/{document_id}/latest?include_payload=false`
+
+Liefert den letzten VenDoc-Exportjob eines Dokuments.
+
+### `GET /vendoc/health`
+
+Liefert Konfigurationsstatus fuer den geplanten MSSQL-Zielzugriff. Der Live-Write ist aktuell noch nicht verfuegbar.
+
 ## Bilder
 
 ### `GET /document/{document_id}/image/{image_id}`
@@ -174,19 +205,6 @@ Fuehrt Parser und LLM separat aus und liefert einen Feldvergleich ohne DB-Write.
 ### `POST /dev/parse-text`
 
 Parser-only gegen freien Text.
-
-## Geplante VenDoc-Endpunkte
-
-Noch nicht implementiert:
-
-- `POST /vendoc/export/{document_id}?dry_run=true|false`
-- `GET /vendoc/export-jobs/{document_id}`
-- `GET /vendoc/export-jobs/{document_id}/latest`
-- `GET /vendoc/health`
-
-Regel fuer Live-Export:
-
-- Nur `processed` und `approved` Dokumente duerfen live in MSSQL geschrieben werden.
 
 ## Wichtige Result-Felder
 
@@ -276,4 +294,6 @@ curl -sS http://localhost:8000/result/1
 curl -sS -X POST "http://localhost:8000/match-images/1?strategy=heuristic"
 curl -sS "http://localhost:8000/preview/1?format=json"
 curl -sS "http://localhost:8000/export/1?format=csv"
+curl -sS -X POST "http://localhost:8000/vendoc/export/1?dry_run=true"
+curl -sS "http://localhost:8000/vendoc/export-jobs/1/latest"
 ```

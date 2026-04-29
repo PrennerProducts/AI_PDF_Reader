@@ -255,6 +255,48 @@ def test_enforced_image_validation_flags_empty_extraction_for_visual_items() -> 
     assert "missing_image_assignment" in issue_codes
 
 
+def test_unsafe_auto_match_decision_does_not_create_missing_image_warning() -> None:
+    line_items = [
+        {
+            "position_no": "2",
+            "description_short": "Fenster dreh-kipp",
+            "quantity": "1",
+            "unit_price": "100.00",
+            "line_total": "100.00",
+            "page_ref": 2,
+            "is_alternative": False,
+            "image_ids": [],
+            "image_auto_match_allowed": False,
+            "image_assignment_source": "unmatched",
+            "image_assignment_reason": "no_unique_image_slot",
+        }
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Entholzer",
+            "document_type": "angebot",
+            "document_number": "12600422.00",
+            "document_date": "2026-02-03",
+            "project_ref": "Bernsteiner",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[{"id": 7, "page_ref": 2, "is_probably_decorative": True}],
+        enforce_image_validation=True,
+    )
+
+    issue_codes = [issue.get("code") for issue in (line_items[0].get("validation_issues") or [])]
+
+    assert validation["status"] == "auto_accept"
+    assert "missing_image_assignment" not in issue_codes
+
+
 def test_non_visual_charge_and_delivery_lines_do_not_require_images() -> None:
     line_items = [
         {

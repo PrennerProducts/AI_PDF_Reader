@@ -1,6 +1,6 @@
 # Projekt-Dokumentation
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 Diese Doku ist der zentrale Einstieg fuer Planung, Status, Architektur, API und VenDoc-Integration.
 
@@ -11,7 +11,7 @@ Diese Doku ist der zentrale Einstieg fuer Planung, Status, Architektur, API und 
 - `docs/PRODUCTION_READINESS.md`: Release-Gates, Checklisten und Risiken fuer Produktivbetrieb.
 - `docs/TASKS.md`: konkrete Umsetzungstasks mit Prioritaet und Akzeptanz.
 - `docs/HOW_IT_WORKS.md`: technische Funktionsweise der aktuellen App.
-- `docs/API.md`: API-Referenz inkl. Review/Freigabe und geplanten VenDoc-Endpunkten.
+- `docs/API.md`: API-Referenz inkl. Review/Freigabe und VenDoc-Dry-Run/Export-Journal.
 - `docs/VENDOC_MSSQL_ACCESS_NOTES.md`: VenDoc/MSSQL-Zugriff, Dragan/CIBEX-Stand, Tabellenmapping.
 - `docs/PROVIDER_ONBOARDING.md`: Ablauf fuer neue Anbieter-Templates und neue PDFs.
 - `docs/DANIELA_DOCUMENT_REQUEST.md`: konkrete Anforderungsliste fuer weitere Parser-/VenDoc-Testdokumente.
@@ -62,5 +62,6 @@ python -m pytest tests/test_offer_corpus_smoke.py -q
 python -m pytest tests/test_offer_validation_smoke.py -q
 python -m pytest tests/test_non_offer_corpus_smoke.py -q
 python -m pytest tests/test_validation_provider_rules.py -q
+.venv/bin/python -m pytest tests -q
 ./infra/api-canary.sh
 ```

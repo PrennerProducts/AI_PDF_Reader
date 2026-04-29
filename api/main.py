@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 from threading import Lock
 from typing import Any, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -18,8 +18,11 @@ from db import (
     get_document,
     get_document_image,
     get_document_result,
+    get_latest_vendoc_export_job,
     insert_document,
+    insert_vendoc_export_job,
     list_documents,
+    list_vendoc_export_jobs,
     reset_document_results,
     update_line_item_image_assignments,
     update_line_item_review_state,
@@ -43,6 +46,7 @@ from image_matcher import rank_line_item_candidates_with_vlm
 from llm import enrich_document_fields_with_ollama, extract_document_full_with_ollama
 from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
+from vendoc_exporter import build_vendoc_payload
 
 app = FastAPI(title="KI PDF Reader PoC API")
 
@@ -136,6 +140,8 @@ def _compute_confidence(template: str, position_count: int, has_totals: bool) ->
 
 def _json_safe(value):
     if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, UUID):
         return str(value)
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -836,6 +842,11 @@ def _build_line_item_rows(extracted_text: str, template: str) -> list[dict]:
         if page_end_ref is not None:
             metadata["page_end_ref"] = page_end_ref
             metadata["spans_page_break"] = bool(item.get("spans_page_break"))
+        if "image_required" in item:
+            metadata["image_required"] = bool(item.get("image_required"))
+        referenced_lv_pos = _clean_optional_str(item.get("referenced_lv_pos"))
+        if referenced_lv_pos:
+            metadata["referenced_lv_pos"] = referenced_lv_pos
         confidence = Decimal("0.85") if line_total is not None else Decimal("0.70")
         rows.append(
             {
@@ -983,6 +994,65 @@ def _write_export_file(document_id: int, extension: str, content: str) -> Path:
     path = EXPORT_DIR / filename
     path.write_text(content, encoding="utf-8")
     return path
+
+
+def _vendoc_target_server() -> str | None:
+    return _clean_optional_str(os.getenv("VENDOC_MSSQL_HOST"))
+
+
+def _vendoc_target_database() -> str:
+    return _clean_optional_str(os.getenv("VENDOC_MSSQL_DATABASE")) or "SRTemp"
+
+
+def _vendoc_error_text(errors: list[dict[str, Any]] | None, fallback: str | None = None) -> str | None:
+    if not errors:
+        return fallback
+    messages: list[str] = []
+    for issue in errors[:8]:
+        if not isinstance(issue, dict):
+            continue
+        code = _clean_optional_str(issue.get("code")) or "vendoc_error"
+        message = _clean_optional_str(issue.get("message")) or code
+        messages.append(f"{code}: {message}")
+    if len(errors) > len(messages):
+        messages.append(f"... {len(errors) - len(messages)} weitere Fehler")
+    return "; ".join(messages) or fallback
+
+
+def _vendoc_job_response(row: dict[str, Any], *, include_payload: bool = False) -> dict[str, Any]:
+    payload = dict(row)
+    if not include_payload:
+        payload.pop("payload_json", None)
+    return _json_safe(payload)
+
+
+def _record_vendoc_export_job(
+    *,
+    document_id: int,
+    result_data: dict[str, Any],
+    vendoc_payload: dict[str, Any],
+    dry_run: bool,
+    status: str,
+    error_text: str | None = None,
+) -> dict[str, Any]:
+    document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
+    summary = vendoc_payload.get("summary") if isinstance(vendoc_payload.get("summary"), dict) else {}
+    return insert_vendoc_export_job(
+        document_id=document_id,
+        external_document_id=str(vendoc_payload.get("external_document_id")),
+        dry_run=dry_run,
+        status=status,
+        target_server=_vendoc_target_server(),
+        target_database=_vendoc_target_database(),
+        line_item_count=int(summary.get("position_count") or 0),
+        warning_count=int(summary.get("warning_count") or 0),
+        error_count=int(summary.get("error_count") or 0),
+        error_text=error_text,
+        approval_status=_clean_optional_str(document.get("approval_status")),
+        reviewed_by=_clean_optional_str(document.get("reviewed_by")),
+        reviewed_at=document.get("reviewed_at"),
+        payload=vendoc_payload,
+    )
 
 
 @app.get("/health")
@@ -1761,6 +1831,184 @@ def _persist_image_assignments(
         "matched_items": (payload.get("summary") or {}).get("matched_items"),
         "vlm_selected_items": (payload.get("summary") or {}).get("vlm_selected_items"),
         "heuristic_selected_items": (payload.get("summary") or {}).get("heuristic_selected_items"),
+    }
+
+
+@app.get("/vendoc/health")
+def vendoc_health():
+    enabled = _is_truthy(os.getenv("VENDOC_MSSQL_ENABLED"), default=False)
+    host = _vendoc_target_server()
+    database = _vendoc_target_database()
+    return {
+        "ok": bool(enabled and host),
+        "status": "configured" if enabled and host else ("disabled" if not enabled else "missing_host"),
+        "target_server_configured": bool(host),
+        "target_database": database,
+        "live_write_available": False,
+        "message": "MSSQL live write is blocked until CIBEX access and final VenDoc field rules are available.",
+    }
+
+
+@app.post("/vendoc/export/{document_id}")
+def vendoc_export_document(
+    document_id: int,
+    dry_run: bool = Query(default=True),
+):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    try:
+        vendoc_payload = build_vendoc_payload(result_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    errors = list(vendoc_payload.get("errors") or [])
+    if dry_run:
+        status = "dry_run_ok" if not errors else "failed"
+        error_text = _vendoc_error_text(errors)
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=True,
+            status=status,
+            error_text=error_text,
+        )
+        return _json_safe(
+            {
+                "ok": not errors,
+                "document_id": document_id,
+                "dry_run": True,
+                "status": status,
+                "job": _vendoc_job_response(job),
+                "vendoc": vendoc_payload,
+            }
+        )
+
+    document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
+    live_errors = list(errors)
+    if str(document.get("status") or "").strip().lower() != "processed":
+        live_errors.append(
+            {
+                "code": "document_not_processed",
+                "scope": "document",
+                "message": "Live-Export ist erst nach abgeschlossener Verarbeitung erlaubt.",
+            }
+        )
+    if str(document.get("approval_status") or "").strip().lower() != "approved":
+        live_errors.append(
+            {
+                "code": "document_not_approved",
+                "scope": "document",
+                "message": "Live-Export ist nur fuer freigegebene Dokumente erlaubt.",
+            }
+        )
+
+    if live_errors:
+        vendoc_payload["errors"] = live_errors
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = len(live_errors)
+        error_text = _vendoc_error_text(live_errors)
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=error_text,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "VenDoc Live-Export ist gesperrt.",
+                "errors": live_errors,
+                "job": _vendoc_job_response(job),
+            },
+        )
+
+    if not _is_truthy(os.getenv("VENDOC_MSSQL_ENABLED"), default=False):
+        live_error = {
+            "code": "mssql_disabled",
+            "scope": "vendoc",
+            "message": "VENDOC_MSSQL_ENABLED ist nicht aktiv; Live-Write wurde nicht ausgefuehrt.",
+        }
+        vendoc_payload["errors"] = [live_error]
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = 1
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=live_error["message"],
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": live_error["message"],
+                "job": _vendoc_job_response(job),
+            },
+        )
+
+    live_error = {
+        "code": "mssql_writer_not_implemented",
+        "scope": "vendoc",
+        "message": "Der transaktionale MSSQL-Live-Writer ist noch nicht implementiert.",
+    }
+    vendoc_payload["errors"] = [live_error]
+    if isinstance(vendoc_payload.get("summary"), dict):
+        vendoc_payload["summary"]["error_count"] = 1
+    job = _record_vendoc_export_job(
+        document_id=document_id,
+        result_data=result_data,
+        vendoc_payload=vendoc_payload,
+        dry_run=False,
+        status="failed",
+        error_text=live_error["message"],
+    )
+    raise HTTPException(
+        status_code=501,
+        detail={
+            "message": live_error["message"],
+            "job": _vendoc_job_response(job),
+        },
+    )
+
+
+@app.get("/vendoc/export-jobs/{document_id}")
+def vendoc_export_jobs(
+    document_id: int,
+    limit: int = Query(default=20, ge=1, le=200),
+    include_payload: bool = Query(default=False),
+):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    jobs = list_vendoc_export_jobs(document_id, limit=limit)
+    return {
+        "document_id": document_id,
+        "items": [_vendoc_job_response(job, include_payload=include_payload) for job in jobs],
+        "count": len(jobs),
+        "limit": limit,
+    }
+
+
+@app.get("/vendoc/export-jobs/{document_id}/latest")
+def vendoc_latest_export_job(
+    document_id: int,
+    include_payload: bool = Query(default=False),
+):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    job = get_latest_vendoc_export_job(document_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"No VenDoc export job found for document {document_id}.")
+    return {
+        "document_id": document_id,
+        "job": _vendoc_job_response(job, include_payload=include_payload),
     }
 
 

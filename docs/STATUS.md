@@ -1,10 +1,10 @@
 # Projektstatus
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 ## Kurzfazit
 
-Die App ist ein fortgeschrittener PoC mit funktionaler Verarbeitung, Validierung, UI-Review und Exporten. Fuer Produktionsreife fehlt vor allem der echte VenDoc-MSSQL-Schreibpfad, ein Export-Journal, Zugriffsschutz und robuste Job-Verarbeitung. Der Live-Canary ist aktuell wieder gruen.
+Die App ist ein fortgeschrittener PoC mit funktionaler Verarbeitung, Validierung, UI-Review, Exporten und VenDoc-Dry-Run. Fuer Produktionsreife fehlt vor allem der echte VenDoc-MSSQL-Schreibpfad, Zugriffsschutz und robuste Job-Verarbeitung. Der Live-Canary ist aktuell gruen.
 
 ## Aktuell umgesetzt
 
@@ -31,6 +31,9 @@ Die App ist ein fortgeschrittener PoC mit funktionaler Verarbeitung, Validierung
 - Manuelle Bildzuordnung.
 - Manuelle Positionspruefung.
 - Dokumentfreigabe.
+- VenDoc-Dry-Run-Endpunkt mit Header-/Positionsmapping.
+- VenDoc-Export-Journal mit Historie und letztem Exportversuch.
+- VenDoc-Live-Gate: nicht verarbeitete oder nicht freigegebene Dokumente werden mit HTTP `409` blockiert.
 
 ### Parser und Korpus
 
@@ -100,17 +103,22 @@ Die UI unter `/ui` bietet:
 
 ## Aktuelle Verifikation
 
-Lokal ausgefuehrt:
+Lokal ausgefuehrt am 2026-04-29:
 
 ```bash
-python -m pytest tests/test_template_regression.py tests/test_offer_corpus_smoke.py tests/test_offer_validation_smoke.py tests/test_non_offer_corpus_smoke.py tests/test_provider_offer_provisional.py tests/test_validation_provider_rules.py tests/test_exporter_approval.py tests/test_image_assignment_rebalance.py tests/test_image_preview_helpers.py -q
+.venv/bin/python -m pytest tests -q
 ```
 
 Ergebnis:
 
 ```text
-135 passed
+165 passed
 ```
+
+Hinweis:
+
+- Der Host-Testlauf brauchte eine lokale `.venv`, weil global `fastapi` und `PyMuPDF` fehlten.
+- Warnungen: FastAPI `on_event` ist deprecated; funktional kein Testfehler.
 
 Zusaetzlich abgesichert:
 
@@ -125,18 +133,18 @@ Zusaetzlich abgesichert:
 - Bildzuordnung fuer gleiche Seite ist abgesichert: Wenn fokussierte Kandidaten keine brauchbare gleiche-Seite-Option enthalten, wird `image_ids_page_all` in die Bewertung aufgenommen.
 - Schuchter `A260172` wurde nach der Line-Art-Ergaenzung neu verarbeitet: 13 bereinigte Positionszeichnungen aus Vektor-Crops, 13/13 Positionen mit Bild, Validierung `auto_accept`.
 - `sr_schauraum` Service-/Softwaremodule werden nicht mehr als bildpflichtige Produktpositionen bewertet.
+- Persistierte `unmatched`-Bildentscheidungen mit unsicherem Auto-Match erzeugen keine offenen Bildpflichtwarnungen mehr, wenn keine belastbare automatische Zuordnung moeglich ist.
 
-Nicht vollstaendig lokal ausfuehrbar:
+API-Runtime:
 
-- `python -m pytest tests -q` bricht auf dem Host ab, weil `fastapi` in der lokalen Python-Umgebung fehlt.
-- Im API-Container sind die Runtime-Abhaengigkeiten vorhanden; dort kompiliert `main.py`, `extractor.py`, `image_assignment.py`, `validation.py` und `db.py`.
-- Der API-Container enthaelt aktuell kein `pytest`, daher wurde die neue Bildfallback-Regel zusaetzlich per direktem Runtime-Check geprueft.
+- Im API-Container kompilieren `main.py`, `db.py`, `vendoc_exporter.py`, `exporter.py`, `extractor.py`, `image_assignment.py` und `validation.py`.
+- Migration `009_create_vendoc_export_jobs.sql` wurde beim API-Start angewendet.
 
 Live-Canary:
 
 - Stack laeuft und `GET /health` ist ok.
 - `./infra/api-canary.sh` verarbeitet alle 6 Provider-Testdokumente.
-- Ergebnis am 2026-04-27 nach PyMuPDF-Umstellung: `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp` liefern `validation=auto_accept`.
+- Ergebnis am 2026-04-29: `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp` liefern `validation=auto_accept`.
 
 ## VenDoc/MSSQL Stand
 
@@ -151,12 +159,17 @@ Dragan hat bestaetigt:
 - Ein Datensatz mit Bildern soll vorbereitet werden.
 - Einige Spalten sind laut Dragan anders oder noch nicht final; Detailabstimmung folgt nach Zugriff.
 
+Im Code umgesetzt:
+
+- VenDoc-Dry-Run-Mapping ohne MSSQL-Zugriff.
+- Stabile deterministische externe UUIDs fuer Dokumente und Positionen.
+- Export-Journal `vendoc_export_jobs`.
+- API-Endpunkte fuer Dry-Run, Historie, letzten Job und Health.
+- Live-Export-Gate fuer `processed` + `approved`.
+
 Im Code noch nicht umgesetzt:
 
 - MSSQL-Verbindung.
-- VenDoc-Mapping.
-- Export-Journal.
-- VenDoc-Dry-Run.
 - VenDoc-Live-Write.
 - UI-Anzeige fuer VenDoc-Exportstatus.
 
@@ -164,10 +177,9 @@ Im Code noch nicht umgesetzt:
 
 P0:
 
-- VenDoc-MSSQL-Dry-Run und Live-Write.
-- Export-Journal und stabile externe UUIDs.
-- Freigabe-Gate fuer VenDoc-Export.
+- VenDoc-MSSQL-Live-Write.
 - Re-Import-/Dublettenregel.
+- UI-Anzeige fuer VenDoc-Preview/Exportstatus.
 
 P1:
 
@@ -184,8 +196,8 @@ P2:
 
 ## Naechste 5 Schritte
 
-1. VenDoc-Dry-Run-Mapping ohne DB-Zugriff implementieren.
-2. `vendoc_export_jobs` Migration und Exportstatus bauen.
-3. UI um VenDoc-Preview/Exportstatus erweitern.
-4. Nach CIBEX-Zugang echten MSSQL-Write aktivieren.
+1. UI um VenDoc-Preview/Exportstatus erweitern.
+2. Nach CIBEX-Zugang echten MSSQL-Write aktivieren.
+3. Re-Import-/Dublettenregel fachlich finalisieren.
+4. Auth/Rollen und Audit fuer Freigabe/Export bauen.
 5. Neue Angebots-PDFs aufnehmen und Parser/Regression erweitern.

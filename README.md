@@ -1,6 +1,6 @@
 # KI-PDF-Reader On-Prem
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 On-Prem-App fuer Angebots-PDFs: Upload, Parser, Bildextraktion, Validierung, Review/Freigabe und Export. Ziel fuer den Produktivbetrieb ist ein direkter VenDoc-Import in eine externe MSSQL-Datenbank `SRTemp`.
 
@@ -75,11 +75,12 @@ Aktueller Hinweis:
 - UI-Workbench mit Review, Freigabe und manueller Bildzuordnung.
 - JSON/CSV Export.
 - SQL Export fuer das interne App-Schema.
+- VenDoc-Dry-Run-Mapping mit Header-/Positionspayload und primaerem Bild als Base64.
+- VenDoc-Export-Journal in Postgres fuer Dry-Runs und geblockte Live-Exportversuche.
 
 Noch nicht umgesetzt:
 
 - Echter VenDoc-MSSQL-Writer.
-- Export-Journal fuer VenDoc.
 - Auth/Rollen.
 - Persistente Background Jobs.
 - Feldkorrekturen in der UI.
@@ -93,7 +94,7 @@ Dragan hat in der MSSQL-Importdatenbank vorbereitet:
   - `dbo.vendoc_import_headers`
   - `dbo.vendoc_import_positions`
 
-Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin wird der VenDoc-Export zuerst als Dry-Run-Mapping vorbereitet.
+Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin ist der VenDoc-Export als Dry-Run-Mapping verfuegbar; Live-Write bleibt gesperrt.
 
 ## Wichtige API-Endpunkte
 
@@ -115,13 +116,11 @@ Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin wird der VenDoc-Ex
 - `POST /match-images/{document_id}?strategy=heuristic|vlm|hybrid`
 - `GET /compare/{document_id}`
 - `GET /llm-runs/{document_id}`
-- `POST /dev/parse-text`
-
-Geplant:
-
 - `POST /vendoc/export/{document_id}?dry_run=true|false`
 - `GET /vendoc/export-jobs/{document_id}`
+- `GET /vendoc/export-jobs/{document_id}/latest`
 - `GET /vendoc/health`
+- `POST /dev/parse-text`
 
 ## Neue Provider oder neue PDFs
 
@@ -151,6 +150,11 @@ python -m pytest tests/test_validation_provider_rules.py -q
 python -m pytest tests/test_exporter_approval.py -q
 ./infra/api-canary.sh
 ```
+
+Aktueller Stand 2026-04-29:
+
+- `.venv/bin/python -m pytest tests -q`: `165 passed`.
+- `./infra/api-canary.sh`: 6/6 Provider `auto_accept`.
 
 ## Dokumentation
 

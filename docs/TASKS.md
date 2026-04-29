@@ -1,6 +1,6 @@
 # Umsetzungstasks
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 Diese Liste ist der konkrete Backlog aus `docs/PLAN.md`.
 
@@ -8,7 +8,7 @@ Diese Liste ist der konkrete Backlog aus `docs/PLAN.md`.
 
 ### P0-001 VenDoc Dry-Run Mapper
 
-Status: offen
+Status: erledigt am 2026-04-29
 
 Ziel:
 
@@ -23,6 +23,15 @@ Tasks:
 - Pflichtfelder validieren.
 - Unit-Tests mit Sample-Result schreiben.
 
+Umgesetzt:
+
+- `api/vendoc_exporter.py`.
+- Deterministische externe UUIDs fuer Dokumente und Positionen.
+- Header-/Positionsmapping gemaess Screenshot-Schema.
+- Primaeres Positionsbild als Base64.
+- `warnings`/`errors`/`summary`.
+- `tests/test_vendoc_exporter.py`.
+
 Akzeptanz:
 
 - Dry-Run liefert `header`, `positions`, `warnings`, `errors`.
@@ -31,7 +40,7 @@ Akzeptanz:
 
 ### P0-002 Export-Journal
 
-Status: offen
+Status: erledigt am 2026-04-29
 
 Ziel:
 
@@ -48,11 +57,11 @@ Tasks:
 Akzeptanz:
 
 - Jeder Dry-Run und Live-Export ist nachvollziehbar.
-- Re-Export kann kontrolliert entschieden werden.
+- Re-Export-Regel ist fachlich noch offen; Jobs liefern dafuer externe IDs und Historie.
 
 ### P0-003 VenDoc API
 
-Status: offen
+Status: erledigt am 2026-04-29
 
 Ziel:
 
@@ -63,6 +72,7 @@ Tasks:
 - `POST /vendoc/export/{document_id}?dry_run=true|false`
 - `GET /vendoc/export-jobs/{document_id}`
 - `GET /vendoc/export-jobs/{document_id}/latest`
+- `GET /vendoc/health`
 - Fehlercodes fuer nicht freigegebene Dokumente.
 
 Akzeptanz:
@@ -95,7 +105,7 @@ Akzeptanz:
 
 ### P0-005 Freigabe-Gate fuer VenDoc
 
-Status: offen
+Status: API erledigt am 2026-04-29, UI offen
 
 Ziel:
 
@@ -114,7 +124,7 @@ Akzeptanz:
 
 ### P0-006 Canary wieder gruen
 
-Status: erledigt am 2026-04-27
+Status: erledigt am 2026-04-27, erneut bestaetigt am 2026-04-29
 
 Ziel:
 

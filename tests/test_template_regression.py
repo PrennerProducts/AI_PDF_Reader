@@ -73,7 +73,38 @@ def test_newo_regression() -> None:
     _assert_totals(parsed, ("9.959,30", "1.991,86", "11.951,16"))
     assert len(items) == 8
     assert items[0]["description_short"] == "NeWo Raffstore Lite, i80"
+    item_by_pos = {item["position_no"]: item for item in items}
+    assert item_by_pos["140"]["image_required"] is False
+    assert item_by_pos["160"]["referenced_lv_pos"] == "57.05.21.A"
+    assert item_by_pos["160"]["image_required"] is False
+    assert item_by_pos["170"]["image_required"] is True
     assert len(amount_lines) == 3
+
+
+def test_schuchter_accessory_position_is_not_image_required() -> None:
+    text = """
+Schuchter Fenster GmbH
+Angebot A260396 vom 03.04.2026
+Pos.
+13 1 Stk. 511203 D
+.
+Az auf Pos.10
+RWA Beschlag Silber
+E-Motor mit Zusatzverriegelung
+fertig am Fenster montiert
+.
+E-Anschluss BAUSEITS
+Zentrale+Taster BAUSEITS
+.
+1.980,00 1.980,00
+"""
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "schuchter"
+    assert len(items) == 1
+    assert items[0]["position_no"] == "13"
+    assert items[0]["image_required"] is False
 
 
 def test_sr_schauraum_regression() -> None:
@@ -114,6 +145,12 @@ def test_rekord_vomp_regression() -> None:
     assert items[0]["description_short"] == "2tlg. Element bestehend aus:"
     assert items[1]["quantity_raw"] == "2"
     item_by_pos = {item["position_no"]: item for item in items}
+    assert (item_by_pos["1"]["width_raw"], item_by_pos["1"]["height_raw"]) == ("3000", "2300")
+    assert (item_by_pos["2"]["width_raw"], item_by_pos["2"]["height_raw"]) == ("1000", "2300")
+    assert (item_by_pos["3"]["width_raw"], item_by_pos["3"]["height_raw"]) == ("1000", "2300")
+    assert (item_by_pos["3.1"]["width_raw"], item_by_pos["3.1"]["height_raw"]) == ("1000", "2300")
+    assert (item_by_pos["5"]["width_raw"], item_by_pos["5"]["height_raw"]) == ("1000", "2300")
+    assert (item_by_pos["6"]["width_raw"], item_by_pos["6"]["height_raw"]) == ("1000", "2300")
     assert item_by_pos["8"]["page_ref"] == 7
     assert item_by_pos["8"]["page_end_ref"] == 8
     assert item_by_pos["8"]["spans_page_break"] is True
@@ -187,6 +224,33 @@ Summe der Positionen 43.343,19Händlerrabatt -39,00 %-16.903,84Zusatzrabatt -15,
     assert items[0]["description_short"].startswith("2tlg. Element")
     assert items[0]["line_total_raw"] == "4.028,95"
     assert items[1]["line_total_raw"] == "2.152,98"
+
+
+def test_rekord_vomp_interleaved_ram_dimensions_regression() -> None:
+    text = """
+REKORD Vomp GmbH
+Angebot: VAX60326
+Belegdatum: 02.02.2026
+Bauvorhaben: Kom. Hagsteiner L. - Daniela Feldes
+Pos. 2 2 Stück
+1tlg.Kunststoff Fenster
+2300 RAM:Element1000außenmmRALx 2300laut mmKollektion 2550
+Gesamt 2 Stück 2.152,98
+Pos. 3 3 Stück
+1tlg.Kunststoff Balkontüre
+2300 StocklichteRAM: 1000 Höhe:mm x 2141.02300 mmmm 2550
+Gesamt 3 Stück 4.852,89
+Summe Netto 22.473,45
+MwSt 20,00 %4.494,69
+Summe Brutto 26.968,14
+""".strip()
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    item_by_pos = {item["position_no"]: item for item in items}
+
+    assert parsed["template"] == "rekord_vomp"
+    assert (item_by_pos["2"]["width_raw"], item_by_pos["2"]["height_raw"]) == ("1000", "2300")
+    assert (item_by_pos["3"]["width_raw"], item_by_pos["3"]["height_raw"]) == ("1000", "2300")
 
 
 def test_alu_one_a2602224mc_regression() -> None:

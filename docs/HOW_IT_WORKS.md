@@ -1,6 +1,6 @@
 # Wie das System funktioniert
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 ## Uebersicht
 
@@ -93,11 +93,11 @@ Tabellen:
 - `document_amount_lines`
 - `line_items`
 - `document_images`
+- `vendoc_export_jobs`
 - `schema_migrations`
 
 Geplant:
 
-- `vendoc_export_jobs`
 - optional `document_corrections` oder Audit-Tabelle fuer manuelle Feldkorrekturen.
 
 ### Storage
@@ -181,6 +181,7 @@ Aktuell:
 - JSON.
 - CSV.
 - SQL fuer das interne App-Schema.
+- VenDoc-Dry-Run-Mapping mit Export-Journal.
 
 Noch nicht umgesetzt:
 
@@ -190,9 +191,9 @@ Geplanter VenDoc-Export:
 
 1. Dokument muss verarbeitet sein.
 2. Dokument muss freigegeben sein.
-3. Mapping wird als Dry-Run pruefbar.
-4. Live-Write schreibt Header und Positionen in einer Transaktion.
-5. Export-Journal speichert Erfolg oder Fehler.
+3. Mapping ist als Dry-Run pruefbar.
+4. Export-Journal speichert Dry-Runs, Sperrgruende und Fehler.
+5. Live-Write schreibt Header und Positionen spaeter in einer Transaktion, sobald MSSQL-Zugriff und Feldregeln final sind.
 
 ## Bildextraktion und Bild-Mapping
 

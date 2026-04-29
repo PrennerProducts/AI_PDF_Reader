@@ -39,6 +39,10 @@ def dedupe_int_list(values: list[int]) -> list[int]:
 
 
 def is_non_visual_line_item(item: dict[str, Any]) -> bool:
+    metadata = metadata_dict(item)
+    if metadata.get("image_required") is False:
+        return True
+
     description = _normalized_text(item.get("description_short"))
     position_no = _normalized_text(item.get("position_no"))
     lv_pos = _normalized_text(item.get("lv_pos"))

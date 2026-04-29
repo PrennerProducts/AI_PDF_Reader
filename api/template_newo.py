@@ -12,6 +12,7 @@ PRICE_WITH_DISCOUNT_RE = re.compile(
 )
 ROW_START_RE = re.compile(r"^\d{3}\s+[0-9]+,[0-9]{2,4}\s+\w+")
 HEADER_RE = re.compile(r"^(\d{3})\s+([0-9]+,[0-9]{2,4})\s+([A-Za-z]+)\s+(.+)$")
+REFERENCE_POSITION_RE = re.compile(r"\bzu\s+Pos\.\s*([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[A-Z])", flags=re.IGNORECASE)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -112,6 +113,8 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
         full_block = "\n".join(block_lines)
         width_raw, height_raw = extract_dimensions(full_block)
         lv_pos = extract_lv_pos(header_tail) or extract_lv_pos(full_block)
+        reference_match = REFERENCE_POSITION_RE.search(f"{header_tail}\n{full_block}")
+        referenced_lv_pos = reference_match.group(1) if reference_match else None
         is_alternative = "alternativ" in full_block.lower()
 
         unit_price_raw = None
@@ -153,11 +156,18 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
                 ),
                 preferred_words=("raffstore", "insektenschutz", "schiebeplissee", "putzkasten"),
             )
+        description_norm = normalize_line(description_short or "").lower()
+        image_required = not (
+            bool(referenced_lv_pos)
+            or description_norm.startswith("diese position")
+        )
 
         items.append(
             {
                 "position_no": position_no,
                 "lv_pos": lv_pos,
+                "referenced_lv_pos": referenced_lv_pos,
+                "image_required": image_required,
                 "is_alternative": is_alternative,
                 "quantity_raw": quantity_raw,
                 "unit": unit,

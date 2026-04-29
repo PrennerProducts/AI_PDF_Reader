@@ -357,6 +357,7 @@ def build_document_validation(
         is_informational_item = _is_informational_item(provider_key, item)
         counts_towards_component_sum = _counts_towards_component_sum(provider_key, item)
         is_visual_item = not is_non_visual_line_item(item) and not is_informational_item
+        image_auto_match_allowed = item.get("image_auto_match_allowed") is not False
 
         if not _has_text(item.get("position_no")):
             issues.append(
@@ -453,7 +454,7 @@ def build_document_validation(
                 except (TypeError, ValueError):
                     continue
         assigned_image_ids = list(dict.fromkeys(assigned_image_ids))
-        if is_visual_item and (images or enforce_image_validation) and not assigned_image_ids:
+        if is_visual_item and image_auto_match_allowed and (images or enforce_image_validation) and not assigned_image_ids:
             issues.append(
                 _make_issue(
                     code="missing_image_assignment",

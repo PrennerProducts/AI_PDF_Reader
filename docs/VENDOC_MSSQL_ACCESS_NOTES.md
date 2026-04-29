@@ -1,6 +1,6 @@
 # VenDoc MSSQL Import: Zugriff, Mapping, Call-Notizen
 
-Stand: 2026-04-27
+Stand: 2026-04-29
 
 ## Zielbild
 
@@ -214,7 +214,9 @@ Fachliche Klaerung:
 
 ### Phase 1 - Dry-Run ohne MSSQL-Zugang
 
-Tasks:
+Status: erledigt am 2026-04-29.
+
+Umgesetzt:
 
 - `api/vendoc_exporter.py` erstellen.
 - Mapping-Funktion fuer Header und Positionen bauen.
@@ -229,7 +231,9 @@ Ergebnis:
 
 ### Phase 2 - Export-Journal
 
-Tasks:
+Status: erledigt am 2026-04-29.
+
+Umgesetzt:
 
 - Postgres-Migration `vendoc_export_jobs`.
 - Stabile `external_document_id` speichern.
@@ -246,7 +250,7 @@ Tasks:
 
 - SQL-Server-Client und Treiber installieren.
 - Connection-Builder aus Env.
-- `GET /vendoc/health`.
+- `GET /vendoc/health`. Status: Basis-Konfigurationsstatus umgesetzt, echter Connection-Test offen.
 - Transaktionaler Write in Header und Positionen.
 - Fehlerbehandlung und Rollback.
 
@@ -310,9 +314,7 @@ VENDOC_MSSQL_TIMEOUT_SECONDS=30
 
 - MSSQL-Zugangsdaten.
 - MSSQL-Treiber/Client im Docker-Image.
-- VenDoc-Mapping-Code.
-- Export-Journal.
-- Live-Write-Endpunkt.
+- Transaktionaler Live-Write.
 - UI fuer Exportstatus.
 - Finale fachliche Regeln fuer Sonderfelder, Alternativen, Nullpositionen und Bilder.
 

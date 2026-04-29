@@ -139,11 +139,17 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
         height_raw = dimensions.group(2) if dimensions else None
         lv_pos = normalize_line(header_match.group("label") or "")
         description_short = _extract_description_short(block_lines, fallback=lv_pos)
+        block_text_normalized = normalize_line(block_text).lower()
+        image_required = not (
+            block_text_normalized.startswith("az auf pos.")
+            or "az auf pos." in block_text_normalized
+        )
 
         items.append(
             {
                 "position_no": header_match.group("position"),
                 "lv_pos": lv_pos,
+                "image_required": image_required,
                 "is_alternative": is_alternative,
                 "quantity_raw": header_match.group("qty"),
                 "unit": header_match.group("unit"),
