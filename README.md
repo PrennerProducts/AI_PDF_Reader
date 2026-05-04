@@ -1,4 +1,4 @@
-# KI-PDF-Reader On-Prem
+# PDF-Reader On-Prem
 
 Stand: 2026-04-29
 
@@ -35,11 +35,8 @@ cp .env.cpu.example .env
 docker compose -f docker-compose.cpu.yml up -d --build
 ```
 
-Empfohlener Startmodus:
-
-- `LLM_ENABLED=false`
-- `VLM_ENABLED=false`
-- zuerst `parser_only` live pruefen
+Der Produktivmodus ist rein lokal und parserbasiert. Es werden keine Cloud-Dienste,
+keine externen APIs und keine KI-/Modellkomponenten fuer die Verarbeitung verwendet.
 
 ## Live Mode
 
@@ -70,7 +67,8 @@ Aktueller Hinweis:
 - Auftragsbestaetigungen als Non-Offer-Korpus.
 - PDF-Text- und Bildextraktion.
 - Heuristische Bildzuordnung.
-- Optional LLM/VLM ueber Ollama.
+- Parser-only-Verarbeitung ohne KI-/Cloud-Abhaengigkeiten.
+- Angebot-zu-Auftragsbestaetigung-Verknuepfung ueber erkannte Angebotsreferenzen.
 - Validierung von Pflichtfeldern, Summen, Positionen und Bildern.
 - UI-Workbench mit Review, Freigabe und manueller Bildzuordnung.
 - JSON/CSV Export.
@@ -102,9 +100,10 @@ Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin ist der VenDoc-Exp
 - `GET /ui`
 - `POST /upload`
 - `GET /documents?limit=20`
-- `POST /process/{document_id}?process_mode=parser_only|hybrid_fill|llm_override|llm_only`
+- `POST /process/{document_id}?process_mode=parser_only`
 - `GET /progress/{document_id}`
 - `GET /result/{document_id}`
+- `GET /relations/{document_id}`
 - `POST /documents/{document_id}/line-items/{line_item_id}/assign-image`
 - `DELETE /documents/{document_id}/line-items/{line_item_id}/assign-image`
 - `POST /documents/{document_id}/line-items/{line_item_id}/review-check`
@@ -113,9 +112,7 @@ Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin ist der VenDoc-Exp
 - `DELETE /documents/{document_id}/approval`
 - `GET /preview/{document_id}?format=json|csv`
 - `GET /export/{document_id}?format=json|csv|sql&include_images_base64=true|false`
-- `POST /match-images/{document_id}?strategy=heuristic|vlm|hybrid`
-- `GET /compare/{document_id}`
-- `GET /llm-runs/{document_id}`
+- `POST /match-images/{document_id}?strategy=heuristic`
 - `POST /vendoc/export/{document_id}?dry_run=true|false`
 - `GET /vendoc/export-jobs/{document_id}`
 - `GET /vendoc/export-jobs/{document_id}/latest`

@@ -75,6 +75,24 @@ CASES = [
         "position_count": 14,
         "validation_status": "auto_accept",
     },
+    {
+        "provider": "schuchter_composite",
+        "path": ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260344.pdf",
+        "supplier_name": "SCHUCHTER Fenster GmbH",
+        "document_number": "A260344",
+        "document_date": "2026-03-25",
+        "position_count": 4,
+        "validation_status": "auto_accept",
+    },
+    {
+        "provider": "schuchter_accessory",
+        "path": ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260396.pdf",
+        "supplier_name": "SCHUCHTER Fenster GmbH",
+        "document_number": "A260396",
+        "document_date": "2026-04-03",
+        "position_count": 13,
+        "validation_status": "auto_accept",
+    },
 ]
 
 

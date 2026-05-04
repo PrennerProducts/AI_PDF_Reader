@@ -146,7 +146,7 @@ Sichtbar:
 Nicht sichtbar im Hauptflow:
 
 - JSON
-- Parser/LLM-Vergleich
+- Parser-Diagnose
 - Debug
 - Reset
 - interne Run-States

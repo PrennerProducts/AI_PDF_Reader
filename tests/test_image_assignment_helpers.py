@@ -11,6 +11,7 @@ from image_assignment import (
     metadata_image_assignment,
     metadata_review_state,
 )
+from db import _line_item_sort_key
 from main import _candidate_images_for_item, _heuristic_match_for_item, _item_for_image_matching
 
 
@@ -107,6 +108,18 @@ def test_image_layout_sort_key_prefers_visual_page_order() -> None:
     lower = {"id": 2, "image_index": 1, "metadata_json": {"top_ratio": 0.70, "left_ratio": 0.20}}
 
     assert image_layout_sort_key(upper) < image_layout_sort_key(lower)
+
+
+def test_line_item_sort_key_uses_extraction_order_for_mixed_subpositions() -> None:
+    items = [
+        {"id": 12, "position_no": "1b"},
+        {"id": 13, "position_no": "1c"},
+        {"id": 14, "position_no": "1"},
+    ]
+
+    ordered = sorted(items, key=_line_item_sort_key)
+
+    assert [item["position_no"] for item in ordered] == ["1b", "1c", "1"]
 
 
 def test_candidate_images_disallow_next_page_for_non_last_item() -> None:

@@ -92,6 +92,22 @@ def _extract_description_short(block_lines: list[str], fallback: str) -> str:
     return fallback
 
 
+def _is_image_required(block_text_normalized: str, width_raw: str | None, height_raw: str | None) -> bool:
+    if block_text_normalized.startswith("az auf pos.") or "az auf pos." in block_text_normalized:
+        return False
+    if (
+        not width_raw
+        and not height_raw
+        and "bestehend aus" in block_text_normalized
+        and (
+            "kopplungselement" in block_text_normalized
+            or re.search(r"\belement\s+bestehend\s+aus\b", block_text_normalized)
+        )
+    ):
+        return False
+    return True
+
+
 def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dict[str, Any]]:
     lines = [line for line, _page_ref in line_records]
     items: list[dict[str, Any]] = []
@@ -140,10 +156,7 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
         lv_pos = normalize_line(header_match.group("label") or "")
         description_short = _extract_description_short(block_lines, fallback=lv_pos)
         block_text_normalized = normalize_line(block_text).lower()
-        image_required = not (
-            block_text_normalized.startswith("az auf pos.")
-            or "az auf pos." in block_text_normalized
-        )
+        image_required = _is_image_required(block_text_normalized, width_raw, height_raw)
 
         items.append(
             {

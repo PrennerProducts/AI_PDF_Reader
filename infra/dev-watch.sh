@@ -21,7 +21,6 @@ done
 
 echo "[3/4] Quick checks"
 echo "API:    $(curl -fsS http://localhost:8000/health)"
-echo "Ollama: $(curl -fsS http://localhost:11435/api/tags)"
 
 echo "[4/4] Live logs (Ctrl+C to stop log stream, containers keep running)"
 docker compose logs -f --tail=120

@@ -10,7 +10,7 @@ Die App ist ein fortgeschrittener PoC mit funktionaler Verarbeitung, Validierung
 
 ### Infrastruktur
 
-- Docker Compose fuer API, Postgres und Ollama.
+- Docker Compose fuer API und Postgres.
 - CPU-only Compose-Datei fuer Server ohne NVIDIA-GPU.
 - Persistente Volumes fuer Postgres, Uploads, Exporte und Logs.
 - Auto-Migrationen fuer Postgres beim API-Start.
@@ -26,8 +26,8 @@ Die App ist ein fortgeschrittener PoC mit funktionaler Verarbeitung, Validierung
 - Reset: `POST /reset/{document_id}`.
 - Vorschau und Export: `GET /preview`, `GET /export`.
 - Original-PDF- und Bildstreaming.
-- LLM-Run-Historie und Parser-vs-LLM-Vergleich.
-- Bild-Matching per Heuristik/VLM.
+- Dokumentverknuepfung Angebot/Auftragsbestaetigung.
+- Bild-Matching per lokaler Heuristik.
 - Manuelle Bildzuordnung.
 - Manuelle Positionspruefung.
 - Dokumentfreigabe.

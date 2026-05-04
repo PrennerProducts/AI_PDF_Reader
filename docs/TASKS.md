@@ -284,7 +284,7 @@ Tasks:
 - Provider-spezifische Bildpflicht.
 - `no_image_required` als Zustand.
 - Schnellere UI fuer Bildkandidaten.
-- VLM nur fuer Review-Faelle optional nutzen.
+- Bild-Review-Faelle manuell schneller aufloesbar machen.
 
 Umgesetzt:
 
@@ -316,8 +316,8 @@ Umgesetzt:
 - Grosser Hero-Header durch kompakte Operator-Leiste ersetzt.
 - Sichtbarer Hauptflow reduziert auf Dokumentauswahl, Upload, Verarbeitung, Status, Pruefung und Freigabe.
 - Parser-only ist der einzige sichtbare Verarbeitungsmodus.
-- LLM-/Debug-/Preview-Aktionen aus dem Hauptflow entfernt und in Diagnosebereich verschoben.
-- Quellen-/LLM-Tab aus sichtbarer Navigation entfernt.
+- KI-/Debug-/Preview-Aktionen aus dem Hauptflow entfernt; Verarbeitung ist parser-only.
+- Quellen-Tab aus sichtbarer Navigation entfernt.
 - Tab-Leiste als Workflow-Stepper `Pruefung -> Aufgaben -> Positionen -> Bilder` mit Status-Badges und Hilfetext umgebaut.
 - Extraktions-Tabs in den Panel-Header verschoben und auf `Uebersicht`, `Freigabe`, `Positionen`, `Bilder` reduziert.
 - PDF-Auswahl startet Upload und Parser-Verarbeitung automatisch; der sichtbare `Verarbeiten`-Button bleibt als manueller Re-Run.

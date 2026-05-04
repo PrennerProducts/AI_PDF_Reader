@@ -31,7 +31,7 @@ Streamt das Original-PDF inline.
 Loescht extrahierte Ergebnisse eines Dokuments.
 
 - Upload-Datei bleibt erhalten.
-- Optional werden Text-, Bild- und LLM-Logs geloescht.
+- Optional werden Text- und Bildlogs geloescht.
 - Dokument wird wieder auf `uploaded` gesetzt.
 
 ## Verarbeitung
@@ -42,15 +42,14 @@ Startet die Extraktionspipeline.
 
 Query-Parameter:
 
-- `process_mode=parser_only|hybrid_fill|llm_override|llm_only`
-- Backward-compatible: `use_llm` und `llm_override`
+- `process_mode=parser_only`
 
 Modi:
 
-- `parser_only`: nur Parser und Extraktor.
-- `hybrid_fill`: Parser zuerst, LLM fuellt fehlende Kopffelder/Summen.
-- `llm_override`: Parser zuerst, LLM darf Kopffelder/Summen ueberschreiben.
-- `llm_only`: LLM extrahiert Kopf, Summen und Positionen; Bilder bleiben aus der PDF-Extraktion.
+- `parser_only`: lokaler Parser, lokaler Text-/Bildextraktor und heuristische Bildzuordnung.
+
+Hinweis: KI-/Modellverarbeitung ist im Produktbetrieb deaktiviert. Alte Parameter wie
+`use_llm=true` oder nicht erlaubte `process_mode`-Werte werden mit HTTP `400` abgelehnt.
 
 ### `GET /progress/{document_id}`
 
@@ -63,10 +62,18 @@ Hinweis: Der Fortschritt ist aktuell in-memory und damit noch nicht produktionsr
 Liefert das normalisierte Ergebnis:
 
 - `document`
+- `document_relations`
 - `amount_lines`
 - `line_items`
 - `images`
 - `validation`
+
+### `GET /relations/{document_id}`
+
+Liefert die logische Dokumentverknuepfung:
+
+- `linked_offer_document`: bei Auftragsbestaetigungen das zugehoerige Angebot, falls gefunden.
+- `linked_order_confirmations`: bei Angeboten die verknuepften Auftragsbestaetigungen.
 
 ## Review und Freigabe
 
@@ -176,29 +183,10 @@ Berechnet Bild-Matching pro Position.
 
 Query-Parameter:
 
-- `strategy=heuristic|vlm|hybrid`
+- `strategy=heuristic`
 - `max_candidates`
 - `max_items`
 - `allow_multiple`
-- `vlm_min_confidence`
-
-## LLM und Vergleich
-
-### `GET /llm-runs/{document_id}?limit=20`
-
-Listet LLM-Runs eines Dokuments.
-
-### `GET /llm-runs/{document_id}/latest`
-
-Liefert den neuesten LLM-Run.
-
-### `GET /llm-runs/{document_id}/run/{run_id}`
-
-Liefert einen bestimmten LLM-Run.
-
-### `GET /compare/{document_id}`
-
-Fuehrt Parser und LLM separat aus und liefert einen Feldvergleich ohne DB-Write.
 
 ## Dev
 

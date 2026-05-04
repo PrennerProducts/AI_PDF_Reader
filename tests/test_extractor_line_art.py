@@ -10,9 +10,26 @@ from extractor import (
     _crop_content_metrics,
     _line_art_metrics,
     _looks_like_position_line_art,
+    _position_line_art_boxes,
     _technical_line_art_bbox,
     extract_pdf_images,
 )
+
+
+class _FakeRect:
+    width = 600.0
+    height = 800.0
+
+
+class _FakePage:
+    rect = _FakeRect()
+
+    def __init__(self, blocks: list[tuple[float, float, float, float, str]]) -> None:
+        self._blocks = blocks
+
+    def get_text(self, mode: str):
+        assert mode == "blocks"
+        return self._blocks
 
 
 def test_position_line_art_accepts_window_sketch() -> None:
@@ -69,6 +86,23 @@ def test_technical_line_art_bbox_removes_position_header() -> None:
     assert bbox[3] > 220
 
 
+def test_technical_line_art_bbox_keeps_right_side_dimension_text() -> None:
+    image = Image.new("RGB", (430, 260), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((35, 30, 270, 200), outline="black", width=2)
+    draw.line((120, 30, 120, 200), fill="black", width=2)
+    draw.line((200, 30, 200, 200), fill="black", width=2)
+    draw.line((305, 30, 305, 200), fill="black", width=2)
+    draw.text((323, 110), "2200", fill="black")
+    draw.line((35, 220, 270, 220), fill="black", width=2)
+    draw.text((132, 228), "2850", fill="black")
+
+    bbox = _technical_line_art_bbox(image)
+
+    assert bbox is not None
+    assert bbox[2] >= 350
+
+
 def test_technical_line_art_bbox_ignores_following_alternative_heading() -> None:
     image = Image.new("RGB", (360, 760), "white")
     draw = ImageDraw.Draw(image)
@@ -87,6 +121,42 @@ def test_technical_line_art_bbox_ignores_following_alternative_heading() -> None
 
     assert bbox is not None
     assert bbox[3] < 380
+
+
+def test_position_line_art_boxes_use_text_separators_for_last_block() -> None:
+    page = _FakePage(
+        [
+            (43.2, 72.1, 532.7, 155.5, "Pos.\n103\n2 Stck\nB/H: 915x 1120"),
+            (
+                43.2,
+                204.1,
+                489.5,
+                335.4,
+                "------------------------------------------------------------\nPos.\n104\n2 Stck\nB/H: 915x 2065",
+            ),
+            (
+                43.2,
+                408.1,
+                489.5,
+                491.4,
+                "------------------------------------------------------------\nPos.\n105\n2 Stck\nB/H: 915x 2065",
+            ),
+            (
+                43.2,
+                552.1,
+                489.5,
+                635.4,
+                "------------------------------------------------------------\nPos.\n106\n2 Stck\nB/H: 915x 1120",
+            ),
+            (57.6, 684.1, 489.5, 695.4, "------------------------------------------------------------"),
+        ]
+    )
+    rendered = Image.new("RGB", (1200, 1600), "white")
+
+    boxes = _position_line_art_boxes(page, rendered)
+
+    assert len(boxes) == 4
+    assert boxes[-1][3] == 1356
 
 
 def test_schuchter_vector_line_art_extracts_position_crops(tmp_path: Path) -> None:

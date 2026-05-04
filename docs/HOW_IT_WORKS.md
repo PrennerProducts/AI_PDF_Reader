@@ -23,7 +23,7 @@ Aufgaben:
 - Result/Preview/Export.
 - Review und Freigabe.
 - Bildzuordnung.
-- LLM/VLM-Hilfsendpunkte.
+- Dokumentverknuepfung Angebot/Auftragsbestaetigung.
 - UI-Auslieferung.
 
 Hinweis:
@@ -63,27 +63,23 @@ Aktuelle Template-Anbieter:
 - `schuchter`
 - `sr_schauraum`
 
-### LLM/VLM
+### Dokumentverknuepfung
 
 Dateien:
 
-- `api/llm.py`
-- `api/image_matcher.py`
+- `api/db.py`
+- `api/parser.py`
 
-LLM wird optional genutzt fuer:
+Aufgabe:
 
-- Kopffelder/Summen ergaenzen.
-- Parser-vs-LLM-Vergleich.
-- LLM-only Fallback.
-
-VLM wird optional genutzt fuer:
-
-- Bildkandidaten zu Positionen ranken.
+- Angebote speichern ihre erkannte `document_number`.
+- Auftragsbestaetigungen speichern ihre erkannte `offer_reference`.
+- Nach der Verarbeitung setzt `refresh_document_links` bei passenden Lieferanten und Referenzen `linked_offer_document_id`.
+- `GET /relations/{document_id}` und `GET /result/{document_id}` liefern die Verknuepfung mit.
 
 Produktionshinweis:
 
-- Auf CPU-only Servern sollen `LLM_ENABLED=false` und `VLM_ENABLED=false` als Startmodus genutzt werden.
-- Parser-only muss der stabile Basispfad sein.
+- Die Verarbeitung ist parser-only. Es werden keine Cloud-Dienste, externen APIs oder KI-Modelle fuer die Extraktion genutzt.
 
 ### Postgres
 
@@ -107,7 +103,6 @@ Verzeichnisse:
 - `data/uploads`: Original-PDFs.
 - `data/logs/extracted_text`: Textdumps.
 - `data/logs/extracted_images`: extrahierte Bilder.
-- `data/logs/llm`: LLM-Runs.
 - `data/exports`: erzeugte JSON/CSV/SQL-Dateien.
 
 ## Workflow
@@ -130,8 +125,8 @@ Schritte:
 3. PDF-Bilder aus echten Render-Placements extrahieren.
 4. Parser-Template erkennen.
 5. Kopfdaten, Summen und Positionen extrahieren.
-6. Optional LLM-Felder ergaenzen.
-7. Daten in Postgres schreiben.
+6. Daten in Postgres schreiben.
+7. Angebot/Auftragsbestaetigung verknuepfen.
 8. Bildzuordnung berechnen.
 9. Status auf `processed` oder `failed`.
 
@@ -235,7 +230,6 @@ Vorhanden:
 - Positionen.
 - Bilder.
 - Preview/Download.
-- LLM-Historie.
 - Freigabe.
 
 Fuer Production geplant:

@@ -107,6 +107,26 @@ Zentrale+Taster BAUSEITS
     assert items[0]["image_required"] is False
 
 
+def test_schuchter_composite_parent_position_is_not_image_required() -> None:
+    text = """
+Schuchter Fenster GmbH
+Angebot A260344 vom 25.03.2026
+Pos.
+1 2 Stk. 430100
+Kopplungselement bestehend aus:
+Pos. 1a, Pos. 1b und Pos. 1c
+.
+3.000,00 6.000,00
+"""
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "schuchter"
+    assert len(items) == 1
+    assert items[0]["position_no"] == "1"
+    assert items[0]["image_required"] is False
+
+
 def test_sr_schauraum_regression() -> None:
     pdf_path = ROOT / "samples/pdfs/regression/offers/sr_schauraum/Angebotsnr AN-2025-113 - SR Schauraum GmbH (2).pdf"
     text = _read_pdf_text(pdf_path)

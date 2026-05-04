@@ -20,14 +20,14 @@ Zielprozess:
 
 Bereits umgesetzt:
 
-- Docker-Stack fuer API, Postgres und Ollama.
+- Docker-Stack fuer API und Postgres.
 - Upload, Reset, Processing, Progress, Result, Preview und Export.
 - Template-Parser fuer die aktuellen Angebotsanbieter.
 - Regression-Korpus fuer Angebote und Auftragsbestaetigungen.
 - Bildextraktion aus echten PDF-Render-Placements.
-- Heuristische Bildzuordnung plus optionaler VLM-Matcher.
+- Heuristische Bildzuordnung.
 - Validierung fuer Pflichtfelder, Summen, Positionen, Seitenreferenzen, Bilder und Provider-Sonderregeln.
-- UI-Workbench mit PDF-Vorschau, Cockpit, Review, Positionen, Bildern, LLM-Historie und manueller Bild-/Review-Freigabe.
+- UI-Workbench mit PDF-Vorschau, Cockpit, Review, Positionen, Bildern und manueller Bild-/Review-Freigabe.
 - Dokumentfreigabe (`approval_status`) als API- und UI-Funktion.
 - VenDoc-Dry-Run-Mapping mit Export-Journal und API-Endpunkten.
 
@@ -173,7 +173,7 @@ Tasks:
 
 Tasks:
 
-- Healthchecks in Docker Compose fuer API/Postgres/Ollama.
+- Healthchecks in Docker Compose fuer API/Postgres.
 - Readiness-Check fuer Postgres, Storage und optional MSSQL.
 - Backup-Plan fuer Postgres und `data/uploads`.
 - Logrotation und strukturierte Logs.
@@ -191,7 +191,7 @@ Tasks:
   - review
   - exports
   - vendoc
-  - llm
+  - relations
 - Pydantic Response-Modelle fuer stabile API-Vertraege.
 - Fehlercodes und Fehlermeldungen vereinheitlichen.
 
@@ -232,7 +232,7 @@ Tasks:
 - Bildpflicht je Provider/Positionstyp konfigurierbar machen.
 - `no_image_required` fachlich von `unmatched` unterscheiden.
 - UI fuer Bildkandidaten schneller bedienbar machen.
-- Optional: VLM-Matching nur fuer Review-Faelle statt fuer alle Positionen.
+- Bild-Matching nur per lokaler Heuristik; Review-Faelle manuell aufloesen.
 
 ## Milestones
 

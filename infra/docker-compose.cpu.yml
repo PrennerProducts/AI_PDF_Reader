@@ -13,11 +13,7 @@ services:
       - ../data/logs:/data/logs
     environment:
       - PDR_ENV=${PDR_ENV}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
       - DATABASE_URL=${DATABASE_URL}
-      - LLM_ENABLED=${LLM_ENABLED:-false}
-      - VLM_ENABLED=${VLM_ENABLED:-false}
       - VENDOC_MSSQL_ENABLED=${VENDOC_MSSQL_ENABLED:-false}
       - VENDOC_MSSQL_HOST=${VENDOC_MSSQL_HOST:-}
       - VENDOC_MSSQL_PORT=${VENDOC_MSSQL_PORT:-1433}
@@ -31,17 +27,7 @@ services:
       - "8000:8000"
     restart: unless-stopped
     depends_on:
-      - ollama
       - db
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: pdr-ollama
-    ports:
-      - "11435:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
 
   db:
     image: postgres:16
@@ -57,5 +43,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  ollama_data:
   pg_data:

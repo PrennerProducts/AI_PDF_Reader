@@ -41,6 +41,7 @@ POSITION_BLOCK_ANCHOR_RE = re.compile(
     r"(?:^|\s)Pos\.\s*\d+(?:[a-z])?(?:\.\d+)?\b",
     flags=re.IGNORECASE,
 )
+POSITION_SEPARATOR_RE = re.compile(r"^[\-\u2014_]{20,}$")
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -447,6 +448,7 @@ def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int
         return []
 
     starts: list[tuple[float, float]] = []
+    separator_ys: list[float] = []
     for block in blocks:
         if not isinstance(block, (tuple, list)) or len(block) < 5:
             continue
@@ -460,6 +462,9 @@ def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int
             continue
 
         text = _normalized_pdf_block_text(block[4])
+        first_line = text.split(" ", 1)[0]
+        if POSITION_SEPARATOR_RE.fullmatch(first_line):
+            separator_ys.append(y0)
         if not _has_position_block_anchor(text):
             continue
         starts.append((y0, y1))
@@ -476,6 +481,8 @@ def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int
     if not deduped_starts:
         return []
 
+    separator_ys = sorted(set(round(y, 2) for y in separator_ys))
+
     scale_x = rendered.width / page_width
     scale_y = rendered.height / page_height
     crop_left = int(max(0, POSITION_LINE_ART_LEFT_PT * scale_x))
@@ -486,11 +493,18 @@ def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int
     boxes: list[tuple[int, int, int, int]] = []
     for idx, (y0, y1) in enumerate(deduped_starts):
         next_y0 = deduped_starts[idx + 1][0] if idx + 1 < len(deduped_starts) else None
+        next_separator_y = next((value for value in separator_ys if value > y1 + 4.0), None)
         block_bottom = (
             next_y0 - POSITION_LINE_ART_BOTTOM_PAD_PT
             if next_y0 is not None
-            else y1 + POSITION_LINE_ART_LAST_BLOCK_PT
+            else (
+                next_separator_y - POSITION_LINE_ART_BOTTOM_PAD_PT
+                if next_separator_y is not None
+                else y1 + POSITION_LINE_ART_LAST_BLOCK_PT
+            )
         )
+        if next_y0 is not None and next_separator_y is not None:
+            block_bottom = min(block_bottom, next_separator_y - POSITION_LINE_ART_BOTTOM_PAD_PT)
         block_bottom = min(page_height - 30.0, block_bottom)
         block_top = max(0.0, y0 - POSITION_LINE_ART_TOP_PAD_PT)
         if block_bottom <= block_top:
@@ -712,7 +726,7 @@ def _technical_line_art_bbox(crop: Image.Image) -> tuple[int, int, int, int] | N
     bottom = (max(bottom_candidates) if bottom_candidates else vertical_bottom) + 1
 
     pad_left = max(16, int(width * 0.045))
-    pad_right = max(28, int(width * 0.075))
+    pad_right = max(48, int(width * 0.13))
     pad_top = max(2, int(height * 0.01))
     pad_bottom = max(18, int(height * 0.075))
 

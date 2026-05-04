@@ -808,6 +808,7 @@
     }
 
     .pdf-stage {
+      position: relative;
       display: flex;
       flex: 1 1 auto;
       min-height: 0;
@@ -897,7 +898,7 @@
       flex-wrap: wrap;
     }
 
-    .summary .card.source-llm {
+    .summary .card.source-auto {
       border-color: rgba(213, 26, 15, 0.18);
       background:
         linear-gradient(180deg, rgba(242, 236, 236, 0.94), rgba(230, 223, 223, 0.86)),
@@ -2485,7 +2486,7 @@
       white-space: nowrap;
     }
 
-    .src-tag.src-llm {
+    .src-tag.src-auto {
       color: var(--brand-strong);
       background: var(--brand-soft);
       border-color: rgba(213, 26, 15, 0.18);
@@ -2811,7 +2812,7 @@
       transition: transform 0.16s ease, box-shadow 0.16s ease;
     }
 
-    .img-card.llm-assigned {
+    .img-card.auto-assigned {
       border-color: #66c89a;
       box-shadow: inset 0 0 0 1px rgba(27, 140, 82, 0.15);
       background: #f4fcf8;
@@ -6262,15 +6263,15 @@
       min-width: 50px;
       padding: 0 12px;
       color: #ffffff;
-      background: #1d1d1f;
+      background: var(--sr-button-bg, #3f4144);
       font-size: 12px;
       font-weight: 820;
-      box-shadow: 0 8px 16px rgba(29, 29, 31, 0.14);
+      box-shadow: 0 8px 16px rgba(39, 41, 44, 0.16);
     }
 
     .app-v3 .pdf-zoom-chip:hover {
       color: #ffffff;
-      background: #2c2c2e;
+      background: var(--sr-button-bg-hover, #4a4c50);
     }
 
     .app-v3 .pdf-control-divider {
@@ -6288,6 +6289,108 @@
 
     .app-v3 #pdfFrame {
       background: transparent;
+    }
+
+    .app-v3 .pdf-crop-overlay[hidden] {
+      display: none !important;
+    }
+
+    .app-v3 .pdf-crop-overlay {
+      position: absolute;
+      inset: 14px;
+      z-index: 30;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid rgba(60, 60, 67, 0.16);
+      border-radius: 18px;
+      background: rgba(246, 246, 248, 0.98);
+      box-shadow:
+        0 24px 64px rgba(29, 29, 31, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(14px);
+    }
+
+    .app-v3 .pdf-crop-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 58px;
+      padding: 12px 14px 12px 16px;
+      border-bottom: 1px solid rgba(60, 60, 67, 0.12);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .app-v3 .pdf-crop-toolbar strong,
+    .app-v3 .pdf-crop-toolbar span {
+      display: block;
+    }
+
+    .app-v3 .pdf-crop-toolbar strong {
+      color: var(--sr-ink);
+      font-size: 14px;
+      font-weight: 840;
+    }
+
+    .app-v3 .pdf-crop-toolbar span {
+      margin-top: 2px;
+      color: rgba(29, 29, 31, 0.54);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .app-v3 .pdf-crop-cancel {
+      flex: 0 0 auto;
+      height: 34px;
+      padding: 0 14px;
+      border: 1px solid rgba(60, 60, 67, 0.14);
+      border-radius: 999px;
+      color: rgba(29, 29, 31, 0.76);
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 12px;
+      font-weight: 760;
+      cursor: pointer;
+    }
+
+    .app-v3 .pdf-crop-workspace {
+      position: relative;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 0;
+      padding: 18px;
+      cursor: crosshair;
+    }
+
+    .app-v3 .pdf-crop-workspace img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow:
+        0 12px 36px rgba(29, 29, 31, 0.18),
+        0 0 0 1px rgba(60, 60, 67, 0.14);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .app-v3 .pdf-crop-selection[hidden] {
+      display: none !important;
+    }
+
+    .app-v3 .pdf-crop-selection {
+      position: absolute;
+      z-index: 2;
+      border: 2px solid var(--sr-red);
+      border-radius: 8px;
+      background: rgba(230, 51, 41, 0.12);
+      box-shadow:
+        0 0 0 9999px rgba(29, 29, 31, 0.20),
+        0 10px 28px rgba(230, 51, 41, 0.20);
+      pointer-events: none;
     }
 
     .app-v3 .extraction-head {
@@ -6821,7 +6924,7 @@
     }
 
     .app-v3 .summary .card,
-    .app-v3 .summary .card.source-llm,
+    .app-v3 .summary .card.source-auto,
     .app-v3 .summary .card.source-parser {
       min-height: 78px;
       padding: 16px;
@@ -7232,7 +7335,7 @@
         0 18px 40px rgba(29, 29, 31, 0.075);
     }
 
-    .app-v3 .img-card.llm-assigned {
+    .app-v3 .img-card.auto-assigned {
       border-color: rgba(52, 199, 89, 0.20);
       background: linear-gradient(180deg, #ffffff, #f6fff9);
       box-shadow: 0 12px 28px rgba(29, 29, 31, 0.050);
@@ -8468,7 +8571,7 @@
       border-color: rgba(11, 122, 72, 0.22);
     }
 
-    .app-v3 .img-card.llm-assigned {
+    .app-v3 .img-card.auto-assigned {
       border-color: rgba(11, 122, 72, 0.28);
       background:
         linear-gradient(180deg, rgba(232, 248, 238, 0.92), rgba(246, 255, 249, 0.96) 54%, #ffffff);
@@ -8495,7 +8598,7 @@
         0 14px 30px rgba(157, 45, 26, 0.12);
     }
 
-    .app-v3 .img-card.llm-assigned:hover {
+    .app-v3 .img-card.auto-assigned:hover {
       border-color: rgba(11, 122, 72, 0.40);
       box-shadow:
         inset 0 4px 0 rgba(11, 122, 72, 0.66),
@@ -8516,7 +8619,7 @@
         0 18px 38px rgba(157, 45, 26, 0.16);
     }
 
-    .app-v3 .img-card.llm-assigned .img-preview-link {
+    .app-v3 .img-card.auto-assigned .img-preview-link {
       border-color: rgba(11, 122, 72, 0.14);
       background: linear-gradient(180deg, #fbfffc, #eefaf2);
     }
@@ -8531,7 +8634,7 @@
       background: linear-gradient(180deg, #fffafa, #ffede8);
     }
 
-    .app-v3 .img-card.llm-assigned .img-badge {
+    .app-v3 .img-card.auto-assigned .img-badge {
       color: #0b7a48;
       background: #dff5e8;
       border-color: rgba(11, 122, 72, 0.22);
@@ -9067,6 +9170,10 @@
       --sr-polish-line: rgba(17, 17, 17, 0.085);
       --sr-polish-line-strong: rgba(17, 17, 17, 0.12);
       --sr-polish-shadow: 0 18px 38px rgba(17, 17, 17, 0.070);
+      --sr-button-bg: #3f4144;
+      --sr-button-bg-hover: #4a4c50;
+      --sr-button-border: #34363a;
+      --sr-button-shadow: rgba(39, 41, 44, 0.18);
       --sr-ok: #0b7a48;
       --sr-ok-soft: #e7f7ed;
       background:
@@ -9095,21 +9202,35 @@
     .app-v3 .shell-actions .btn,
     .app-v3 .review-next-button,
     .app-v3 #approveDocumentBtn {
-      border-color: #1f1f1f !important;
-      background: #1f1f1f !important;
+      border-color: var(--sr-button-border) !important;
+      background: var(--sr-button-bg) !important;
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.16),
-        0 12px 24px rgba(17, 17, 17, 0.16) !important;
+        0 12px 24px var(--sr-button-shadow) !important;
     }
 
     .app-v3 .shell-controls input[type="file"]::file-selector-button:hover,
     .app-v3 .shell-actions .btn:hover,
     .app-v3 .review-next-button:hover,
     .app-v3 #approveDocumentBtn:hover {
-      background: #2a2a2a !important;
+      background: var(--sr-button-bg-hover) !important;
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.18),
-        0 14px 28px rgba(17, 17, 17, 0.18) !important;
+        0 14px 28px var(--sr-button-shadow) !important;
+    }
+
+    .app-v3 .pdf-zoom-chip,
+    .app-v3 #pdfFitBtn {
+      color: #ffffff !important;
+      border-color: var(--sr-button-border) !important;
+      background: var(--sr-button-bg) !important;
+      box-shadow: 0 8px 16px rgba(39, 41, 44, 0.16) !important;
+    }
+
+    .app-v3 .pdf-zoom-chip:hover,
+    .app-v3 #pdfFitBtn:hover {
+      color: #ffffff !important;
+      background: var(--sr-button-bg-hover) !important;
     }
 
     .app-v3 .review-panel {
@@ -9708,8 +9829,21 @@
             </span>
           </div>
         </div>
-        <div class="pdf-stage">
+        <div class="pdf-stage" id="pdfStage">
           <iframe id="pdfFrame" title="PDF Vorschau"></iframe>
+          <div class="pdf-crop-overlay" id="pdfCropOverlay" hidden>
+            <div class="pdf-crop-toolbar">
+              <div>
+                <strong id="pdfCropTitle">PDF-Bereich setzen</strong>
+                <span>Rechteck auf der Seite ziehen, um das Bild der Position zuzuordnen.</span>
+              </div>
+              <button class="pdf-crop-cancel" id="pdfCropCancelBtn" type="button">Abbrechen</button>
+            </div>
+            <div class="pdf-crop-workspace" id="pdfCropWorkspace">
+              <img id="pdfCropPreviewImg" alt="PDF-Seite für manuelle Bildauswahl" draggable="false">
+              <div class="pdf-crop-selection" id="pdfCropSelection" hidden></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -9908,10 +10042,10 @@
           </div>
 
           <div hidden>
-            <div id="llmRunInfo"></div>
+            <div id="diagnosticRunInfo"></div>
             <div id="compareInfo"></div>
             <div id="compareSummary"></div>
-            <table><tbody id="llmChangeRows"></tbody></table>
+            <table><tbody id="diagnosticChangeRows"></tbody></table>
             <table><tbody id="compareRows"></tbody></table>
           </div>
         </div>
@@ -9943,8 +10077,6 @@
       documentId: null,
       documents: [],
       result: null,
-      llmRun: null,
-      compare: null,
       fieldSources: {},
       previewFormat: null,
       previewContent: "",
@@ -9969,6 +10101,14 @@
         zoom: "fit",
         reloadToken: 0,
       },
+      pdfCrop: {
+        active: false,
+        lineItemId: null,
+        itemKey: "",
+        page: 1,
+        pointerId: null,
+        start: null,
+      },
     };
 
     const ui = {
@@ -9989,7 +10129,14 @@
       processLiveState: document.getElementById("processLiveState"),
       clearDebugBtn: document.getElementById("clearDebugBtn"),
       debugLog: document.getElementById("debugLog"),
+      pdfStage: document.getElementById("pdfStage"),
       pdfFrame: document.getElementById("pdfFrame"),
+      pdfCropOverlay: document.getElementById("pdfCropOverlay"),
+      pdfCropWorkspace: document.getElementById("pdfCropWorkspace"),
+      pdfCropPreviewImg: document.getElementById("pdfCropPreviewImg"),
+      pdfCropSelection: document.getElementById("pdfCropSelection"),
+      pdfCropTitle: document.getElementById("pdfCropTitle"),
+      pdfCropCancelBtn: document.getElementById("pdfCropCancelBtn"),
       pdfPrevPageBtn: document.getElementById("pdfPrevPageBtn"),
       pdfNextPageBtn: document.getElementById("pdfNextPageBtn"),
       pdfPageInput: document.getElementById("pdfPageInput"),
@@ -10029,8 +10176,8 @@
       tabBadgeItems: document.getElementById("tabBadgeItems"),
       tabBadgeAudit: document.getElementById("tabBadgeAudit"),
       summary: document.getElementById("summary"),
-      llmRunInfo: document.getElementById("llmRunInfo"),
-      llmChangeRows: document.getElementById("llmChangeRows"),
+      diagnosticRunInfo: document.getElementById("diagnosticRunInfo"),
+      diagnosticChangeRows: document.getElementById("diagnosticChangeRows"),
       compareInfo: document.getElementById("compareInfo"),
       compareSummary: document.getElementById("compareSummary"),
       compareRows: document.getElementById("compareRows"),
@@ -10052,10 +10199,7 @@
       closePreviewBtn: document.getElementById("closePreviewBtn"),
     };
     const PROCESS_MODE_LABELS = {
-      parser_only: "Parser only",
-      hybrid_fill: "Hybrid fill",
-      llm_override: "LLM override",
-      llm_only: "LLM only",
+      parser_only: "Lokaler Parser",
     };
     const PDF_ZOOM_LEVELS = [75, 90, 100, 125, 150, 175, 200];
     const REVIEW_FIELD_LABELS = {
@@ -10266,11 +10410,13 @@
     }
 
     function setPdfPage(page) {
+      if (state.pdfCrop && state.pdfCrop.active) cancelPdfCrop({ silent: true });
       state.pdf.page = clampPdfPage(page);
       refreshPdfFrame({ forceReload: true });
     }
 
     function setPdfZoom(zoom) {
+      if (state.pdfCrop && state.pdfCrop.active) cancelPdfCrop({ silent: true });
       state.pdf.zoom = zoom;
       refreshPdfFrame({ forceReload: true });
     }
@@ -10426,11 +10572,8 @@
         } else if (status === "processing") {
           const nowMs = Date.now();
           if (!state.processingHeartbeatAtMs || (nowMs - state.processingHeartbeatAtMs) >= 10000) {
-            const modeNote = state.processingMode === "llm_only"
-              ? "LLM-only rechnet (Zwischenergebnis kommt erst am Ende)."
-              : "Verarbeitung laeuft.";
             addDebug(
-              `Dokument #${state.processingDocumentId}: ${progressMessage || modeNote} Laufzeit ${elapsed}.`,
+              `Dokument #${state.processingDocumentId}: ${progressMessage || "Verarbeitung laeuft."} Laufzeit ${elapsed}.`,
               "warn"
             );
             state.processingHeartbeatAtMs = nowMs;
@@ -10468,9 +10611,6 @@
       state.processingMode = modeValue || null;
       setLiveState(`processing · 0:00`, "running");
       addDebug(`Start processing fuer Dokument #${documentId} (Mode: ${modeLabel})`, "info");
-      if (modeValue === "llm_only") {
-        addDebug("Hinweis: Im LLM-only Modus bleiben Positionen/Bilder bis zum Ende oft bei 0.", "warn");
-      }
       pollProcessingSnapshot();
       state.processingPollTimer = setInterval(() => {
         pollProcessingSnapshot();
@@ -10478,7 +10618,6 @@
     }
 
     function sourceTagHtml(source) {
-      if (source === "llm") return "<span class=\"src-tag src-llm\">LLM</span>";
       if (source === "parser") return "<span class=\"src-tag src-parser\">Parser</span>";
       return "<span class=\"src-tag src-unknown\">-</span>";
     }
@@ -10500,17 +10639,7 @@
       return current;
     }
 
-    function buildAppliedChangeSet(changes) {
-      const set = new Set();
-      for (const item of (Array.isArray(changes) ? changes : [])) {
-        if (item && item.applied && item.field) {
-          set.add(String(item.field));
-        }
-      }
-      return set;
-    }
-
-    function deriveFieldSources(llmRun) {
+    function deriveFieldSources() {
       const keys = [
         "supplier_name",
         "document_type",
@@ -10525,43 +10654,11 @@
       ];
       const out = {};
       for (const key of keys) out[key] = "parser";
-
-      if (!llmRun || typeof llmRun !== "object") return out;
-      const result = (llmRun.result && typeof llmRun.result === "object") ? llmRun.result : {};
-      const llmUsed = !!(llmRun.enabled_effective && result.ok);
-      const mode = String(llmRun.process_mode_effective || llmRun.process_mode_requested || "");
-      if (!llmUsed || mode.startsWith("parser_only")) return out;
-      if (mode === "llm_only") {
-        for (const key of keys) out[key] = "llm";
-        return out;
-      }
-
-      const applied = buildAppliedChangeSet(llmRun.changes);
-      const before = (llmRun.parser_snapshot_before && typeof llmRun.parser_snapshot_before === "object")
-        ? llmRun.parser_snapshot_before
-        : {};
-      const after = (llmRun.parser_snapshot_after && typeof llmRun.parser_snapshot_after === "object")
-        ? llmRun.parser_snapshot_after
-        : {};
-      const llmFields = (result.fields && typeof result.fields === "object") ? result.fields : {};
-
-      for (const key of keys) {
-        if (applied.has(key)) {
-          out[key] = "llm";
-          continue;
-        }
-        const beforeVal = fmt(getPathValue(before, key), "");
-        const afterVal = fmt(getPathValue(after, key), "");
-        const llmVal = fmt(getPathValue(llmFields, key), "");
-        if (llmVal && beforeVal !== afterVal && afterVal === llmVal) {
-          out[key] = "llm";
-        }
-      }
       return out;
     }
 
     function syncFieldSources() {
-      state.fieldSources = deriveFieldSources(state.llmRun);
+      state.fieldSources = deriveFieldSources();
       if (state.result) {
         renderReview(state.result);
         renderDocumentIssues(state.result);
@@ -10589,7 +10686,6 @@
       valueEl.appendChild(valueText);
       if (sourceKey) {
         const source = state.fieldSources[sourceKey] || "unknown";
-        if (source === "llm") card.classList.add("source-llm");
         if (source === "parser") card.classList.add("source-parser");
         valueEl.appendChild(sourceTagElement(source));
       }
@@ -10984,9 +11080,9 @@
         "currency",
       ];
       const totalKeys = ["totals.net_total", "totals.vat_total", "totals.gross_total"];
-      const headCounts = { parser: 0, llm: 0, unknown: 0 };
-      const totalCounts = { parser: 0, llm: 0, unknown: 0 };
-      const itemCounts = { parser: 0, llm: 0, unknown: 0 };
+      const headCounts = { parser: 0, unknown: 0 };
+      const totalCounts = { parser: 0, unknown: 0 };
+      const itemCounts = { parser: 0, unknown: 0 };
 
       for (const key of headKeys) {
         const source = state.fieldSources[key] || "unknown";
@@ -11001,15 +11097,11 @@
         itemCounts[source] = (itemCounts[source] || 0) + 1;
       }
 
-      const llmChanges = Array.isArray(state.llmRun && state.llmRun.changes)
-        ? state.llmRun.changes.filter((item) => item && item.applied).length
-        : 0;
       return {
         documentNumber: fmt(document.document_number),
         headCounts,
         totalCounts,
         itemCounts,
-        llmChanges,
       };
     }
 
@@ -11739,23 +11831,18 @@
       ui.sourceBreakdown.innerHTML = [
         reviewRowHtml(
           "Kopfdaten",
-          `${sourceSummary.headCounts.parser || 0} Parser · ${sourceSummary.headCounts.llm || 0} LLM`,
+          `${sourceSummary.headCounts.parser || 0} Parser`,
           reviewFlagHtml(`${sourceSummary.headCounts.unknown || 0} offen`, sourceSummary.headCounts.unknown ? "review" : "ok")
         ),
         reviewRowHtml(
           "Summenfelder",
-          `${sourceSummary.totalCounts.parser || 0} Parser · ${sourceSummary.totalCounts.llm || 0} LLM`,
+          `${sourceSummary.totalCounts.parser || 0} Parser`,
           reviewFlagHtml(`${sourceSummary.totalCounts.unknown || 0} offen`, sourceSummary.totalCounts.unknown ? "review" : "ok")
         ),
         reviewRowHtml(
           "Positionen",
-          `${sourceSummary.itemCounts.parser || 0} Parser · ${sourceSummary.itemCounts.llm || 0} LLM`,
+          `${sourceSummary.itemCounts.parser || 0} Parser`,
           reviewFlagHtml(`${sourceSummary.itemCounts.unknown || 0} offen`, sourceSummary.itemCounts.unknown ? "review" : "ok")
-        ),
-        reviewRowHtml(
-          "LLM-Änderungen",
-          sourceSummary.llmChanges ? `${sourceSummary.llmChanges} Feldänderungen wurden angewendet.` : "Keine angewendeten Feldänderungen.",
-          reviewFlagHtml(sourceSummary.llmChanges ? "aktiv" : "keine", sourceSummary.llmChanges ? "review" : "neutral")
         ),
       ].join("");
     }
@@ -11920,62 +12007,16 @@
       }
     }
 
-    function renderLlmRun(runPayload) {
-      clearNode(ui.llmChangeRows);
-      if (!runPayload || typeof runPayload !== "object") {
-        ui.llmRunInfo.textContent = "Kein LLM Lauf fuer dieses Dokument gefunden.";
-        const row = document.createElement("tr");
-        row.innerHTML = "<td colspan=\"4\" class=\"small\">Noch keine LLM-Aenderungen vorhanden.</td>";
-        ui.llmChangeRows.appendChild(row);
-        return;
-      }
-
-      const result = (runPayload.result && typeof runPayload.result === "object") ? runPayload.result : {};
-      const changes = Array.isArray(runPayload.changes) ? runPayload.changes : [];
-      const appliedCount = changes.filter((item) => item && item.applied).length;
-      const modeRequested = fmt(runPayload.process_mode_requested);
-      const modeEffective = fmt(runPayload.process_mode_effective);
-      const status = fmt(result.status);
-      const model = fmt(result.model);
-      const runId = fmt(runPayload.run_id);
-      const createdAt = fmt(runPayload.created_at_utc);
-      const errorText = result.error ? ` | Error: ${String(result.error).slice(0, 140)}` : "";
-      ui.llmRunInfo.textContent =
-        `Run ${runId} | ${createdAt} | Mode ${modeRequested} -> ${modeEffective} | Status ${status} | Model ${model} | Changes ${appliedCount}/${changes.length}${errorText}`;
-
-      if (!changes.length) {
-        const row = document.createElement("tr");
-        row.innerHTML = "<td colspan=\"4\" class=\"small\">Keine Feld-Aenderungen in diesem Lauf.</td>";
-        ui.llmChangeRows.appendChild(row);
-        return;
-      }
-
-      for (const change of changes) {
-        const row = document.createElement("tr");
-        const appliedChip = change && change.applied
-          ? "<span class=\"chip ok-chip\">ja</span>"
-          : "<span class=\"chip no-chip\">nein</span>";
-        row.innerHTML = `
-          <td><code>${escapeHtml(fmt(change && change.field))}</code></td>
-          <td>${escapeHtml(fmt(change && change.old))}</td>
-          <td>${escapeHtml(fmt(change && change.new))}</td>
-          <td>${appliedChip}</td>
-        `;
-        ui.llmChangeRows.appendChild(row);
-      }
+    function renderDiagnosticRun(runPayload) {
+      if (ui.diagnosticChangeRows) clearNode(ui.diagnosticChangeRows);
+      if (ui.diagnosticRunInfo) ui.diagnosticRunInfo.textContent = "";
     }
 
     function compareStatusLabel(item) {
       const status = String((item && item.status) || "");
-      if (status === "same") {
-        const parserVal = fmt(item.parser_value, "");
-        const llmVal = fmt(item.llm_value, "");
-        if (parserVal && llmVal && parserVal !== llmVal) return "gleich (normalisiert)";
-        return "gleich";
-      }
+      if (status === "same") return "gleich";
       if (status === "different") return "anders";
       if (status === "missing_in_parser") return "Parser fehlt";
-      if (status === "missing_in_llm") return "LLM fehlt";
       if (status === "missing_both") return "beide fehlen";
       return status || "-";
     }
@@ -11987,47 +12028,9 @@
     }
 
     function renderCompare(comparePayload) {
-      clearNode(ui.compareRows);
-      ui.compareSummary.textContent = "";
-
-      if (!comparePayload || typeof comparePayload !== "object") {
-        ui.compareInfo.textContent = "Noch kein Vergleich geladen. Klick auf \"Parser vs LLM aktualisieren\".";
-        const row = document.createElement("tr");
-        row.innerHTML = "<td colspan=\"4\" class=\"small\">Noch kein Parser-vs-LLM Vergleich vorhanden.</td>";
-        ui.compareRows.appendChild(row);
-        return;
-      }
-
-      const summary = (comparePayload.summary && typeof comparePayload.summary === "object")
-        ? comparePayload.summary
-        : {};
-      const llmStatus = fmt(comparePayload.llm_status);
-      const llmModel = fmt(comparePayload.llm_model);
-      const llmUsed = comparePayload.llm_used ? "ja" : "nein";
-      const llmError = comparePayload.llm_error ? ` | Error: ${String(comparePayload.llm_error).slice(0, 140)}` : "";
-      ui.compareInfo.textContent = `LLM genutzt: ${llmUsed} | Status: ${llmStatus} | Model: ${llmModel}${llmError}`;
-      ui.compareSummary.textContent =
-        `Felder: ${summary.total || 0} | gleich: ${summary.same || 0} | anders: ${summary.different || 0} | Parser fehlt: ${summary.missing_in_parser || 0} | LLM fehlt: ${summary.missing_in_llm || 0}`;
-
-      const rows = Array.isArray(comparePayload.comparison) ? comparePayload.comparison : [];
-      if (!rows.length) {
-        const row = document.createElement("tr");
-        row.innerHTML = "<td colspan=\"4\" class=\"small\">Keine Vergleichswerte verfuegbar.</td>";
-        ui.compareRows.appendChild(row);
-        return;
-      }
-
-      for (const item of rows) {
-        const status = String((item && item.status) || "");
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td><code>${escapeHtml(fmt(item && item.field))}</code></td>
-          <td>${escapeHtml(fmt(item && item.parser_value))}</td>
-          <td>${escapeHtml(fmt(item && item.llm_value))}</td>
-          <td><span class="compare-status ${escapeHtml(compareStatusClass(status))}">${escapeHtml(compareStatusLabel(item))}</span></td>
-        `;
-        ui.compareRows.appendChild(row);
-      }
+      if (ui.compareRows) clearNode(ui.compareRows);
+      if (ui.compareInfo) ui.compareInfo.textContent = "";
+      if (ui.compareSummary) ui.compareSummary.textContent = "";
     }
 
     function renderAmountLines(lines) {
@@ -12074,6 +12077,11 @@
     function imageRecordById(imageId) {
       const images = Array.isArray(state.result && state.result.images) ? state.result.images : [];
       return images.find((image) => Number(image.id) === Number(imageId)) || null;
+    }
+
+    function lineItemById(lineItemId) {
+      const lineItems = Array.isArray(state.result && state.result.line_items) ? state.result.line_items : [];
+      return lineItems.find((item) => Number(item && item.id) === Number(lineItemId)) || null;
     }
 
     function imageUrl(documentId, imageId) {
@@ -12293,6 +12301,115 @@
       }
     }
 
+    function resetPdfCropSelection() {
+      if (!ui.pdfCropSelection) return;
+      ui.pdfCropSelection.setAttribute("hidden", "");
+      ui.pdfCropSelection.style.left = "";
+      ui.pdfCropSelection.style.top = "";
+      ui.pdfCropSelection.style.width = "";
+      ui.pdfCropSelection.style.height = "";
+    }
+
+    function cancelPdfCrop({ silent = false } = {}) {
+      state.pdfCrop.active = false;
+      state.pdfCrop.lineItemId = null;
+      state.pdfCrop.itemKey = "";
+      state.pdfCrop.pointerId = null;
+      state.pdfCrop.start = null;
+      resetPdfCropSelection();
+      if (ui.pdfCropOverlay) ui.pdfCropOverlay.setAttribute("hidden", "");
+      if (ui.pdfCropPreviewImg) ui.pdfCropPreviewImg.removeAttribute("src");
+      if (!silent) setStatus("Manuelle Bildauswahl abgebrochen.", "warn");
+    }
+
+    function pdfCropPointFromEvent(event) {
+      if (!ui.pdfCropWorkspace || !ui.pdfCropPreviewImg) return null;
+      const imageRect = ui.pdfCropPreviewImg.getBoundingClientRect();
+      if (!imageRect.width || !imageRect.height) return null;
+      const x = Math.min(Math.max(event.clientX - imageRect.left, 0), imageRect.width);
+      const y = Math.min(Math.max(event.clientY - imageRect.top, 0), imageRect.height);
+      const withinX = event.clientX >= imageRect.left && event.clientX <= imageRect.right;
+      const withinY = event.clientY >= imageRect.top && event.clientY <= imageRect.bottom;
+      if (!withinX || !withinY) return null;
+      return { x, y, imageRect };
+    }
+
+    function renderPdfCropSelection(start, current) {
+      if (!ui.pdfCropWorkspace || !ui.pdfCropSelection || !start || !current) return null;
+      const workspaceRect = ui.pdfCropWorkspace.getBoundingClientRect();
+      const imageRect = current.imageRect;
+      const left = Math.min(start.x, current.x);
+      const top = Math.min(start.y, current.y);
+      const width = Math.abs(current.x - start.x);
+      const height = Math.abs(current.y - start.y);
+      ui.pdfCropSelection.style.left = `${imageRect.left - workspaceRect.left + left + ui.pdfCropWorkspace.scrollLeft}px`;
+      ui.pdfCropSelection.style.top = `${imageRect.top - workspaceRect.top + top + ui.pdfCropWorkspace.scrollTop}px`;
+      ui.pdfCropSelection.style.width = `${width}px`;
+      ui.pdfCropSelection.style.height = `${height}px`;
+      ui.pdfCropSelection.removeAttribute("hidden");
+      return { left, top, width, height, imageWidth: imageRect.width, imageHeight: imageRect.height };
+    }
+
+    async function submitPdfCropSelection(selection) {
+      if (!state.documentId || !state.pdfCrop.active || !Number.isFinite(Number(state.pdfCrop.lineItemId))) return;
+      if (!selection || selection.width < 12 || selection.height < 12) {
+        resetPdfCropSelection();
+        setStatus("Der ausgewählte PDF-Bereich ist zu klein.", "warn");
+        return;
+      }
+      const lineItemId = Number(state.pdfCrop.lineItemId);
+      const itemKey = state.pdfCrop.itemKey;
+      const payload = {
+        page_ref: clampPdfPage(state.pdfCrop.page || state.pdf.page || 1),
+        left_ratio: selection.left / selection.imageWidth,
+        top_ratio: selection.top / selection.imageHeight,
+        width_ratio: selection.width / selection.imageWidth,
+        height_ratio: selection.height / selection.imageHeight,
+      };
+      setStatus(`PDF-Bereich wird als Bild für Position ${lineItemId} gespeichert ...`);
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/crop-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        if (itemKey) expandedSnapshot.add(itemKey);
+        cancelPdfCrop({ silent: true });
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setExtractTab("items");
+        setStatus(`Manueller PDF-Bereich wurde als Bild #${response.image_id} zugeordnet.`, "ok");
+      } catch (error) {
+        setStatus(`PDF-Bereich konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    function startPdfCropForLineItem(lineItemId, itemKey, button) {
+      if (!state.documentId || !ui.pdfCropOverlay || !ui.pdfCropPreviewImg) return;
+      const item = lineItemById(lineItemId);
+      if (!item) {
+        setStatus(`Position ${lineItemId} wurde nicht gefunden.`, "warn");
+        return;
+      }
+      const page = clampPdfPage(item.page_ref || state.pdf.page || 1);
+      state.pdf.page = page;
+      refreshPdfFrame({ forceReload: true });
+      state.pdfCrop.active = true;
+      state.pdfCrop.lineItemId = Number(lineItemId);
+      state.pdfCrop.itemKey = String(itemKey || "");
+      state.pdfCrop.page = page;
+      state.pdfCrop.pointerId = null;
+      state.pdfCrop.start = null;
+      resetPdfCropSelection();
+      if (ui.pdfCropTitle) ui.pdfCropTitle.textContent = `Bildbereich für Pos. ${fmt(item.position_no)} · Seite ${fmt(page)}`;
+      ui.pdfCropPreviewImg.src = `/document/${state.documentId}/page/${page}/preview?scale=2&crop_preview=${Date.now()}`;
+      ui.pdfCropOverlay.removeAttribute("hidden");
+      setStatus("Ziehe im PDF ein Rechteck um das gewünschte Bild.");
+      if (button instanceof HTMLElement) button.blur();
+    }
+
     async function setLineItemReviewChecked(lineItemId, checked, button) {
       if (!state.documentId) return;
       const targetButton = button instanceof HTMLElement ? button : null;
@@ -12369,6 +12486,7 @@
       const value = String(source || "").trim().toLowerCase();
       if (!value) return "-";
       if (value === "manual") return "Manuell";
+      if (value === "manual_crop") return "Manueller PDF-Bereich";
       if (value === "heuristic") return "Heuristik";
       if (value === "page_layout") return "Seitenlayout";
       if (value === "page_neighbor_fallback") return "Nachbarseite";
@@ -12405,7 +12523,6 @@
 
     function lineItemSource(item) {
       const direct = String(item && (item.source || item.extraction_source || "")).trim().toLowerCase();
-      if (direct === "llm") return "llm";
       if (direct === "parser") return "parser";
 
       const metaRaw = item && item.metadata_json;
@@ -12413,7 +12530,6 @@
         try {
           const meta = JSON.parse(metaRaw);
           const fromMeta = String((meta && (meta.source || meta.extraction_source || "")) || "").trim().toLowerCase();
-          if (fromMeta === "llm") return "llm";
           if (fromMeta === "parser") return "parser";
         } catch (_error) {
           // Ignore invalid metadata JSON and keep parser fallback.
@@ -12497,6 +12613,9 @@
         ].filter(Boolean).join("");
         const imageActionButtons = [
           !isNonVisual && Number.isFinite(lineItemId)
+            ? reviewTaskActionHtml("PDF-Bereich setzen", "crop-image", { line_item_id: lineItemId, item_key: itemKey, primary: true })
+            : "",
+          !isNonVisual && Number.isFinite(lineItemId)
             ? reviewTaskActionHtml("Kein Bild setzen", "clear-image", { line_item_id: lineItemId, warning: true })
             : "",
         ].filter(Boolean).join("");
@@ -12513,13 +12632,12 @@
           "referenced_lv_pos",
           "source",
           "extraction_source",
-          "llm_confidence_raw",
         ]);
         const pageEndRef = itemMetadata.page_end_ref;
         const pageRange = pageEndRef && String(pageEndRef) !== String(item.page_ref)
           ? `${fmt(item.page_ref)}-${fmt(pageEndRef)}`
           : fmt(item.page_ref);
-        const sourceLabel = lineItemSource(item) === "llm" ? "LLM" : "Parser";
+        const sourceLabel = "Parser";
         const imageRequiredLabel = itemMetadata.image_required === undefined
           ? (lineItemNeedsImageForUi(item) ? "ja" : "nein")
           : detailValue(itemMetadata.image_required);
@@ -12710,7 +12828,7 @@
         if (hasConflict) {
           card.classList.add("conflict-assigned");
         } else if (isAssigned) {
-          card.classList.add("llm-assigned");
+          card.classList.add("auto-assigned");
         } else {
           card.classList.add("unassigned");
         }
@@ -12770,17 +12888,9 @@
       }
     }
 
-    async function loadLatestLlmRun(documentId) {
-      try {
-        const payload = await apiJson(`/llm-runs/${documentId}/latest`);
-        state.llmRun = payload;
-        renderLlmRun(payload);
-        syncFieldSources();
-      } catch (_error) {
-        state.llmRun = null;
-        renderLlmRun(null);
-        syncFieldSources();
-      }
+    async function loadLatestDiagnosticRun(documentId) {
+      renderDiagnosticRun(null);
+      syncFieldSources();
     }
 
     async function loadResult(documentId) {
@@ -12790,8 +12900,7 @@
         setPdfPageCountFromResult(result);
         syncCurrentDocumentIntoList(result.document || {});
         setDocumentApprovalPills(result);
-        state.compare = null;
-        state.fieldSources = deriveFieldSources(null);
+        state.fieldSources = deriveFieldSources();
         state.expandedItemKeys = new Set();
         renderReview(result);
         renderDocumentIssues(result);
@@ -12801,8 +12910,7 @@
         renderLineItems(result.line_items || []);
         renderImages(result.images || []);
         updateWorkflowNavigation();
-        state.llmRun = null;
-        renderLlmRun(null);
+        renderDiagnosticRun(null);
         syncFieldSources();
         const imageCount = (result.images || []).length;
         const itemCount = (result.line_items || []).length;
@@ -12816,18 +12924,16 @@
         clearNode(ui.sourceBreakdown);
         clearNode(ui.documentIssueList);
         clearNode(ui.summary);
-        clearNode(ui.llmChangeRows);
-        clearNode(ui.compareRows);
+        if (ui.diagnosticChangeRows) clearNode(ui.diagnosticChangeRows);
+        if (ui.compareRows) clearNode(ui.compareRows);
         clearNode(ui.amountRows);
         clearNode(ui.itemRows);
         clearNode(ui.imageGrid);
         if (ui.itemFilterInfo) ui.itemFilterInfo.textContent = "Keine Positionen geladen.";
-        ui.llmRunInfo.textContent = "LLM Run konnte nicht geladen werden.";
-        ui.compareInfo.textContent = "Vergleich konnte nicht geladen werden.";
-        ui.compareSummary.textContent = "";
+        if (ui.diagnosticRunInfo) ui.diagnosticRunInfo.textContent = "";
+        if (ui.compareInfo) ui.compareInfo.textContent = "";
+        if (ui.compareSummary) ui.compareSummary.textContent = "";
         state.result = null;
-        state.llmRun = null;
-        state.compare = null;
         state.fieldSources = {};
         state.expandedItemKeys = new Set();
         state.pdf.pageCount = null;
@@ -12841,6 +12947,7 @@
     }
 
     async function selectDocument(documentId) {
+      if (state.pdfCrop && state.pdfCrop.active) cancelPdfCrop({ silent: true });
       state.documentId = documentId;
       ui.docSelect.value = String(documentId);
       state.pdf.page = 1;
@@ -12958,73 +13065,37 @@
       }
     }
 
-    async function previewLatestLlmRun() {
+    async function previewLatestDiagnosticRun() {
       if (!state.documentId) return;
-      setStatus("Lade LLM Run...");
-      try {
-        const payload = await apiJson(`/llm-runs/${state.documentId}/latest`);
-        const text = JSON.stringify(payload, null, 2);
-        state.previewFormat = "json";
-        state.previewContent = text;
-        ui.previewTitle.textContent = `LLM Run - Dokument #${state.documentId}`;
-        ui.previewContent.textContent = text;
-        openPreviewModal();
-        setStatus("LLM Run geladen.", "ok");
-      } catch (error) {
-        setStatus(`LLM Run konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
-      }
+      setStatus("KI-Diagnose ist im Produktbetrieb deaktiviert.", "warn");
     }
 
-    async function previewLlmHistory() {
+    async function previewDiagnosticHistory() {
       if (!state.documentId) return;
-      setStatus("Lade LLM History...");
-      try {
-        const payload = await apiJson(`/llm-runs/${state.documentId}?limit=25`);
-        const text = JSON.stringify(payload, null, 2);
-        state.previewFormat = "json";
-        state.previewContent = text;
-        ui.previewTitle.textContent = `LLM History - Dokument #${state.documentId}`;
-        ui.previewContent.textContent = text;
-        openPreviewModal();
-        setStatus("LLM History geladen.", "ok");
-      } catch (error) {
-        setStatus(`LLM History konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
-      }
+      setStatus("KI-Diagnose ist im Produktbetrieb deaktiviert.", "warn");
     }
 
-    async function previewParserLlmCompare() {
+    async function previewParserDiagnosticCompare() {
       if (!state.documentId) return;
-      setStatus("Vergleiche Parser vs LLM...");
-      try {
-        const payload = await apiJson(`/compare/${state.documentId}`);
-        state.compare = payload;
-        renderCompare(payload);
-        const summary = payload.summary || {};
-        setStatus(
-          `Vergleich fertig: gleich ${summary.same || 0}, unterschiedlich ${summary.different || 0}, parser fehlt ${summary.missing_in_parser || 0}, llm fehlt ${summary.missing_in_llm || 0}.`,
-          "ok"
-        );
-      } catch (error) {
-        setStatus(`Vergleich konnte nicht geladen werden: ${String(error.message).slice(0, 220)}`, "warn");
-      }
+      setStatus("KI-Vergleich ist im Produktbetrieb deaktiviert.", "warn");
     }
 
     async function previewImageMatch() {
       if (!state.documentId) return;
-      setStatus("Starte Bild-Matching (PoC)...");
+      setStatus("Starte Bild-Matching...");
       try {
-        const payload = await apiJson(`/match-images/${state.documentId}?strategy=hybrid&max_candidates=4&max_items=80`, {
+        const payload = await apiJson(`/match-images/${state.documentId}?strategy=heuristic&max_candidates=4&max_items=80`, {
           method: "POST",
         });
         const text = JSON.stringify(payload, null, 2);
         state.previewFormat = "json";
         state.previewContent = text;
-        ui.previewTitle.textContent = `Bild-Match (PoC) - Dokument #${state.documentId}`;
+        ui.previewTitle.textContent = `Bild-Match - Dokument #${state.documentId}`;
         ui.previewContent.textContent = text;
         openPreviewModal();
         const summary = payload.summary || {};
         setStatus(
-          `Bild-Matching fertig: ${summary.matched_items || 0}/${summary.line_items_processed || 0} Positionen gematcht, Quelle VLM ${summary.vlm_selected_items || 0}.`,
+          `Bild-Matching fertig: ${summary.matched_items || 0}/${summary.line_items_processed || 0} Positionen gematcht.`,
           "ok"
         );
       } catch (error) {
@@ -13158,6 +13229,10 @@
         void clearImageAssignment(lineItemId, actionButton);
         return;
       }
+      if (action === "crop-image" && Number.isFinite(lineItemId)) {
+        startPdfCropForLineItem(lineItemId, itemKey, actionButton);
+        return;
+      }
       if (action === "mark-reviewed" && Number.isFinite(lineItemId)) {
         void setLineItemReviewChecked(lineItemId, true, actionButton);
         return;
@@ -13189,6 +13264,11 @@
         if (!Number.isFinite(lineItemId)) return;
         if (action === "clear-image") {
           void clearImageAssignment(lineItemId, reviewAction);
+          return;
+        }
+        if (action === "crop-image") {
+          const itemKey = String(reviewAction.getAttribute("data-item_key") || "");
+          startPdfCropForLineItem(lineItemId, itemKey, reviewAction);
           return;
         }
         if (action === "mark-reviewed") {
@@ -13259,6 +13339,45 @@
     ui.pdfFitBtn.addEventListener("click", () => setPdfZoom("fit"));
     ui.pdfDownloadBtn.addEventListener("click", () => openCurrentPdf({ download: true }));
     ui.pdfOpenBtn.addEventListener("click", () => openCurrentPdf());
+    if (ui.pdfCropCancelBtn) {
+      ui.pdfCropCancelBtn.addEventListener("click", () => cancelPdfCrop());
+    }
+    if (ui.pdfCropWorkspace) {
+      ui.pdfCropWorkspace.addEventListener("pointerdown", (event) => {
+        if (!state.pdfCrop.active || !ui.pdfCropWorkspace) return;
+        const point = pdfCropPointFromEvent(event);
+        if (!point) return;
+        event.preventDefault();
+        state.pdfCrop.pointerId = event.pointerId;
+        state.pdfCrop.start = point;
+        ui.pdfCropWorkspace.setPointerCapture(event.pointerId);
+        renderPdfCropSelection(point, point);
+      });
+      ui.pdfCropWorkspace.addEventListener("pointermove", (event) => {
+        if (!state.pdfCrop.active || state.pdfCrop.pointerId !== event.pointerId || !state.pdfCrop.start) return;
+        const point = pdfCropPointFromEvent(event);
+        if (!point) return;
+        renderPdfCropSelection(state.pdfCrop.start, point);
+      });
+      ui.pdfCropWorkspace.addEventListener("pointerup", (event) => {
+        if (!state.pdfCrop.active || state.pdfCrop.pointerId !== event.pointerId || !state.pdfCrop.start) return;
+        const point = pdfCropPointFromEvent(event);
+        const selection = point ? renderPdfCropSelection(state.pdfCrop.start, point) : null;
+        state.pdfCrop.pointerId = null;
+        state.pdfCrop.start = null;
+        if (ui.pdfCropWorkspace.hasPointerCapture(event.pointerId)) {
+          ui.pdfCropWorkspace.releasePointerCapture(event.pointerId);
+        }
+        void submitPdfCropSelection(selection);
+      });
+      ui.pdfCropWorkspace.addEventListener("pointercancel", (event) => {
+        if (state.pdfCrop.pointerId === event.pointerId) {
+          state.pdfCrop.pointerId = null;
+          state.pdfCrop.start = null;
+          resetPdfCropSelection();
+        }
+      });
+    }
 
     ui.processBtn.addEventListener("click", async () => {
       await processCurrent();
@@ -13303,7 +13422,7 @@
     renderReview(null);
     renderReviewWorkbench(null);
     renderDocumentIssues(null);
-    renderLlmRun(null);
+    renderDiagnosticRun(null);
     renderCompare(null);
     syncPdfControls();
     addDebug("UI initialisiert.");

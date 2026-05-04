@@ -28,8 +28,6 @@ py-modules = [
   "extractor",
   "exporter",
   "image_assignment",
-  "image_matcher",
-  "llm",
   "main",
   "parser",
   "structured_parser",

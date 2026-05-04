@@ -103,15 +103,12 @@ def metadata_image_assignment(row: dict[str, Any], valid_ids: set[int]) -> dict[
         key in metadata
         for key in (
             "image_assignment_ids",
-            "llm_image_ids",
             "image_assignment_source",
             "image_assignment_reason",
             "image_assignment_strategy",
         )
     )
     raw_ids = metadata.get("image_assignment_ids")
-    if not isinstance(raw_ids, list):
-        raw_ids = metadata.get("llm_image_ids")
     values: list[int] = []
     if isinstance(raw_ids, list):
         for value in raw_ids:

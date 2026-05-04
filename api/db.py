@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -123,6 +124,7 @@ def list_documents(limit: int = 20) -> list[dict[str, Any]]:
                 supplier_name,
                 document_type,
                 offer_reference,
+                linked_offer_document_id,
                 document_number,
                 document_date,
                 approval_status,
@@ -152,6 +154,7 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 supplier_name,
                 document_type,
                 offer_reference,
+                linked_offer_document_id,
                 document_number,
                 document_date,
                 project_ref,
@@ -246,6 +249,7 @@ def update_document_parse_result(
                 supplier_name,
                 document_type,
                 offer_reference,
+                linked_offer_document_id,
                 document_number,
                 document_date,
                 project_ref,
@@ -280,6 +284,226 @@ def update_document_parse_result(
             ),
         ).fetchone()
     return dict(row)
+
+
+def _document_reference_key(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = re.sub(r"[^A-Za-z0-9]+", "", str(value).upper())
+    return normalized or None
+
+
+def _compact_document_link(row: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not row:
+        return None
+    return {
+        "id": row.get("id"),
+        "supplier_name": row.get("supplier_name"),
+        "document_type": row.get("document_type"),
+        "document_number": row.get("document_number"),
+        "offer_reference": row.get("offer_reference"),
+        "document_date": row.get("document_date"),
+        "project_ref": row.get("project_ref"),
+        "status": row.get("status"),
+        "approval_status": row.get("approval_status"),
+    }
+
+
+def _find_linked_offer_document_id(
+    conn: psycopg.Connection,
+    *,
+    source_document_id: int,
+    supplier_name: str | None,
+    offer_reference: str | None,
+) -> int | None:
+    reference_key = _document_reference_key(offer_reference)
+    if reference_key is None:
+        return None
+
+    supplier_filter = (supplier_name or "").strip()
+    if supplier_filter:
+        rows = conn.execute(
+            """
+            SELECT id, document_number
+            FROM documents
+            WHERE id <> %s
+              AND document_type = 'angebot'
+              AND supplier_name = %s
+              AND document_number IS NOT NULL
+            ORDER BY document_date DESC NULLS LAST, id DESC;
+            """,
+            (source_document_id, supplier_filter),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, document_number
+            FROM documents
+            WHERE id <> %s
+              AND document_type = 'angebot'
+              AND document_number IS NOT NULL
+            ORDER BY document_date DESC NULLS LAST, id DESC;
+            """,
+            (source_document_id,),
+        ).fetchall()
+
+    for row in rows:
+        if _document_reference_key(row.get("document_number")) == reference_key:
+            return int(row["id"])
+    return None
+
+
+def refresh_document_links(document_id: int) -> dict[str, Any] | None:
+    with get_db() as conn:
+        document = conn.execute(
+            """
+            SELECT id, supplier_name, document_type, offer_reference, document_number
+            FROM documents
+            WHERE id = %s;
+            """,
+            (document_id,),
+        ).fetchone()
+        if not document:
+            return None
+
+        document_type = str(document.get("document_type") or "").strip().lower()
+        supplier_name = (document.get("supplier_name") or "").strip() or None
+
+        if document_type == "auftragsbestaetigung":
+            linked_offer_id = _find_linked_offer_document_id(
+                conn,
+                source_document_id=document_id,
+                supplier_name=supplier_name,
+                offer_reference=document.get("offer_reference"),
+            )
+            conn.execute(
+                """
+                UPDATE documents
+                SET linked_offer_document_id = %s,
+                    updated_at = NOW()
+                WHERE id = %s;
+                """,
+                (linked_offer_id, document_id),
+            )
+        elif document_type == "angebot":
+            offer_key = _document_reference_key(document.get("document_number"))
+            conn.execute(
+                """
+                UPDATE documents
+                SET linked_offer_document_id = NULL
+                WHERE id = %s;
+                """,
+                (document_id,),
+            )
+            if offer_key is not None:
+                if supplier_name:
+                    candidates = conn.execute(
+                        """
+                        SELECT id, offer_reference
+                        FROM documents
+                        WHERE document_type = 'auftragsbestaetigung'
+                          AND supplier_name = %s
+                          AND offer_reference IS NOT NULL;
+                        """,
+                        (supplier_name,),
+                    ).fetchall()
+                else:
+                    candidates = conn.execute(
+                        """
+                        SELECT id, offer_reference
+                        FROM documents
+                        WHERE document_type = 'auftragsbestaetigung'
+                          AND offer_reference IS NOT NULL;
+                        """
+                    ).fetchall()
+
+                matching_ab_ids = [
+                    int(row["id"])
+                    for row in candidates
+                    if _document_reference_key(row.get("offer_reference")) == offer_key
+                ]
+                if matching_ab_ids:
+                    conn.execute(
+                        """
+                        UPDATE documents
+                        SET linked_offer_document_id = %s,
+                            updated_at = NOW()
+                        WHERE id = ANY(%s::bigint[]);
+                        """,
+                        (document_id, matching_ab_ids),
+                    )
+
+        row = conn.execute(
+            """
+            SELECT
+                id,
+                source_file,
+                original_filename,
+                file_size_bytes,
+                content_type,
+                supplier_name,
+                document_type,
+                offer_reference,
+                linked_offer_document_id,
+                document_number,
+                document_date,
+                project_ref,
+                currency,
+                net_total,
+                vat_total,
+                gross_total,
+                parse_confidence,
+                approval_status,
+                reviewed_by,
+                reviewed_at,
+                approval_note,
+                status,
+                error_message,
+                raw_text_path,
+                created_at,
+                updated_at
+            FROM documents
+            WHERE id = %s;
+            """,
+            (document_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_document_relations(document_id: int) -> dict[str, Any]:
+    document = get_document(document_id)
+    if not document:
+        return {"linked_offer_document": None, "linked_order_confirmations": []}
+
+    with get_db() as conn:
+        linked_offer = None
+        linked_offer_id = document.get("linked_offer_document_id")
+        if linked_offer_id is not None:
+            linked_offer = conn.execute(
+                """
+                SELECT id, supplier_name, document_type, document_number, offer_reference,
+                       document_date, project_ref, status, approval_status
+                FROM documents
+                WHERE id = %s;
+                """,
+                (linked_offer_id,),
+            ).fetchone()
+
+        linked_abs = conn.execute(
+            """
+            SELECT id, supplier_name, document_type, document_number, offer_reference,
+                   document_date, project_ref, status, approval_status
+            FROM documents
+            WHERE linked_offer_document_id = %s
+            ORDER BY document_date ASC NULLS LAST, id ASC;
+            """,
+            (document_id,),
+        ).fetchall()
+
+    return {
+        "linked_offer_document": _compact_document_link(dict(linked_offer)) if linked_offer else None,
+        "linked_order_confirmations": [_compact_document_link(dict(row)) for row in linked_abs],
+    }
 
 
 def replace_document_amount_lines(document_id: int, rows: list[dict[str, Any]]) -> int:
@@ -409,6 +633,63 @@ def replace_document_images(document_id: int, rows: list[dict[str, Any]]) -> int
     return len(rows)
 
 
+def insert_document_image(document_id: int, row: dict[str, Any]) -> dict[str, Any]:
+    with get_db() as conn:
+        current_index = conn.execute(
+            """
+            SELECT COALESCE(MAX(image_index), 0) AS max_index
+            FROM document_images
+            WHERE document_id = %s AND page_ref = %s;
+            """,
+            (document_id, row["page_ref"]),
+        ).fetchone()
+        next_index = int((current_index["max_index"] if current_index else 0) or 0) + 1
+        inserted = conn.execute(
+            """
+            INSERT INTO document_images (
+                document_id,
+                page_ref,
+                image_index,
+                mime_type,
+                storage_path,
+                sha256,
+                width,
+                height,
+                bytes_size,
+                metadata_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            RETURNING
+                id,
+                document_id,
+                page_ref,
+                image_index,
+                mime_type,
+                storage_path,
+                sha256,
+                width,
+                height,
+                metadata_json,
+                bytes_size,
+                created_at;
+            """,
+            (
+                document_id,
+                row["page_ref"],
+                next_index,
+                row.get("mime_type"),
+                row["storage_path"],
+                row.get("sha256"),
+                row.get("width"),
+                row.get("height"),
+                row.get("bytes_size"),
+                json.dumps(row.get("metadata_json", {}), ensure_ascii=True),
+            ),
+        ).fetchone()
+        _clear_document_approval_state(conn, document_id)
+    return dict(inserted)
+
+
 def _clear_document_approval_state(conn: psycopg.Connection, document_id: int) -> None:
     conn.execute(
         """
@@ -457,7 +738,6 @@ def update_line_item_image_assignments(document_id: int, assignments: dict[int, 
                 strategy = str(assignment.get("strategy_requested") or assignment.get("strategy") or "").strip()
                 patch_payload: dict[str, Any] = {
                     "image_assignment_ids": unique_ids,
-                    "llm_image_ids": unique_ids,
                     "image_assignment_source": source,
                     "image_assignment_reason": reason,
                     "image_assignment_strategy": strategy or None,
@@ -680,13 +960,6 @@ def get_latest_vendoc_export_job(document_id: int) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
-def update_line_item_llm_image_ids(document_id: int, assignments: dict[int, list[int]]) -> int:
-    normalized: dict[int, dict[str, Any]] = {}
-    for line_item_id, image_ids in assignments.items():
-        normalized[line_item_id] = {"image_ids": image_ids, "selection_source": "vlm"}
-    return update_line_item_image_assignments(document_id, normalized)
-
-
 def reset_document_results(document_id: int) -> dict[str, Any] | None:
     with get_db() as conn:
         document = conn.execute(
@@ -712,6 +985,15 @@ def reset_document_results(document_id: int) -> dict[str, Any] | None:
             "DELETE FROM document_images WHERE document_id = %s;",
             (document_id,),
         ).rowcount or 0
+        conn.execute(
+            """
+            UPDATE documents
+            SET linked_offer_document_id = NULL,
+                updated_at = NOW()
+            WHERE linked_offer_document_id = %s;
+            """,
+            (document_id,),
+        )
 
         updated = conn.execute(
             """
@@ -720,6 +1002,7 @@ def reset_document_results(document_id: int) -> dict[str, Any] | None:
                 supplier_name = NULL,
                 document_type = 'angebot',
                 offer_reference = NULL,
+                linked_offer_document_id = NULL,
                 document_number = NULL,
                 document_date = NULL,
                 project_ref = NULL,
@@ -771,11 +1054,15 @@ def _metadata_image_ids(item: dict[str, Any], valid_ids: set[int]) -> list[int]:
 
 
 def _line_item_sort_key(item: dict[str, Any]) -> tuple[int, int, int]:
+    item_id = _to_int(item.get("id"))
+    if item_id is not None:
+        return (0, item_id, 0)
+
     position_no = item.get("position_no")
     position_int = _to_int(position_no)
     if position_int is not None:
-        return (0, position_int, _to_int(item.get("id")) or 0)
-    return (1, _to_int(item.get("id")) or 0, 0)
+        return (1, position_int, 0)
+    return (2, 0, 0)
 
 
 def _image_sort_key(image: dict[str, Any]) -> tuple[int, float, float, int, int]:
@@ -833,6 +1120,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
     document = get_document(document_id)
     if not document:
         return None
+    document_relations = get_document_relations(document_id)
 
     with get_db() as conn:
         amount_lines = conn.execute(
@@ -1159,9 +1447,6 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         image_id = _to_int(image.get("id"))
         matched_item_ids = assigned_image_to_items.get(image_id, []) if image_id is not None else []
         matched_positions = assigned_image_to_positions.get(image_id, []) if image_id is not None else []
-        image["is_llm_matched"] = bool(matched_item_ids)
-        image["llm_matched_line_item_ids"] = matched_item_ids
-        image["llm_match_count"] = len(matched_item_ids)
         image["is_assigned"] = bool(matched_item_ids)
         image["assigned_line_item_ids"] = matched_item_ids
         image["assigned_match_count"] = len(matched_item_ids)
@@ -1181,6 +1466,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
 
     return {
         "document": document,
+        "document_relations": document_relations,
         "amount_lines": [dict(row) for row in amount_lines],
         "line_items": line_item_list,
         "images": image_list,
