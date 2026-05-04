@@ -140,14 +140,15 @@ Wichtig:
 
 ## VenDoc
 
-### `POST /vendoc/export/{document_id}?dry_run=true|false`
+### `POST /vendoc/export/{document_id}?dry_run=true|false&include_sql=false`
 
 Erzeugt ein VenDoc-Mapping fuer das Dokument und schreibt einen Eintrag in `vendoc_export_jobs`.
 
 Dry-Run:
 
 - baut `header`, `positions`, `warnings`, `errors` und `summary`.
-- liest das primaere Positionsbild als Base64, wenn vorhanden.
+- erzeugt je Position `image_long_text_rtf` als VenDoc-RTF-LongText; das primaere Positionsbild wird darin als PNG-Hex eingebettet.
+- liefert mit `include_sql=true` ein SRTemp-Insert-Script fuer `dbo.vendoc_import_headers` und `dbo.vendoc_import_positions`.
 - benoetigt keinen MSSQL-Zugriff.
 - ist auch vor Dokumentfreigabe nutzbar.
 

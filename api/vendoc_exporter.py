@@ -1,9 +1,10 @@
-import base64
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
+
+from vendoc_rtf import build_vendoc_long_text_rtf
 
 
 VENDOC_NAMESPACE = UUID("8f0f8c50-0f58-45d8-b8e5-83a0f7e79a11")
@@ -52,6 +53,10 @@ def _date_value(value: Any) -> str | None:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     return _to_str(value)
+
+
+def _datetime_value(value: datetime) -> str:
+    return value.astimezone(timezone.utc).replace(tzinfo=None).isoformat(sep=" ")
 
 
 def external_document_id(document_id: Any) -> str:
@@ -109,9 +114,8 @@ def _image_payload(
     image_id = _primary_image_id(line_item)
     if image_id is None:
         return {
-            "image_mime_type": None,
-            "image_filename": None,
-            "image_base64": None,
+            "image_bytes": None,
+            "image_name": None,
             "image_is_primary": False,
         }
 
@@ -127,18 +131,17 @@ def _image_payload(
             }
         )
         return {
-            "image_mime_type": None,
-            "image_filename": None,
-            "image_base64": None,
+            "image_bytes": None,
+            "image_name": None,
             "image_is_primary": False,
         }
 
     storage_path = _to_str(image.get("storage_path"))
-    image_base64 = None
+    image_bytes = None
     if storage_path:
         path = Path(storage_path)
         if path.exists() and path.is_file():
-            image_base64 = base64.b64encode(path.read_bytes()).decode("ascii")
+            image_bytes = path.read_bytes()
         else:
             warnings.append(
                 {
@@ -161,10 +164,9 @@ def _image_payload(
         )
 
     return {
-        "image_mime_type": _to_str(image.get("mime_type")),
-        "image_filename": _image_filename(document_id, line_item, image),
-        "image_base64": image_base64,
-        "image_is_primary": image_base64 is not None,
+        "image_bytes": image_bytes,
+        "image_name": _image_filename(document_id, line_item, image) if image_bytes is not None else None,
+        "image_is_primary": image_bytes is not None,
     }
 
 
@@ -185,6 +187,7 @@ def _validate_required(payload: dict[str, Any], required_fields: list[str], scop
 
 def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime | None = None) -> dict[str, Any]:
     exported_at = exported_at or _utc_now()
+    created_at = _datetime_value(exported_at)
     document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
     line_items = result_data.get("line_items") if isinstance(result_data.get("line_items"), list) else []
     images = result_data.get("images") if isinstance(result_data.get("images"), list) else []
@@ -219,7 +222,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         "vat_total": _to_float(document.get("vat_total")),
         "gross_total": _to_float(document.get("gross_total")),
         "is_alternate": bool(line_items and not non_alternative_items),
-        "created_at": exported_at.isoformat(),
+        "created_at": created_at,
         "subject": _to_str(document.get("project_ref")),
         "tax_type": None,
     }
@@ -245,6 +248,26 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             images_by_id=images_by_id,
             warnings=warnings,
         )
+        description_long = _to_str(raw_item.get("description_long"))
+        image_bytes = image_payload.pop("image_bytes", None)
+        image_name = image_payload.pop("image_name", None)
+        try:
+            image_long_text_rtf = build_vendoc_long_text_rtf(
+                description_long,
+                image_bytes=image_bytes if isinstance(image_bytes, bytes) else None,
+                image_name=_to_str(image_name),
+            )
+        except Exception as exc:
+            warnings.append(
+                {
+                    "code": "image_long_text_rtf_failed",
+                    "message": f"Could not build VenDoc RTF long text: {exc}",
+                    "line_item_id": raw_item.get("id"),
+                    "position_no": raw_item.get("position_no"),
+                }
+            )
+            image_payload["image_is_primary"] = False
+            image_long_text_rtf = build_vendoc_long_text_rtf(description_long)
         line_item_ids[source_line_item_id] = ext_line_item_id
         position = {
             "external_line_item_id": ext_line_item_id,
@@ -258,11 +281,12 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             "width_mm": _to_float(raw_item.get("width_mm")),
             "height_mm": _to_float(raw_item.get("height_mm")),
             "description_short": _to_str(raw_item.get("description_short")),
-            "description_long": _to_str(raw_item.get("description_long")),
+            "description_long": description_long,
+            "image_long_text_rtf": image_long_text_rtf,
             "unit_price": _to_float(raw_item.get("unit_price")),
             "page_ref": _to_str(raw_item.get("page_ref")),
             **image_payload,
-            "created_at": exported_at.isoformat(),
+            "created_at": created_at,
             "article_no": None,
             "discount_1": None,
             "discount_2": None,
@@ -304,6 +328,6 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             "position_count": len(positions),
             "warning_count": len(warnings),
             "error_count": len(errors),
-            "has_images": any(position.get("image_base64") for position in positions),
+            "has_images": any(position.get("image_is_primary") for position in positions),
         },
     }

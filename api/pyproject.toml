@@ -47,4 +47,6 @@ py-modules = [
   "template_sr_schauraum",
   "validation",
   "vendoc_exporter",
+  "vendoc_mssql",
+  "vendoc_rtf",
 ]

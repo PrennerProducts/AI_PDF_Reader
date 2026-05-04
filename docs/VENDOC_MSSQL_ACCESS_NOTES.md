@@ -133,11 +133,9 @@ Fachliche Klaerung:
 | `height_mm` | `float` | null |
 | `description_short` | `nvarchar(max)` | null |
 | `description_long` | `nvarchar(max)` | null |
+| `image_long_text_rtf` | `nvarchar(max)` | null |
 | `unit_price` | `float` | null |
 | `page_ref` | `nvarchar(max)` | null |
-| `image_mime_type` | `nvarchar(max)` | null |
-| `image_filename` | `nvarchar(max)` | null |
-| `image_base64` | `nvarchar(max)` | null |
 | `image_is_primary` | `bit` | null |
 | `created_at` | `datetime` | null |
 | `article_no` | `nvarchar(max)` | null |
@@ -152,7 +150,7 @@ Fachliche Klaerung:
 1. `external_document_id` ist im Header `uniqueidentifier`, in den Positionen aber `nvarchar(max)`.
 2. In `vendoc_import_positions` fehlt aktuell `line_total`.
 3. Geldfelder sind `float`, nicht `decimal`. Das kann Rundungsfragen erzeugen.
-4. Bilddaten liegen direkt auf Positionsebene als Base64.
+4. Bilddaten werden nach Dragans `LineItemBase.LongText`-Beispiel als PNG-Hex in einem RTF-Wert uebergeben, nicht als Base64.
 5. `main_line_item_id` deutet auf Unterpositionen oder Varianten hin, ist fachlich aber noch offen.
 6. `unity` ist `float`; vermutlich ist die fachliche Bedeutung noch zu klaeren.
 
@@ -196,11 +194,9 @@ Fachliche Klaerung:
 | `height_mm` | `line_item.height_mm` | klar |
 | `description_short` | `line_item.description_short` | klar |
 | `description_long` | `line_item.description_long` | klar |
+| `image_long_text_rtf` | fertiger RTF-LongText inkl. eingebettetem PNG-Hex | bestaetigt |
 | `unit_price` | `line_item.unit_price` | klar |
 | `page_ref` | `line_item.page_ref` als String | klar |
-| `image_mime_type` | primaeres Bild | klar |
-| `image_filename` | generiert aus Dokument/Position/Bild | zu implementieren |
-| `image_base64` | primaeres Bild Base64 | zu implementieren |
 | `image_is_primary` | `true`, wenn Bild vorhanden | klar |
 | `created_at` | Exportzeitpunkt | klar |
 | `article_no` | nicht vorhanden | offen |
@@ -220,7 +216,8 @@ Umgesetzt:
 
 - `api/vendoc_exporter.py` erstellen.
 - Mapping-Funktion fuer Header und Positionen bauen.
-- Base64 aus primaerem Bild lesen.
+- `image_long_text_rtf` aus Positions-Langtext und primaerem Bild als RTF mit PNG-Hex erzeugen.
+- SRTemp-Insert-Script mit `include_sql=true` erzeugen.
 - Pflichtfelder vorab validieren.
 - `dry_run` API-Endpunkt bauen.
 - Tests fuer Mapping mit Sample-Result bauen.
@@ -307,7 +304,7 @@ VENDOC_MSSQL_TIMEOUT_SECONDS=30
 - Trennung Kopf/Positionen passt zum bestehenden Datenmodell.
 - Die meisten Kernfelder sind schon vorhanden.
 - `source_document_id` und `source_line_item_id` geben Rueckverfolgbarkeit.
-- Base64-Bilder koennen aus `document_images.storage_path` erzeugt werden.
+- Der fertige VenDoc-RTF-LongText kann aus `line_items.description_long` und dem primaeren Bild aus `document_images.storage_path` erzeugt werden.
 - Freigabe-Workflow existiert bereits und kann als Export-Gate genutzt werden.
 
 ## Was noch fehlt

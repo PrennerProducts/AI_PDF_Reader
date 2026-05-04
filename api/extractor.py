@@ -38,7 +38,7 @@ POSITION_LINE_ART_MIN_WIDTH = 80
 POSITION_LINE_ART_MIN_HEIGHT = 60
 FITZ_IMAGE_SOURCE = "fitz_image_block"
 POSITION_BLOCK_ANCHOR_RE = re.compile(
-    r"(?:^|\s)Pos\.\s*\d+(?:[a-z])?(?:\.\d+)?\b",
+    r"(?:^|\s)Pos\.?\s*:?\s*\d+(?:[a-z])?(?:\.\d+)?\b",
     flags=re.IGNORECASE,
 )
 POSITION_SEPARATOR_RE = re.compile(r"^[\-\u2014_]{20,}$")
@@ -114,6 +114,13 @@ def _normal_image_suffix(ext: Any) -> str:
     return ".png"
 
 
+def _looks_like_page_header_image(metadata: dict[str, Any]) -> bool:
+    top_ratio = float(metadata.get("top_ratio") or 0)
+    width_ratio = float(metadata.get("width_ratio") or 0)
+    height_ratio = float(metadata.get("height_ratio") or 0)
+    return top_ratio <= 0.14 and width_ratio >= 0.65 and height_ratio <= 0.14
+
+
 def _fitz_image_block_rows(pdf_path: Path, output_dir: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     document = fitz.open(str(pdf_path))
@@ -150,13 +157,6 @@ def _fitz_image_block_rows(pdf_path: Path, output_dir: Path) -> list[dict[str, A
                 if max(display_width, display_height) < 40 or display_width * display_height < 900:
                     continue
 
-                image_index += 1
-                suffix = _normal_image_suffix(block.get("ext"))
-                filename = f"page_{page_ref:03d}_img_{image_index:03d}{suffix}"
-                target_path = output_dir / filename
-                payload = bytes(data)
-                target_path.write_bytes(payload)
-
                 metadata = _crop_layout_metadata(
                     left,
                     top,
@@ -167,6 +167,15 @@ def _fitz_image_block_rows(pdf_path: Path, output_dir: Path) -> list[dict[str, A
                     source=FITZ_IMAGE_SOURCE,
                 )
                 metadata["fitz_block_no"] = block_no
+                if _looks_like_page_header_image(metadata):
+                    continue
+
+                image_index += 1
+                suffix = _normal_image_suffix(block.get("ext"))
+                filename = f"page_{page_ref:03d}_img_{image_index:03d}{suffix}"
+                target_path = output_dir / filename
+                payload = bytes(data)
+                target_path.write_bytes(payload)
 
                 rows.append(
                     {
@@ -724,11 +733,49 @@ def _technical_line_art_bbox(crop: Image.Image) -> tuple[int, int, int, int] | N
         if y <= vertical_bottom + lower_context
     ]
     bottom = (max(bottom_candidates) if bottom_candidates else vertical_bottom) + 1
+    # Labels such as "(Innenansicht)" sit just below the dimension line and do
+    # not form long technical strokes. Keep the immediately attached content
+    # cluster, but ignore later right-column description text.
+    content_rows: list[tuple[int, int, int]] = []
+    for y in range(height):
+        row_xs = [x for x in range(width) if pixels[x, y] < 245]
+        if len(row_xs) >= 2:
+            content_rows.append((y, min(row_xs), max(row_xs)))
+
+    active: list[int] | None = None
+    label_gap_tolerance = max(96, int(height * 0.14))
+    for y, x0, x1 in content_rows:
+        if active is None:
+            active = [y, y, x0, x1]
+            continue
+        if y - active[1] <= 2:
+            active[1] = y
+            active[2] = min(active[2], x0)
+            active[3] = max(active[3], x1)
+            continue
+        cluster_y0, cluster_y1, cluster_x0, cluster_x1 = active
+        if (
+            cluster_y0 <= bottom + label_gap_tolerance
+            and cluster_y1 >= bottom - label_gap_tolerance
+            and cluster_x0 <= right + 12
+            and cluster_x1 >= left - 12
+        ):
+            bottom = max(bottom, cluster_y1 + 1)
+        active = [y, y, x0, x1]
+    if active is not None:
+        cluster_y0, cluster_y1, cluster_x0, cluster_x1 = active
+        if (
+            cluster_y0 <= bottom + label_gap_tolerance
+            and cluster_y1 >= bottom - label_gap_tolerance
+            and cluster_x0 <= right + 12
+            and cluster_x1 >= left - 12
+        ):
+            bottom = max(bottom, cluster_y1 + 1)
 
     pad_left = max(16, int(width * 0.045))
-    pad_right = max(48, int(width * 0.13))
+    pad_right = max(28, min(44, int(width * 0.10)))
     pad_top = max(2, int(height * 0.01))
-    pad_bottom = max(18, int(height * 0.075))
+    pad_bottom = max(28, int(height * 0.09))
 
     return (
         max(0, left - pad_left),
@@ -746,6 +793,13 @@ def _looks_like_embedded_product_image(row: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return False
     if width <= 0 or height <= 0:
+        return False
+
+    # Entholzer and similar PDFs embed the repeated page header/logo as a very
+    # wide image. It must not suppress vector crop extraction for product
+    # sketches in the actual line items below.
+    metadata = row.get("metadata_json") if isinstance(row.get("metadata_json"), dict) else {}
+    if _looks_like_page_header_image(metadata):
         return False
 
     area = width * height
@@ -801,7 +855,7 @@ def _extract_vector_crop_rows(
                     if _has_significant_bbox_overlap(bbox, position_boxes):
                         continue
                     candidate_boxes.append((bbox, "vector_strip_band"))
-            if not candidate_boxes:
+            if not candidate_boxes and not has_product_image_by_page.get(page_ref):
                 candidate_boxes.extend((bbox, "vector_strip_band") for bbox in _extract_left_strip_sketch_boxes(rendered))
 
             if not candidate_boxes:
@@ -826,11 +880,16 @@ def _extract_vector_crop_rows(
                     if not _looks_like_position_line_art(crop, crop_metrics, line_metrics):
                         continue
                 else:
-                    if crop_metrics["content_nonwhite_ratio"] < VECTOR_STRIP_MIN_NONWHITE_RATIO:
+                    looks_like_line_art = _looks_like_position_line_art(crop, crop_metrics, line_metrics)
+                    if (
+                        crop_metrics["content_nonwhite_ratio"] < VECTOR_STRIP_MIN_NONWHITE_RATIO
+                        and not looks_like_line_art
+                    ):
                         continue
                     if (
                         crop_metrics["content_dark_ratio"] > VECTOR_STRIP_MAX_DARK_RATIO
                         and crop_metrics["content_colorful_ratio"] < 0.01
+                        and not looks_like_line_art
                     ):
                         continue
 

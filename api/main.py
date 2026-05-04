@@ -50,6 +50,7 @@ from image_preview import browser_preview_for_image
 from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
 from vendoc_exporter import build_vendoc_payload
+from vendoc_mssql import build_srtemp_export_preview
 
 app = FastAPI(title="PDF Reader PoC API")
 
@@ -1470,6 +1471,7 @@ def vendoc_health():
 def vendoc_export_document(
     document_id: int,
     dry_run: bool = Query(default=True),
+    include_sql: bool = Query(default=False),
 ):
     result_data = get_document_result(document_id)
     if not result_data:
@@ -1481,6 +1483,20 @@ def vendoc_export_document(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     errors = list(vendoc_payload.get("errors") or [])
+    if include_sql:
+        try:
+            vendoc_payload["srtemp"] = build_srtemp_export_preview(vendoc_payload)
+        except ValueError as exc:
+            errors.append(
+                {
+                    "code": "srtemp_sql_preview_failed",
+                    "scope": "vendoc",
+                    "message": str(exc),
+                }
+            )
+    vendoc_payload["errors"] = errors
+    if isinstance(vendoc_payload.get("summary"), dict):
+        vendoc_payload["summary"]["error_count"] = len(errors)
     if dry_run:
         status = "dry_run_ok" if not errors else "failed"
         error_text = _vendoc_error_text(errors)

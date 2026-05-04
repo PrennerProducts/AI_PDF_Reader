@@ -103,6 +103,40 @@ def test_technical_line_art_bbox_keeps_right_side_dimension_text() -> None:
     assert bbox[2] >= 350
 
 
+def test_technical_line_art_bbox_keeps_immediate_view_label() -> None:
+    image = Image.new("RGB", (260, 260), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((45, 30, 165, 160), outline="black", width=2)
+    draw.line((45, 30, 165, 160), fill="black", width=2)
+    draw.line((165, 30, 45, 160), fill="black", width=2)
+    draw.line((42, 182, 168, 182), fill="black", width=2)
+    draw.text((80, 190), "800", fill="black")
+    draw.text((48, 212), "(Innenansicht)", fill="black")
+
+    bbox = _technical_line_art_bbox(image)
+
+    assert bbox is not None
+    assert bbox[3] >= 232
+
+
+def test_technical_line_art_bbox_keeps_view_label_with_larger_gap() -> None:
+    image = Image.new("RGB", (300, 360), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((45, 30, 185, 170), outline="black", width=2)
+    draw.line((45, 30, 185, 170), fill="black", width=2)
+    draw.line((185, 30, 45, 170), fill="black", width=2)
+    draw.line((42, 198, 188, 198), fill="black", width=2)
+    draw.text((92, 206), "1200", fill="black")
+    draw.text((48, 248), "(Innenansicht)", fill="black")
+    draw.text((230, 250), "Rahmenfarbe", fill="black")
+
+    bbox = _technical_line_art_bbox(image)
+
+    assert bbox is not None
+    assert bbox[2] < 230
+    assert bbox[3] >= 268
+
+
 def test_technical_line_art_bbox_ignores_following_alternative_heading() -> None:
     image = Image.new("RGB", (360, 760), "white")
     draw = ImageDraw.Draw(image)
@@ -196,3 +230,48 @@ def test_rekord_continuation_page_sketches_are_extracted(tmp_path: Path) -> None
         "vector_position_line_art",
     ]
     assert [row["metadata_json"]["layout_source"] for row in page_10_rows] == ["vector_strip_band"]
+
+
+def test_newo_embedded_product_images_do_not_get_vector_duplicates(tmp_path: Path) -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/newo/AN NEWO BVH Projekt 353 Achhorner.pdf"
+    if not pdf_path.exists():
+        return
+
+    rows = extract_pdf_images(pdf_path, tmp_path / "images")
+    page_three_rows = [row for row in rows if row.get("page_ref") == 3]
+    page_three_sources = [
+        (row.get("metadata_json") or {}).get("layout_source")
+        for row in page_three_rows
+    ]
+
+    assert page_three_sources.count("fitz_image_block") == 2
+    assert "vector_strip_band" not in page_three_sources
+
+
+def test_entholzer_header_images_do_not_suppress_position_sketches(tmp_path: Path) -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/entholzer/Angebot 12600422.00 Bernsteiner.pdf"
+    if not pdf_path.exists():
+        return
+
+    rows = extract_pdf_images(pdf_path, tmp_path / "images")
+    sources = [(row.get("metadata_json") or {}).get("layout_source") for row in rows]
+    header_like_rows = [
+        row
+        for row in rows
+        if (row.get("metadata_json") or {}).get("top_ratio", 1) <= 0.14
+        and (row.get("metadata_json") or {}).get("width_ratio", 0) >= 0.65
+    ]
+    page_two_rows = [row for row in rows if row.get("page_ref") == 2]
+
+    assert len(rows) == 20
+    assert sources.count("vector_position_line_art") == 17
+    assert not header_like_rows
+    assert [row["metadata_json"]["layout_source"] for row in page_two_rows] == [
+        "vector_position_line_art",
+        "vector_position_line_art",
+    ]
+    assert all(
+        (row.get("metadata_json") or {}).get("line_art_refined_crop") is True
+        for row in rows
+        if (row.get("metadata_json") or {}).get("layout_source") == "vector_position_line_art"
+    )
