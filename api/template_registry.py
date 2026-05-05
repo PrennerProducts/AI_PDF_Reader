@@ -6,6 +6,7 @@ from template_common import normalize_text
 import template_alu_one
 import template_entholzer
 import template_koch
+import template_koch_detail
 import template_muigg
 import template_newo
 import template_rekord_vomp
@@ -22,6 +23,10 @@ def _identity_headers(_: str, headers: HeaderFields) -> HeaderFields:
     return dict(headers)
 
 
+def _no_document_notes(_: str) -> str | None:
+    return None
+
+
 @dataclass(frozen=True)
 class TemplateSpec:
     key: str
@@ -30,6 +35,7 @@ class TemplateSpec:
     count_positions: Callable[[str], int]
     extract_line_items: Callable[[str], list[dict[str, Any]]]
     refine_headers: Callable[[str, HeaderFields], HeaderFields] = _identity_headers
+    extract_document_notes: Callable[[str], str | None] = _no_document_notes
 
 
 TEMPLATES = (
@@ -87,6 +93,15 @@ TEMPLATES = (
         count_positions=template_koch.count_positions,
         extract_line_items=template_koch.extract_line_items,
         refine_headers=template_koch.refine_headers,
+        extract_document_notes=template_koch.extract_document_notes,
+    ),
+    TemplateSpec(
+        key="koch_detail",
+        supplier_name="Koch Türen GmbH",
+        detector=template_koch_detail.detect,
+        count_positions=template_koch_detail.count_positions,
+        extract_line_items=template_koch_detail.extract_line_items,
+        refine_headers=template_koch_detail.refine_headers,
     ),
     TemplateSpec(
         key="schachermayer",
@@ -161,3 +176,11 @@ def refine_headers_for_template(template: str, text: str, headers: HeaderFields)
     if spec is None:
         return dict(headers)
     return spec.refine_headers(normalized_text, dict(headers))
+
+
+def extract_document_notes_for_template(template: str, text: str) -> str | None:
+    spec = TEMPLATES_BY_KEY.get(template)
+    normalized_text = normalize_text(text)
+    if spec is None:
+        return None
+    return spec.extract_document_notes(normalized_text)

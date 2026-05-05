@@ -39,6 +39,7 @@ from db import (
     update_document_status,
 )
 from extractor import extract_pdf_images, extract_pdf_text
+from document_package import build_document_package_result
 from exporter import build_export_content
 from image_assignment import (
     is_non_visual_line_item,
@@ -49,8 +50,9 @@ from image_assignment import (
 from image_preview import browser_preview_for_image
 from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
+from template_koch_detail import parse_page_details as parse_koch_detail_page_details
 from vendoc_exporter import build_vendoc_payload
-from vendoc_mssql import build_srtemp_export_preview
+from vendoc_mssql import build_srtemp_export_preview, check_connection, config_from_env, driver_status, write_srtemp_payload
 
 app = FastAPI(title="PDF Reader PoC API")
 
@@ -77,6 +79,11 @@ class ParseTextRequest(BaseModel):
 
 class AssignImageRequest(BaseModel):
     image_id: int = Field(gt=0, description="Final image id to assign to the line item.")
+
+
+class DocumentPackageRequest(BaseModel):
+    document_ids: list[int] = Field(min_length=1, description="Documents that belong to one logical PDF package.")
+    main_document_id: int | None = Field(default=None, description="Optional explicit master document id.")
 
 
 class PdfCropImageRequest(BaseModel):
@@ -139,6 +146,46 @@ def _compute_confidence(template: str, position_count: int, has_totals: bool) ->
     if has_totals:
         base += Decimal("0.10")
     return min(base, Decimal("0.99"))
+
+
+def _postprocess_image_rows(
+    image_rows: list[dict[str, Any]],
+    *,
+    template: str,
+    document_type: str | None,
+    extracted_text: str,
+) -> list[dict[str, Any]]:
+    if template == "koch" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
+        return [
+            row
+            for row in image_rows
+            if (row.get("metadata_json") or {}).get("layout_source")
+            not in {"vector_strip_band", "vector_position_line_art"}
+        ]
+
+    if template != "koch_detail":
+        return image_rows
+
+    page_details = parse_koch_detail_page_details(extracted_text)
+    processed: list[dict[str, Any]] = []
+    for row in image_rows:
+        width = int(row.get("width") or 0)
+        height = int(row.get("height") or 0)
+        if width <= 0 or height <= 0:
+            continue
+        # Koch technical PDFs include repeated header logos and small profile fragments.
+        # Keep the large drawings that can be assigned to positions.
+        if width >= 500 and height <= 220:
+            continue
+        if max(width, height) < 700:
+            continue
+        metadata = dict(row.get("metadata_json") or {})
+        metadata.update(page_details.get(int(row.get("page_ref") or 0), {}))
+        metadata["source_template"] = "koch_detail"
+        metadata["koch_detail_candidate"] = True
+        row = {**row, "metadata_json": metadata}
+        processed.append(row)
+    return processed
 
 
 def _json_safe(value):
@@ -769,6 +816,46 @@ def _record_vendoc_export_job(
         reviewed_at=document.get("reviewed_at"),
         payload=vendoc_payload,
     )
+
+
+def _load_package_result(request: DocumentPackageRequest) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    missing: list[int] = []
+    seen: set[int] = set()
+    for document_id in request.document_ids:
+        if document_id in seen:
+            continue
+        seen.add(document_id)
+        result = get_document_result(document_id)
+        if result is None:
+            missing.append(document_id)
+            continue
+        results.append(result)
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Documents not found: {', '.join(str(item) for item in missing)}")
+    try:
+        return build_document_package_result(results, main_document_id=request.main_document_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _apply_srtemp_preview(vendoc_payload: dict[str, Any], include_sql: bool) -> list[dict[str, Any]]:
+    errors = list(vendoc_payload.get("errors") or [])
+    if include_sql:
+        try:
+            vendoc_payload["srtemp"] = build_srtemp_export_preview(vendoc_payload)
+        except ValueError as exc:
+            errors.append(
+                {
+                    "code": "srtemp_sql_preview_failed",
+                    "scope": "vendoc",
+                    "message": str(exc),
+                }
+            )
+    vendoc_payload["errors"] = errors
+    if isinstance(vendoc_payload.get("summary"), dict):
+        vendoc_payload["summary"]["error_count"] = len(errors)
+    return errors
 
 
 @app.get("/health")
@@ -1453,18 +1540,214 @@ def _persist_image_assignments(
 
 
 @app.get("/vendoc/health")
-def vendoc_health():
+def vendoc_health(check_connection_live: bool = Query(default=False, alias="check_connection")):
     enabled = _is_truthy(os.getenv("VENDOC_MSSQL_ENABLED"), default=False)
     host = _vendoc_target_server()
     database = _vendoc_target_database()
+    driver = driver_status()
+    config = config_from_env()
+    connection = None
+    if enabled and config and check_connection_live:
+        connection = check_connection(config)
     return {
-        "ok": bool(enabled and host),
-        "status": "configured" if enabled and host else ("disabled" if not enabled else "missing_host"),
+        "ok": bool(enabled and config and driver.get("available") and ((connection or {}).get("ok") if check_connection_live else True)),
+        "status": (
+            "disabled"
+            if not enabled
+            else ("missing_config" if config is None else ((connection or {}).get("status") or "configured"))
+        ),
         "target_server_configured": bool(host),
         "target_database": database,
-        "live_write_available": False,
-        "message": "MSSQL live write is blocked until CIBEX access and final VenDoc field rules are available.",
+        "driver": driver,
+        "connection": connection,
+        "live_write_available": bool(enabled and config and driver.get("available")),
+        "connection_tested": check_connection_live,
+        "message": (
+            "MSSQL live write is disabled."
+            if not enabled
+            else (
+                "MSSQL config is incomplete."
+                if config is None
+                else ((connection or {}).get("message") or "MSSQL live write is configured.")
+            )
+        ),
     }
+
+
+@app.post("/document-packages/preview")
+def document_package_preview(request: DocumentPackageRequest):
+    package_result = _load_package_result(request)
+    return _json_safe(
+        {
+            "ok": True,
+            "package": package_result.get("package"),
+            "document": package_result.get("document"),
+            "amount_lines": package_result.get("amount_lines"),
+            "line_items": package_result.get("line_items"),
+            "images": package_result.get("images"),
+            "validation": package_result.get("validation"),
+        }
+    )
+
+
+@app.post("/vendoc/export-package")
+def vendoc_export_document_package(
+    request: DocumentPackageRequest,
+    dry_run: bool = Query(default=True),
+    include_sql: bool = Query(default=False),
+):
+    result_data = _load_package_result(request)
+    document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
+    document_id = int(document.get("id") or result_data.get("package", {}).get("main_document_id") or 0)
+    if document_id <= 0:
+        raise HTTPException(status_code=400, detail="Package main document id is missing.")
+
+    try:
+        vendoc_payload = build_vendoc_payload(result_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    vendoc_payload["package"] = result_data.get("package")
+
+    errors = _apply_srtemp_preview(vendoc_payload, include_sql)
+    if dry_run:
+        status = "dry_run_ok" if not errors else "failed"
+        error_text = _vendoc_error_text(errors)
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=True,
+            status=status,
+            error_text=error_text,
+        )
+        return _json_safe(
+            {
+                "ok": not errors,
+                "document_id": document_id,
+                "dry_run": True,
+                "status": status,
+                "job": _vendoc_job_response(job),
+                "package": result_data.get("package"),
+                "vendoc": vendoc_payload,
+            }
+        )
+
+    live_errors = list(errors)
+    if str(document.get("status") or "").strip().lower() != "processed":
+        live_errors.append(
+            {
+                "code": "document_not_processed",
+                "scope": "document",
+                "message": "Live-Export ist erst nach abgeschlossener Verarbeitung erlaubt.",
+            }
+        )
+    if str(document.get("approval_status") or "").strip().lower() != "approved":
+        live_errors.append(
+            {
+                "code": "document_not_approved",
+                "scope": "approval",
+                "message": "Live-Export ist erst nach Freigabe des Hauptdokuments erlaubt.",
+            }
+        )
+    if live_errors:
+        vendoc_payload["errors"] = live_errors
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = len(live_errors)
+        error_text = _vendoc_error_text(live_errors)
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=error_text,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": error_text,
+                "job": _vendoc_job_response(job),
+                "package": result_data.get("package"),
+                "vendoc": vendoc_payload,
+            },
+        )
+
+    config = config_from_env()
+    if config is None:
+        live_error = {
+            "code": "mssql_config_incomplete",
+            "scope": "vendoc",
+            "message": "MSSQL-Ziel ist aktiviert, aber Host/User/Passwort sind nicht vollstaendig konfiguriert.",
+        }
+        vendoc_payload["errors"] = [live_error]
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = 1
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=live_error["message"],
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": live_error["message"],
+                "job": _vendoc_job_response(job),
+                "package": result_data.get("package"),
+            },
+        )
+
+    try:
+        write_result = write_srtemp_payload(vendoc_payload, config)
+    except Exception as exc:
+        live_error = {
+            "code": "mssql_write_failed",
+            "scope": "vendoc",
+            "message": str(exc)[:1000],
+        }
+        vendoc_payload["errors"] = [live_error]
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = 1
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=live_error["message"],
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "MSSQL Live-Write fehlgeschlagen.",
+                "error": live_error,
+                "job": _vendoc_job_response(job),
+                "package": result_data.get("package"),
+            },
+        ) from exc
+
+    job = _record_vendoc_export_job(
+        document_id=document_id,
+        result_data=result_data,
+        vendoc_payload=vendoc_payload,
+        dry_run=False,
+        status="exported",
+        error_text=None,
+    )
+    return _json_safe(
+        {
+            "ok": True,
+            "document_id": document_id,
+            "dry_run": False,
+            "status": "exported",
+            "job": _vendoc_job_response(job),
+            "package": result_data.get("package"),
+            "write": write_result,
+            "vendoc": vendoc_payload,
+        }
+    )
 
 
 @app.post("/vendoc/export/{document_id}")
@@ -1585,28 +1868,78 @@ def vendoc_export_document(
             },
         )
 
-    live_error = {
-        "code": "mssql_writer_not_implemented",
-        "scope": "vendoc",
-        "message": "Der transaktionale MSSQL-Live-Writer ist noch nicht implementiert.",
-    }
-    vendoc_payload["errors"] = [live_error]
-    if isinstance(vendoc_payload.get("summary"), dict):
-        vendoc_payload["summary"]["error_count"] = 1
+    config = config_from_env()
+    if config is None:
+        live_error = {
+            "code": "mssql_config_incomplete",
+            "scope": "vendoc",
+            "message": "MSSQL-Ziel ist aktiviert, aber Host/User/Passwort sind nicht vollstaendig konfiguriert.",
+        }
+        vendoc_payload["errors"] = [live_error]
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = 1
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=live_error["message"],
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": live_error["message"],
+                "job": _vendoc_job_response(job),
+            },
+        )
+
+    try:
+        write_result = write_srtemp_payload(vendoc_payload, config)
+    except Exception as exc:
+        live_error = {
+            "code": "mssql_write_failed",
+            "scope": "vendoc",
+            "message": str(exc)[:1000],
+        }
+        vendoc_payload["errors"] = [live_error]
+        if isinstance(vendoc_payload.get("summary"), dict):
+            vendoc_payload["summary"]["error_count"] = 1
+        job = _record_vendoc_export_job(
+            document_id=document_id,
+            result_data=result_data,
+            vendoc_payload=vendoc_payload,
+            dry_run=False,
+            status="failed",
+            error_text=live_error["message"],
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "MSSQL Live-Write fehlgeschlagen.",
+                "error": live_error,
+                "job": _vendoc_job_response(job),
+            },
+        ) from exc
+
     job = _record_vendoc_export_job(
         document_id=document_id,
         result_data=result_data,
         vendoc_payload=vendoc_payload,
         dry_run=False,
-        status="failed",
-        error_text=live_error["message"],
+        status="exported",
+        error_text=None,
     )
-    raise HTTPException(
-        status_code=501,
-        detail={
-            "message": live_error["message"],
+    return _json_safe(
+        {
+            "ok": True,
+            "document_id": document_id,
+            "dry_run": False,
+            "status": "exported",
             "job": _vendoc_job_response(job),
-        },
+            "write": write_result,
+            "vendoc": vendoc_payload,
+        }
     )
 
 
@@ -1729,15 +2062,6 @@ def process_document(
         text_dump_path.write_text(extracted_text, encoding="utf-8")
         _set_process_progress(
             document_id,
-            stage="extract_images",
-            message="PDF-Bilder werden extrahiert.",
-            mode=requested_mode,
-            status="processing",
-        )
-        image_rows = extract_pdf_images(source_path, IMAGE_DUMP_DIR / f"document_{document_id}")
-
-        _set_process_progress(
-            document_id,
             stage="parse_text",
             message="Parser extrahiert Felder, Positionen und Betragszeilen.",
             mode=requested_mode,
@@ -1745,6 +2069,20 @@ def process_document(
         )
         parsed = parse_document_text(extracted_text)
         template = _clean_optional_str(parsed.get("template")) or "generic"
+        _set_process_progress(
+            document_id,
+            stage="extract_images",
+            message="PDF-Bilder werden extrahiert.",
+            mode=requested_mode,
+            status="processing",
+        )
+        image_rows = extract_pdf_images(source_path, IMAGE_DUMP_DIR / f"document_{document_id}")
+        image_rows = _postprocess_image_rows(
+            image_rows,
+            template=template,
+            document_type=parsed.get("document_type"),
+            extracted_text=extracted_text,
+        )
         amount_line_rows = _build_amount_line_rows(
             extracted_text,
             parsed.get("totals") if isinstance(parsed.get("totals"), dict) else {},
@@ -1804,6 +2142,7 @@ def process_document(
             parse_confidence=confidence,
             raw_text_path=str(text_dump_path),
             status="processed",
+            document_notes=_clean_optional_str(parsed.get("document_notes")),
         )
         refreshed = refresh_document_links(document_id)
         if refreshed:

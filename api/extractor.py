@@ -643,6 +643,13 @@ def _looks_like_position_line_art(
     max_horizontal_ratio = float(line_metrics["line_art_max_horizontal_run_ratio"])
     max_vertical_ratio = float(line_metrics["line_art_max_vertical_run_ratio"])
 
+    if (
+        crop_metrics["content_dark_ratio"] > 0.22
+        and max_horizontal_ratio < 0.45
+        and max_vertical_ratio < 0.22
+    ):
+        return False
+
     if vertical_runs >= 5 and max_vertical_ratio >= 0.24:
         return True
     if horizontal_runs >= 5 and max_horizontal_ratio >= 0.18 and vertical_runs >= 4:

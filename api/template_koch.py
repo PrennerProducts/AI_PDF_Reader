@@ -24,6 +24,10 @@ SUM_LINE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 OBJECT_POSITION_RE = re.compile(r"Objektposition:\s*(.+)", flags=re.IGNORECASE)
+DOCUMENT_NOTE_START_RE = re.compile(r"(?mi)^\s*Allgemeine Ausf[üu]hrung\s*:\s*$")
+DOCUMENT_NOTE_END_RE = re.compile(
+    r"(?mi)^\s*(?:Position\s+St[üu]ck|Angebotsnummer\s*:|Gesamtpreis|Zahlungskonditionen|Mit freundlichen Gr[üu][ßs]en)\b"
+)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -91,6 +95,28 @@ def _extract_sum_prices(block_lines: list[str]) -> tuple[str | None, str | None]
         if match:
             return match.group("unit_price"), match.group("line_total")
     return None, None
+
+
+def extract_document_notes(text: str) -> str | None:
+    normalized_text = normalize_text(text)
+    start_match = DOCUMENT_NOTE_START_RE.search(normalized_text)
+    if not start_match:
+        return None
+
+    end_match = DOCUMENT_NOTE_END_RE.search(normalized_text, start_match.end())
+    note_text = normalized_text[start_match.start() : end_match.start() if end_match else len(normalized_text)]
+    cleaned_lines: list[str] = []
+    for line in note_text.splitlines():
+        cleaned = normalize_line(line)
+        if not cleaned:
+            continue
+        if cleaned.lower().startswith(("tel ", "uid-nr.", "angebotsnummer:")):
+            continue
+        cleaned_lines.append(cleaned)
+
+    if not cleaned_lines:
+        return None
+    return "\n".join(cleaned_lines)[:12000]
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:

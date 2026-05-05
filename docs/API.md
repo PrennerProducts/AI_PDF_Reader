@@ -156,7 +156,9 @@ Live-Export:
 
 - ist nur bei `document.status=processed` und `approval_status=approved` erlaubt.
 - liefert fuer nicht freigegebene Dokumente HTTP `409`.
-- bleibt aktuell mit HTTP `503`/`501` gesperrt, bis CIBEX-Zugriff und MSSQL-Writer verfuegbar sind.
+- schreibt bei aktivem `VENDOC_MSSQL_ENABLED=true` transaktional nach `SRTemp`.
+- liefert HTTP `503`, wenn MSSQL nicht aktiviert oder unvollstaendig konfiguriert ist.
+- liefert HTTP `502`, wenn der MSSQL-Write fehlschlaegt.
 
 ### `GET /vendoc/export-jobs/{document_id}?limit=20&include_payload=false`
 
@@ -166,9 +168,9 @@ Listet VenDoc-Exportversuche und Dry-Runs eines Dokuments.
 
 Liefert den letzten VenDoc-Exportjob eines Dokuments.
 
-### `GET /vendoc/health`
+### `GET /vendoc/health?check_connection=false`
 
-Liefert Konfigurationsstatus fuer den geplanten MSSQL-Zielzugriff. Der Live-Write ist aktuell noch nicht verfuegbar.
+Liefert Konfigurationsstatus fuer den MSSQL-Zielzugriff inklusive ODBC-Treiberstatus. Mit `check_connection=true` wird zusaetzlich eine echte SQL-Server-Verbindung getestet.
 
 ## Bilder
 

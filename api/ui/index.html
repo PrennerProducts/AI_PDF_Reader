@@ -5303,6 +5303,13 @@
       padding: 12px 14px;
     }
 
+    .app-shell.has-package {
+      grid-template-areas:
+        "brand controls actions logo"
+        "status controls actions logo"
+        "package package package package";
+    }
+
     .shell-brand h1 {
       font-size: clamp(17px, 1.08vw, 22px);
     }
@@ -5904,6 +5911,86 @@
     }
 
     .app-v3 .control-hint {
+      display: none;
+    }
+
+    .app-v3 .package-panel {
+      grid-area: package;
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-width: 0;
+      padding: 7px 10px;
+      border-radius: 16px;
+      border: 1px solid rgba(60, 60, 67, 0.09);
+      background: rgba(255, 255, 255, 0.62);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70);
+      color: rgba(29, 29, 31, 0.72);
+      font-size: 12px;
+    }
+
+    .app-v3 .package-panel[hidden] {
+      display: none;
+    }
+
+    .app-v3 .package-panel strong {
+      color: rgba(29, 29, 31, 0.88);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .app-v3 .package-docs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .app-v3 .package-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 26px;
+      max-width: 240px;
+      padding: 0 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: rgba(255, 255, 255, 0.76);
+      color: rgba(29, 29, 31, 0.68);
+      font-size: 11px;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+
+    .app-v3 .package-chip.is-main {
+      border-color: rgba(52, 199, 89, 0.30);
+      background: #eafaf0;
+      color: #147a3f;
+    }
+
+    .app-v3 .package-chip span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .app-v3 .package-clear-btn {
+      justify-self: end;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: #ffffff;
+      color: rgba(29, 29, 31, 0.64);
+      font-size: 11px;
+      font-weight: 780;
+      cursor: pointer;
+    }
+
+    .topbar.is-collapsed .package-panel {
       display: none;
     }
 
@@ -6955,6 +7042,18 @@
       letter-spacing: -0.02em;
     }
 
+    .app-v3 .summary .card.summary-wide {
+      grid-column: 1 / -1;
+    }
+
+    .app-v3 .summary .card.summary-wide .value {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      font-size: 13px;
+      font-weight: 620;
+      color: rgba(29, 29, 31, 0.72);
+    }
+
     .app-v3 .position-section {
       padding: 0;
       border: 0;
@@ -7634,6 +7733,7 @@
     }
 
     .app-v3 .review-approval-card,
+    .app-v3 .vendoc-export-card,
     .app-v3 .review-open-tasks-card {
       padding: 18px;
       min-height: 0;
@@ -7760,6 +7860,63 @@
       background: #f5f5f7;
       border-color: rgba(60, 60, 67, 0.10);
       box-shadow: none;
+    }
+
+    .app-v3 .vendoc-export-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .app-v3 .vendoc-status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: #f5f5f7;
+      color: rgba(29, 29, 31, 0.64);
+      font-size: 12px;
+      font-weight: 780;
+      white-space: nowrap;
+    }
+
+    .app-v3 .vendoc-status-pill.ok {
+      border-color: rgba(52, 199, 89, 0.30);
+      background: #eafaf0;
+      color: #147a3f;
+    }
+
+    .app-v3 .vendoc-status-pill.warn {
+      border-color: rgba(255, 204, 0, 0.38);
+      background: #fff8df;
+      color: #8a6100;
+    }
+
+    .app-v3 .vendoc-status-pill.err {
+      border-color: rgba(255, 59, 48, 0.28);
+      background: #fff0ef;
+      color: #b42318;
+    }
+
+    .app-v3 .vendoc-export-meta {
+      min-height: 50px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: #f5f5f7;
+      color: rgba(29, 29, 31, 0.70);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .app-v3 .vendoc-export-actions {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .app-v3 .vendoc-export-actions .btn {
+      min-height: 42px;
     }
 
     .app-v3 .review-open-tasks-card {
@@ -9765,9 +9922,15 @@
         </div>
         <div class="control-card">
           <label class="control-label" for="uploadInput">PDF</label>
-          <input id="uploadInput" type="file" accept=".pdf,application/pdf" aria-label="PDF auswählen und automatisch verarbeiten">
-          <div class="control-hint">Auswahl startet Upload und Verarbeitung automatisch.</div>
+          <input id="uploadInput" type="file" accept=".pdf,application/pdf" multiple aria-label="PDFs auswählen und automatisch verarbeiten">
+          <div class="control-hint">Eine oder mehrere PDFs auswaehlen. Upload und Verarbeitung starten automatisch.</div>
+          <div class="control-hint" id="packageModeState">Multi-PDF: inaktiv</div>
         </div>
+      </div>
+      <div class="package-panel" id="packagePanel" hidden>
+        <strong id="packageTitle">Multi-PDF-Paket</strong>
+        <div class="package-docs" id="packageDocs"></div>
+        <button class="package-clear-btn" id="packageClearBtn" type="button">Einzelmodus</button>
       </div>
       <div class="action-bar shell-actions">
         <div class="action-group">
@@ -9980,6 +10143,21 @@
                     </div>
                   </div>
                 </div>
+                <div class="review-card vendoc-export-card" id="vendocExportCard">
+                  <div class="review-card-head">
+                    <div>
+                      <h2>VenDoc Export</h2>
+                      <div class="small">SRTemp-Dry-Run, SQL-Vorschau und Live-Übergabe.</div>
+                    </div>
+                    <span class="vendoc-status-pill pending" id="vendocExportState">Nicht geprüft</span>
+                  </div>
+                  <div class="vendoc-export-meta" id="vendocExportMeta">Noch kein Exportstatus geladen.</div>
+                  <div class="review-approval-actions vendoc-export-actions">
+                    <button class="btn btn-ghost" id="vendocDryRunBtn" type="button">Dry-Run prüfen</button>
+                    <button class="btn btn-ghost" id="vendocSqlPreviewBtn" type="button">SQL Vorschau</button>
+                    <button class="btn btn-primary" id="vendocLiveExportBtn" type="button">An VenDoc übergeben</button>
+                  </div>
+                </div>
                 <div class="review-card review-open-tasks-card" id="reviewOpenTasksCard">
                   <div class="review-card-head">
                     <div>
@@ -10088,6 +10266,9 @@
       processingHeartbeatAtMs: 0,
       processingMode: null,
       processingLastProgressKey: null,
+      packageDocumentIds: [],
+      packageMainDocumentId: null,
+      packageAutoDisabledForDocumentId: null,
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -10119,8 +10300,18 @@
       documentApprovalBadge: document.getElementById("documentApprovalBadge"),
       documentApprovalState: document.getElementById("documentApprovalState"),
       uploadInput: document.getElementById("uploadInput"),
+      packageModeState: document.getElementById("packageModeState"),
+      packagePanel: document.getElementById("packagePanel"),
+      packageTitle: document.getElementById("packageTitle"),
+      packageDocs: document.getElementById("packageDocs"),
+      packageClearBtn: document.getElementById("packageClearBtn"),
       uploadBtn: document.getElementById("uploadBtn"),
       resetBtn: document.getElementById("resetBtn"),
+      vendocExportState: document.getElementById("vendocExportState"),
+      vendocExportMeta: document.getElementById("vendocExportMeta"),
+      vendocDryRunBtn: document.getElementById("vendocDryRunBtn"),
+      vendocSqlPreviewBtn: document.getElementById("vendocSqlPreviewBtn"),
+      vendocLiveExportBtn: document.getElementById("vendocLiveExportBtn"),
       processModeSelect: document.getElementById("processModeSelect"),
       processBtn: document.getElementById("processBtn"),
       jsonPreviewBtn: document.getElementById("jsonPreviewBtn"),
@@ -10676,6 +10867,7 @@
     function createSummaryCard(label, value, sourceKey = null, options = {}) {
       const card = document.createElement("div");
       card.className = "card";
+      if (options.wide) card.classList.add("summary-wide");
       const labelEl = document.createElement("div");
       labelEl.className = "label";
       labelEl.innerHTML = options.required ? requiredLabelHtml(label) : escapeHtml(label);
@@ -11865,46 +12057,161 @@
       return text;
     }
 
-    function selectedUploadFile() {
+    function selectedUploadFiles() {
       const files = ui.uploadInput.files;
-      if (!files || !files.length) return null;
-      return files[0];
+      if (!files || !files.length) return [];
+      return Array.from(files);
     }
 
-    async function uploadSelectedPdf({ autoProcess = false } = {}) {
-      const file = selectedUploadFile();
-      if (!file) {
-        setStatus("Bitte zuerst eine PDF-Datei auswaehlen.", "warn");
+    function updatePackageModeState() {
+      const ids = Array.isArray(state.packageDocumentIds) ? state.packageDocumentIds : [];
+      if (ids.length <= 1) {
+        if (ui.packageModeState) ui.packageModeState.textContent = "Multi-PDF: inaktiv";
+        if (ui.packagePanel) ui.packagePanel.setAttribute("hidden", "");
+        if (ui.topbar) ui.topbar.classList.remove("has-package");
         return;
       }
+      const mainLabel = state.packageMainDocumentId ? `Master #${state.packageMainDocumentId}` : "Master automatisch";
+      if (ui.packageModeState) ui.packageModeState.textContent = `Multi-PDF: ${ids.length} PDFs im Paket · ${mainLabel}`;
+      if (ui.packagePanel) ui.packagePanel.removeAttribute("hidden");
+      if (ui.topbar) ui.topbar.classList.add("has-package");
+      if (ui.packageTitle) ui.packageTitle.textContent = `Multi-PDF-Paket · ${mainLabel}`;
+      if (ui.packageDocs) {
+        clearNode(ui.packageDocs);
+        for (const id of ids) {
+          const doc = state.documents.find((item) => Number(item.id) === Number(id));
+          const chip = document.createElement("span");
+          chip.className = `package-chip${Number(id) === Number(state.packageMainDocumentId) ? " is-main" : ""}`;
+          const type = doc && doc.document_type ? doc.document_type : "PDF";
+          const name = doc && doc.original_filename ? doc.original_filename : `Dokument #${id}`;
+          chip.title = `${fmt(type)} · ${fmt(name)}`;
+          chip.innerHTML = `<strong>#${escapeHtml(fmt(id))}</strong><span>${escapeHtml(type)}</span>`;
+          ui.packageDocs.appendChild(chip);
+        }
+      }
+    }
+
+    function inferPackageMainDocumentId(documentIds) {
+      const ids = Array.isArray(documentIds) ? documentIds.map((id) => Number(id)).filter(Number.isFinite) : [];
+      const candidates = state.documents.filter((document) => {
+        const id = Number(document.id);
+        const type = String(document.document_type || "").toLowerCase();
+        return ids.includes(id) && ["angebot", "auftragsbestaetigung"].includes(type);
+      });
+      if (candidates.length === 1) return Number(candidates[0].id);
+      if (ids.includes(Number(state.documentId))) return Number(state.documentId);
+      return ids[0] || null;
+    }
+
+    function autoPackageDocumentIdsFor(documentId) {
+      const mainId = Number(documentId);
+      const mainDoc = state.documents.find((doc) => Number(doc.id) === mainId);
+      if (!mainDoc) return [];
+      const mainType = String(mainDoc.document_type || "").toLowerCase();
+      if (!["angebot", "auftragsbestaetigung"].includes(mainType)) return [];
+      const documentNumber = String(mainDoc.document_number || "").trim();
+      if (!documentNumber) return [];
+      const supplier = String(mainDoc.supplier_name || "").trim().toLowerCase();
+      const detailDocs = state.documents
+        .filter((doc) => {
+          if (Number(doc.id) === mainId) return false;
+          if (String(doc.status || "").toLowerCase() !== "processed") return false;
+          if (String(doc.document_type || "").toLowerCase() !== "detailzeichnung") return false;
+          if (String(doc.document_number || "").trim() !== documentNumber) return false;
+          if (supplier && String(doc.supplier_name || "").trim().toLowerCase() !== supplier) return false;
+          return true;
+        })
+        .sort((left, right) => Number(right.id || 0) - Number(left.id || 0));
+      const seenNames = new Set();
+      const pickedDetails = [];
+      for (const doc of detailDocs) {
+        const key = String(doc.original_filename || doc.id);
+        if (seenNames.has(key)) continue;
+        seenNames.add(key);
+        pickedDetails.push(Number(doc.id));
+      }
+      return pickedDetails.length ? [mainId, ...pickedDetails] : [];
+    }
+
+    function activePackageRequestBody() {
+      const ids = Array.isArray(state.packageDocumentIds) ? state.packageDocumentIds.map((id) => Number(id)).filter(Number.isFinite) : [];
+      if (ids.length <= 1 || !ids.includes(Number(state.documentId))) return null;
+      const mainDocumentId = state.packageMainDocumentId || inferPackageMainDocumentId(ids);
+      if (Number(state.documentId) !== Number(mainDocumentId)) return null;
+      return {
+        document_ids: ids,
+        main_document_id: mainDocumentId,
+      };
+    }
+
+    function clearPackageMode() {
+      state.packageDocumentIds = [];
+      state.packageMainDocumentId = null;
+      state.packageAutoDisabledForDocumentId = state.documentId ? Number(state.documentId) : null;
+      updatePackageModeState();
+      if (state.documentId) loadResult(state.documentId);
+    }
+
+    async function uploadSelectedPdfFile(file, { autoProcess = false, index = 1, total = 1 } = {}) {
       const fileName = String(file.name || "");
-      if (!fileName.toLowerCase().endsWith(".pdf")) {
+      const progressPrefix = total > 1 ? `${index}/${total}: ` : "";
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setStatus(`${progressPrefix}Lade PDF hoch: ${fileName} ...`);
+      const payload = await apiJson("/upload", { method: "POST", body: formData });
+      const newDocId = Number(payload.document_id);
+      if (!Number.isFinite(newDocId) || newDocId <= 0) {
+        throw new Error("Upload erfolgreich, aber keine gueltige Dokument-ID erhalten.");
+      }
+
+      state.documentId = newDocId;
+      await loadDocuments();
+      setStatus(`${progressPrefix}Upload erfolgreich: Dokument #${newDocId} (${fileName}).`, "ok");
+      if (autoProcess) {
+        setStatus(`${progressPrefix}Upload fertig. Verarbeitung startet fuer Dokument #${newDocId} ...`);
+        await processCurrent();
+      }
+      return newDocId;
+    }
+
+    async function uploadSelectedPdfs({ autoProcess = false } = {}) {
+      const files = selectedUploadFiles();
+      if (!files.length) {
+        setStatus("Bitte zuerst eine oder mehrere PDF-Dateien auswaehlen.", "warn");
+        return;
+      }
+      const invalidFile = files.find((file) => !String(file.name || "").toLowerCase().endsWith(".pdf"));
+      if (invalidFile) {
         setStatus("Nur PDF-Dateien sind erlaubt.", "warn");
         return;
       }
 
-      const formData = new FormData();
-      formData.append("file", file);
-
       ui.uploadBtn.disabled = true;
       ui.uploadInput.disabled = true;
       ui.processBtn.disabled = true;
-      setStatus(`Lade PDF hoch: ${fileName} ...`);
+      const uploadedIds = [];
       try {
-        const payload = await apiJson("/upload", { method: "POST", body: formData });
-        const newDocId = Number(payload.document_id);
-        ui.uploadInput.value = "";
-        if (Number.isFinite(newDocId) && newDocId > 0) {
-          state.documentId = newDocId;
-          await loadDocuments();
-          setStatus(`Upload erfolgreich: Dokument #${newDocId} (${fileName}).`, "ok");
-          if (autoProcess) {
-            setStatus(`Upload fertig. Verarbeitung startet automatisch fuer Dokument #${newDocId} ...`);
-            await processCurrent();
-          }
-        } else {
-          setStatus("Upload erfolgreich, aber keine gueltige Dokument-ID erhalten.", "warn");
+        for (const [idx, file] of files.entries()) {
+          const newDocId = await uploadSelectedPdfFile(file, {
+            autoProcess,
+            index: idx + 1,
+            total: files.length,
+          });
+          uploadedIds.push(newDocId);
         }
+        ui.uploadInput.value = "";
+        state.packageDocumentIds = uploadedIds;
+        state.packageAutoDisabledForDocumentId = null;
+        await loadDocuments();
+        state.packageMainDocumentId = files.length > 1 ? inferPackageMainDocumentId(uploadedIds) : null;
+        if (state.packageMainDocumentId) {
+          await selectDocument(state.packageMainDocumentId);
+        }
+        updatePackageModeState();
+        const label = files.length === 1 ? "PDF" : "PDFs";
+        const packageText = files.length > 1 ? ` Paket-Master: #${state.packageMainDocumentId || state.documentId}.` : "";
+        setStatus(`${uploadedIds.length} ${label} hochgeladen${autoProcess ? " und verarbeitet" : ""}.${packageText} Aktives Dokument: #${state.documentId}.`, "ok");
       } catch (error) {
         setStatus(`Upload fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
       } finally {
@@ -12005,6 +12312,9 @@
       for (const [label, value, sourceKey, required] of cards) {
         ui.summary.appendChild(createSummaryCard(label, value, sourceKey, { required }));
       }
+      if (document.document_notes) {
+        ui.summary.appendChild(createSummaryCard("Vortext / Allgemeine Ausführung", document.document_notes, null, { wide: true }));
+      }
     }
 
     function renderDiagnosticRun(runPayload) {
@@ -12085,7 +12395,10 @@
     }
 
     function imageUrl(documentId, imageId) {
-      return `/document/${documentId}/image/${imageId}`;
+      const image = imageRecordById(imageId);
+      const metadata = image && image.metadata_json && typeof image.metadata_json === "object" ? image.metadata_json : {};
+      const sourceDocumentId = Number(metadata.package_source_document_id || image && image.document_id || documentId);
+      return `/document/${Number.isFinite(sourceDocumentId) && sourceDocumentId > 0 ? sourceDocumentId : documentId}/image/${imageId}`;
     }
 
     function imageAssignmentChipsHtml(documentId, item) {
@@ -12146,7 +12459,7 @@
             const image = imageRecordById(imageId);
             const pageLabel = image ? `Seite ${fmt(image.page_ref)}` : "Seite -";
             const imageMarkup = `
-              <img src="/document/${documentId}/image/${imageId}" alt="Bild ${escapeHtml(fmt(imageId))}" loading="lazy">
+              <img src="${imageUrl(documentId, imageId)}" alt="Bild ${escapeHtml(fmt(imageId))}" loading="lazy">
               <div class="position-image-card-meta">
                 <strong>#${escapeHtml(fmt(imageId))}</strong><br>
                 ${escapeHtml(pageLabel)}
@@ -12172,7 +12485,7 @@
             return `
               <a
                 class="position-image-card assigned"
-                href="/document/${documentId}/image/${imageId}"
+                href="${imageUrl(documentId, imageId)}"
                 target="_blank"
                 rel="noopener"
                 data-image-preview-id="${escapeHtml(fmt(imageId))}"
@@ -12895,7 +13208,26 @@
 
     async function loadResult(documentId) {
       try {
-        const result = await apiJson(`/result/${documentId}`);
+        if (
+          (!Array.isArray(state.packageDocumentIds) || state.packageDocumentIds.length <= 1)
+          && Number(state.packageAutoDisabledForDocumentId) !== Number(documentId)
+        ) {
+          const autoIds = autoPackageDocumentIdsFor(documentId);
+          if (autoIds.length > 1) {
+            state.packageDocumentIds = autoIds;
+            state.packageMainDocumentId = Number(documentId);
+            updatePackageModeState();
+          }
+        }
+        const packageBody = activePackageRequestBody();
+        const usePackage = !!packageBody && Number(packageBody.main_document_id) === Number(documentId);
+        const result = usePackage
+          ? await apiJson("/document-packages/preview", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(packageBody),
+            })
+          : await apiJson(`/result/${documentId}`);
         state.result = result;
         setPdfPageCountFromResult(result);
         syncCurrentDocumentIntoList(result.document || {});
@@ -12914,7 +13246,9 @@
         syncFieldSources();
         const imageCount = (result.images || []).length;
         const itemCount = (result.line_items || []).length;
-        setStatus(`Dokument #${documentId} geladen: ${itemCount} Positionen, ${imageCount} Bilder.`, "ok");
+        const packagePrefix = usePackage ? `Multi-PDF-Paket #${documentId}` : `Dokument #${documentId}`;
+        setStatus(`${packagePrefix} geladen: ${itemCount} Positionen, ${imageCount} Bilder.`, "ok");
+        await loadVendocExportStatus(documentId);
       } catch (error) {
         clearNode(ui.reviewHero);
         clearNode(ui.reviewMetrics);
@@ -12939,6 +13273,7 @@
         state.pdf.pageCount = null;
         syncPdfControls();
         setDocumentApprovalPills(null);
+        setVendocExportState("Nicht geprüft", "pending");
         updateWorkflowNavigation();
         renderReview(null);
         renderDocumentIssues(null);
@@ -13065,6 +13400,185 @@
       }
     }
 
+    function setVendocExportState(label, level = "pending", meta = "") {
+      if (ui.vendocExportState) {
+        ui.vendocExportState.textContent = label;
+        ui.vendocExportState.className = `vendoc-status-pill ${level}`;
+      }
+      if (ui.vendocExportMeta) {
+        ui.vendocExportMeta.textContent = meta || "Noch kein Exportstatus geladen.";
+      }
+    }
+
+    function setVendocButtonsBusy(busy) {
+      for (const button of [ui.vendocDryRunBtn, ui.vendocSqlPreviewBtn, ui.vendocLiveExportBtn]) {
+        if (button) button.disabled = !!busy;
+      }
+    }
+
+    function currentDocumentApprovalStatus() {
+      const documentPayload = state.result && state.result.document ? state.result.document : null;
+      if (documentPayload && documentPayload.approval_status) {
+        return String(documentPayload.approval_status).toLowerCase();
+      }
+      const selected = state.documents.find((doc) => Number(doc.id) === Number(state.documentId));
+      return String((selected && selected.approval_status) || "pending").toLowerCase();
+    }
+
+    function compactVendocDryRun(payload) {
+      const vendoc = payload && payload.vendoc ? payload.vendoc : {};
+      const positions = Array.isArray(vendoc.positions) ? vendoc.positions : [];
+      return {
+        ok: payload.ok,
+        status: payload.status,
+        job: payload.job,
+        package: payload.package || vendoc.package || null,
+        summary: vendoc.summary,
+        header: vendoc.header,
+        positions: positions.map((position) => {
+          const rtf = String(position.image_long_text_rtf || "");
+          return {
+            external_line_item_id: position.external_line_item_id,
+            position_no: position.position_no,
+            quantity: position.quantity,
+            unit_code: position.unit_code,
+            description_short: position.description_short,
+            unit_price: position.unit_price,
+            page_ref: position.page_ref,
+            image_is_primary: position.image_is_primary,
+            image_long_text_rtf_length: rtf.length,
+            image_long_text_rtf_has_png: rtf.includes("\\pngblip"),
+          };
+        }),
+        warnings: vendoc.warnings || [],
+        errors: vendoc.errors || [],
+      };
+    }
+
+    async function loadVendocExportStatus(documentId) {
+      if (!documentId) {
+        setVendocExportState("Nicht geprüft", "pending");
+        return;
+      }
+      try {
+        const [health, latest] = await Promise.all([
+          apiJson("/vendoc/health").catch((error) => ({ status: "error", message: error.message })),
+          apiJson(`/vendoc/export-jobs/${documentId}/latest`).catch(() => null),
+        ]);
+        const latestJob = latest && latest.job ? latest.job : null;
+        const liveReady = !!health.live_write_available;
+        const approvalStatus = currentDocumentApprovalStatus();
+        const latestText = latestJob
+          ? `Letzter Export: ${fmt(latestJob.status)} · ${fmt(latestJob.created_at)}`
+          : "Noch kein VenDoc-Exportlauf.";
+        const driver = health.driver || {};
+        const configText = health.status === "disabled"
+          ? "Live-Write deaktiviert"
+          : (liveReady ? "Live-Write konfiguriert" : `Live-Write nicht bereit: ${fmt(health.message)}`);
+        const meta = `${configText}. Ziel: ${fmt(health.target_database || "SRTemp")}. Driver: ${driver.available ? "ok" : "fehlt"}. ${latestText}`;
+        if (latestJob && latestJob.status === "exported") {
+          setVendocExportState("Übergeben", "ok", meta);
+        } else if (latestJob && latestJob.status === "failed") {
+          setVendocExportState("Fehler", "err", meta);
+        } else if (latestJob && latestJob.status === "dry_run_ok") {
+          setVendocExportState("Dry-Run ok", "ok", meta);
+        } else {
+          setVendocExportState(liveReady ? "Bereit" : "Dry-Run möglich", liveReady ? "ok" : "warn", meta);
+        }
+        if (ui.vendocLiveExportBtn) {
+          ui.vendocLiveExportBtn.disabled = !liveReady || approvalStatus !== "approved";
+          ui.vendocLiveExportBtn.title = approvalStatus !== "approved"
+            ? "Live-Export erst nach Freigabe möglich"
+            : (liveReady ? "Nach SRTemp schreiben" : "MSSQL ist noch nicht bereit");
+        }
+      } catch (error) {
+        setVendocExportState("Statusfehler", "err", `VenDoc-Status konnte nicht geladen werden: ${String(error.message).slice(0, 180)}`);
+      }
+    }
+
+    async function runVendocDryRun({ includeSql = false } = {}) {
+      if (!state.documentId) return;
+      const label = includeSql ? "SQL Vorschau" : "VenDoc Dry-Run";
+      const packageBody = activePackageRequestBody();
+      const packageMode = !!packageBody;
+      setVendocButtonsBusy(true);
+      setStatus(`${label}${packageMode ? " fuer Multi-PDF-Paket" : ""} wird erzeugt...`);
+      try {
+        const payload = packageMode
+          ? await apiJson(`/vendoc/export-package?dry_run=true&include_sql=${includeSql ? "true" : "false"}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(packageBody),
+            })
+          : await apiJson(`/vendoc/export/${state.documentId}?dry_run=true&include_sql=${includeSql ? "true" : "false"}`, {
+              method: "POST",
+            });
+        if (includeSql) {
+          const sql = payload && payload.vendoc && payload.vendoc.srtemp ? payload.vendoc.srtemp.sql_script : "";
+          state.previewFormat = "sql";
+          state.previewContent = sql || JSON.stringify(payload, null, 2);
+          ui.previewTitle.textContent = packageMode
+            ? `VenDoc SQL Vorschau - Multi-PDF-Paket #${packageBody.main_document_id}`
+            : `VenDoc SQL Vorschau - Dokument #${state.documentId}`;
+        } else {
+          state.previewFormat = "json";
+          state.previewContent = JSON.stringify(compactVendocDryRun(payload), null, 2);
+          ui.previewTitle.textContent = packageMode
+            ? `VenDoc Dry-Run - Multi-PDF-Paket #${packageBody.main_document_id}`
+            : `VenDoc Dry-Run - Dokument #${state.documentId}`;
+        }
+        ui.previewContent.textContent = state.previewContent;
+        openPreviewModal();
+        setStatus(`${label} fertig.`, payload.ok ? "ok" : "warn");
+        await loadVendocExportStatus(state.documentId);
+      } catch (error) {
+        setStatus(`${label} fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        setVendocButtonsBusy(false);
+        await loadVendocExportStatus(state.documentId);
+      }
+    }
+
+    async function runVendocLiveExport() {
+      if (!state.documentId) return;
+      const packageBody = activePackageRequestBody();
+      const packageMode = !!packageBody;
+      if (currentDocumentApprovalStatus() !== "approved") {
+        setStatus("VenDoc Live-Export ist erst nach Freigabe möglich.", "warn");
+        return;
+      }
+      const ok = window.confirm(
+        packageMode
+          ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach SRTemp übergeben?`
+          : `Dokument #${state.documentId} wirklich nach SRTemp übergeben?`
+      );
+      if (!ok) return;
+      setVendocButtonsBusy(true);
+      setStatus("VenDoc Live-Export wird ausgeführt...");
+      try {
+        const payload = packageMode
+          ? await apiJson(`/vendoc/export-package?dry_run=false`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(packageBody),
+            })
+          : await apiJson(`/vendoc/export/${state.documentId}?dry_run=false`, { method: "POST" });
+        setStatus(`VenDoc Übergabe fertig: ${fmt(payload.status)}.`, "ok");
+        state.previewFormat = "json";
+        state.previewContent = JSON.stringify(payload.write || payload, null, 2);
+        ui.previewTitle.textContent = packageMode
+          ? `VenDoc Übergabe - Multi-PDF-Paket #${packageBody.main_document_id}`
+          : `VenDoc Übergabe - Dokument #${state.documentId}`;
+        ui.previewContent.textContent = state.previewContent;
+        openPreviewModal();
+      } catch (error) {
+        setStatus(`VenDoc Übergabe fehlgeschlagen: ${String(error.message).slice(0, 260)}`, "err");
+      } finally {
+        setVendocButtonsBusy(false);
+        await loadVendocExportStatus(state.documentId);
+      }
+    }
+
     async function previewLatestDiagnosticRun() {
       if (!state.documentId) return;
       setStatus("KI-Diagnose ist im Produktbetrieb deaktiviert.", "warn");
@@ -13113,15 +13627,22 @@
     ui.resetBtn.addEventListener("click", async () => {
       await resetCurrentDocument();
     });
+    if (ui.packageClearBtn) {
+      ui.packageClearBtn.addEventListener("click", () => {
+        clearPackageMode();
+        setStatus("Multi-PDF-Paketmodus deaktiviert. Einzel-Dokumentansicht geladen.", "ok");
+      });
+    }
 
     ui.uploadBtn.addEventListener("click", async () => {
-      await uploadSelectedPdf();
+      await uploadSelectedPdfs();
     });
     ui.uploadInput.addEventListener("change", async () => {
-      const file = selectedUploadFile();
-      if (!file) return;
-      setStatus(`Ausgewaehlt: ${file.name}. Upload und Verarbeitung starten automatisch.`);
-      await uploadSelectedPdf({ autoProcess: true });
+      const files = selectedUploadFiles();
+      if (!files.length) return;
+      const label = files.length === 1 ? files[0].name : `${files.length} PDFs`;
+      setStatus(`Ausgewaehlt: ${label}. Upload und Verarbeitung starten automatisch.`);
+      await uploadSelectedPdfs({ autoProcess: true });
     });
 
     ui.itemIssuesOnly.addEventListener("change", () => {
@@ -13388,6 +13909,15 @@
     });
     ui.csvPreviewBtn.addEventListener("click", async () => {
       await previewExport("csv");
+    });
+    ui.vendocDryRunBtn.addEventListener("click", async () => {
+      await runVendocDryRun({ includeSql: false });
+    });
+    ui.vendocSqlPreviewBtn.addEventListener("click", async () => {
+      await runVendocDryRun({ includeSql: true });
+    });
+    ui.vendocLiveExportBtn.addEventListener("click", async () => {
+      await runVendocLiveExport();
     });
     ui.copyPreviewBtn.addEventListener("click", async () => {
       await copyPreviewContent();

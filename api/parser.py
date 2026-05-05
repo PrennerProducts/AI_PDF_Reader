@@ -7,6 +7,7 @@ from template_common import normalize_line as _normalize_line
 from template_common import normalize_text as _normalize_text
 from template_registry import count_positions as _count_positions
 from template_registry import detect_template as _detect_template
+from template_registry import extract_document_notes_for_template as _extract_document_notes_for_template
 from template_registry import refine_headers_for_template
 from template_registry import supplier_name_for_template
 from template_headers import collapse_header_value as _collapse_header_value
@@ -90,6 +91,9 @@ def _extract_amount_via_inline_pattern(text: str, patterns: tuple[str, ...]) -> 
 
 
 def _detect_document_type(normalized_text: str, template: str) -> str:
+    if template == "koch_detail":
+        return "detailzeichnung"
+
     first_page = normalized_text.split("\f", 1)[0]
     head_text = "\n".join(first_page.splitlines()[:80])
     head_lower = head_text.lower()
@@ -196,7 +200,14 @@ def _extract_totals(text: str) -> dict[str, str | None]:
         ),
     )
     if vat_total is None:
-        vat_total = _find_labeled_amount(lines, ("zuzüglich", "mwst", "mehrwertsteuer", "ust.", "ust"), pick="first")
+        taxable_lines = [
+            line
+            for line in lines
+            if "ohne mwst" not in line.lower()
+            and "ohne ust" not in line.lower()
+            and "ohne mehrwertsteuer" not in line.lower()
+        ]
+        vat_total = _find_labeled_amount(taxable_lines, ("zuzüglich", "mwst", "mehrwertsteuer", "ust.", "ust"), pick="first")
     gross_total = _extract_amount_via_inline_pattern(
         text,
         (
@@ -291,6 +302,7 @@ def parse_document_text(text: str) -> dict[str, Any]:
         offer_reference = _extract_offer_reference_from_project_ref(project_ref)
     currency = "EUR" if ("\u20ac" in normalized_text or "EUR" in normalized_text.upper()) else None
     totals = _extract_totals(normalized_text)
+    document_notes = _extract_document_notes_for_template(template, normalized_text)
 
     return {
         "template": template,
@@ -303,6 +315,7 @@ def parse_document_text(text: str) -> dict[str, Any]:
         "currency": currency,
         "position_count": _count_positions(template, normalized_text),
         "totals": totals,
+        "document_notes": document_notes,
         "notes": [
             "Template detection and header extraction are now routed via a template registry.",
             "Next step: expand golden regression coverage per customer layout.",

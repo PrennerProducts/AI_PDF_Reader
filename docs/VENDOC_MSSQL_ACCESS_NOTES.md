@@ -154,6 +154,22 @@ Fachliche Klaerung:
 5. `main_line_item_id` deutet auf Unterpositionen oder Varianten hin, ist fachlich aber noch offen.
 6. `unity` ist `float`; vermutlich ist die fachliche Bedeutung noch zu klaeren.
 
+## VenDoc `LineItemBase`
+
+Dragan hat am 05.05.2026 die Struktur von `LineItemBase` nachgereicht. Diese Tabelle ist die VenDoc-interne Positionstabelle, in die Dragan aus `SRTemp` importiert. Wir schreiben weiterhin nicht direkt in diese Tabelle.
+
+Relevante Felder fuer unser Mapping:
+
+| Spalte | Typ | Bedeutung fuer uns |
+| --- | --- | --- |
+| `Text` | `nvarchar(255)` | kurzer Positionstext; `description_short` sollte fachlich kurz bleiben |
+| `LongText` | `nvarchar(max)` | RTF-LongText; Ziel fuer `image_long_text_rtf` inkl. PNG-Hex |
+| `ExternalNumber` | `nvarchar(20)` | moeglicher Zielwert fuer `position_no`, falls Dragan so mappt |
+| `Document` | `uniqueidentifier` | VenDoc-interner Dokumentbezug, wird vom Importer gesetzt |
+| `Oid`, `CreatedOn`, `CreatedBy`, `Client`, `ObjectType`, `Sort` | diverse | VenDoc-interne Felder, nicht durch unsere App direkt zu setzen |
+
+Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange technische Text und das Bild vollstaendig in `image_long_text_rtf` landen; `description_long` bleibt zusaetzlich als Plaintext-Quelle erhalten.
+
 ## Erstes Mapping aus der Anwendung
 
 ### Header-Mapping
@@ -245,15 +261,16 @@ Ergebnis:
 
 Tasks:
 
-- SQL-Server-Client und Treiber installieren.
-- Connection-Builder aus Env.
-- `GET /vendoc/health`. Status: Basis-Konfigurationsstatus umgesetzt, echter Connection-Test offen.
-- Transaktionaler Write in Header und Positionen.
-- Fehlerbehandlung und Rollback.
+- SQL-Server-Client und Treiber installieren. Status: Dockerfile fuer Microsoft ODBC Driver 18 und `pyodbc` vorbereitet.
+- Connection-Builder aus Env. Status: umgesetzt.
+- `GET /vendoc/health`. Status: Treiber-/Konfigurationsstatus umgesetzt, echter Connection-Test per `check_connection=true`.
+- Transaktionaler Write in Header und Positionen. Status: umgesetzt, bleibt ohne Zugangsdaten deaktiviert.
+- Fehlerbehandlung und Rollback. Status: umgesetzt.
 
 Ergebnis:
 
 - Freigegebene Dokumente koennen live in `SRTemp` geschrieben werden.
+- Bis CIBEX Zugangsdaten liefert, bleibt `VENDOC_MSSQL_ENABLED=false`.
 
 ### Phase 4 - UI
 
@@ -277,6 +294,7 @@ VENDOC_MSSQL_PASSWORD=
 VENDOC_MSSQL_ENCRYPT=true
 VENDOC_MSSQL_TRUST_SERVER_CERTIFICATE=false
 VENDOC_MSSQL_TIMEOUT_SECONDS=30
+VENDOC_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
 ```
 
 ## Regeln fuer Live-Export
@@ -310,9 +328,8 @@ VENDOC_MSSQL_TIMEOUT_SECONDS=30
 ## Was noch fehlt
 
 - MSSQL-Zugangsdaten.
-- MSSQL-Treiber/Client im Docker-Image.
-- Transaktionaler Live-Write.
-- UI fuer Exportstatus.
+- Docker-Image mit installiertem Microsoft ODBC Driver 18 neu bauen und gegen Zielserver testen.
+- UI fuer Exportstatus gegen Dry-Run, SQL-Vorschau und Live-Export ist vorbereitet.
 - Finale fachliche Regeln fuer Sonderfelder, Alternativen, Nullpositionen und Bilder.
 
 ## Call-Notiz fuer Dragan/CIBEX

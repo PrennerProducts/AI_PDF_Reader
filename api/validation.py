@@ -263,6 +263,16 @@ def build_document_validation(
     document_type = _normalized_text(document.get("document_type"))
     component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
 
+    if provider_key == "koch" and document_type in {"angebot", "auftragsbestaetigung"} and line_items and not images:
+        document_issues.append(
+            _make_issue(
+                code="koch_detail_drawings_missing",
+                severity="warning",
+                field="images",
+                message="Koch-Dokument hat keine Detailzeichnungen im Haupt-PDF. Zusatz-PDFs mit Zeichnungen sollten dem Dokumentpaket zugeordnet werden.",
+            )
+        )
+
     if document_type not in {"angebot", "auftragsbestaetigung"}:
         document_issues.append(
             _make_issue(
@@ -463,7 +473,8 @@ def build_document_validation(
                     message="Für diese Position ist noch kein finales Bild zugeordnet.",
                 )
             )
-        if isinstance(page_ref, int):
+        skip_same_document_page_check = item.get("image_assignment_source") == "document_package"
+        if isinstance(page_ref, int) and not skip_same_document_page_check:
             preceding_pages = [
                 image_page
                 for image_page in (image_page_by_id.get(image_id) for image_id in assigned_image_ids)
