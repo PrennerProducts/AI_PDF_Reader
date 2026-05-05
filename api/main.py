@@ -843,7 +843,7 @@ def _apply_srtemp_preview(vendoc_payload: dict[str, Any], include_sql: bool) -> 
     errors = list(vendoc_payload.get("errors") or [])
     if include_sql:
         try:
-            vendoc_payload["srtemp"] = build_srtemp_export_preview(vendoc_payload)
+            vendoc_payload["srtemp"] = build_srtemp_export_preview(vendoc_payload, config=config_from_env())
         except ValueError as exc:
             errors.append(
                 {
@@ -1768,7 +1768,7 @@ def vendoc_export_document(
     errors = list(vendoc_payload.get("errors") or [])
     if include_sql:
         try:
-            vendoc_payload["srtemp"] = build_srtemp_export_preview(vendoc_payload)
+            vendoc_payload["srtemp"] = build_srtemp_export_preview(vendoc_payload, config=config_from_env())
         except ValueError as exc:
             errors.append(
                 {

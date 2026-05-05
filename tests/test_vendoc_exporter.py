@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 
 from vendoc_exporter import build_vendoc_payload, external_document_id, external_line_item_id
-from vendoc_mssql import POSITION_COLUMNS, build_srtemp_insert_script
+from vendoc_mssql import POSITION_COLUMNS, build_srtemp_export_preview, build_srtemp_insert_script
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 
 
@@ -171,3 +171,36 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
         "unity",
         "main_line_item_id",
     ]
+
+
+def test_srtemp_preview_uses_runtime_resolved_column_names(monkeypatch, tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    payload = build_vendoc_payload(_sample_result(image_path))
+
+    def _fake_resolve(cursor=None):
+        return {
+            "dbo.vendoc_import_headers": [
+                ("external_document_id", "external_document_id"),
+                ("source_document_id", "source_document_id"),
+                ("is_alternative", "is_alternate"),
+            ],
+            "dbo.vendoc_import_positions": [
+                ("external_line_item_id", "external_line_item_id"),
+                ("external_document_id", "external_document_id"),
+                ("source_line_item_id", "source_line_item_id"),
+                ("is_alternative", "is_alternative"),
+            ],
+        }
+
+    monkeypatch.setattr("vendoc_mssql._resolve_table_bindings", _fake_resolve)
+
+    preview = build_srtemp_export_preview(payload)
+
+    assert preview["header_columns"] == [
+        "external_document_id",
+        "source_document_id",
+        "is_alternative",
+    ]
+    assert "INSERT INTO dbo.vendoc_import_headers (external_document_id, source_document_id, is_alternative)" in preview["sql_script"]
+    assert "is_alternate" not in preview["sql_script"]

@@ -57,6 +57,26 @@ POSITION_COLUMNS = [
     "main_line_item_id",
 ]
 
+REQUIRED_HEADER_COLUMNS = {
+    "external_document_id",
+    "source_document_id",
+}
+
+REQUIRED_POSITION_COLUMNS = {
+    "external_line_item_id",
+    "external_document_id",
+    "source_line_item_id",
+}
+
+COLUMN_ALIASES: dict[str, dict[str, list[str]]] = {
+    HEADER_TABLE: {
+        "is_alternate": ["is_alternative"],
+    },
+    POSITION_TABLE: {
+        "is_alternative": ["is_alternate"],
+    },
+}
+
 
 @dataclass(frozen=True)
 class VendocMssqlConfig:
@@ -202,12 +222,106 @@ def _insert_statement(table: str, columns: list[str], row: dict[str, Any]) -> st
     return f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({values});"
 
 
-def build_srtemp_insert_script(vendoc_payload: dict[str, Any]) -> str:
+def _split_table_name(table: str) -> tuple[str, str]:
+    if "." in table:
+        schema, name = table.split(".", 1)
+        return schema, name
+    return "dbo", table
+
+
+def _fetch_table_columns(cursor: Any, table: str) -> list[str]:
+    schema, name = _split_table_name(table)
+    rows = cursor.execute(
+        """
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+        ORDER BY ORDINAL_POSITION;
+        """,
+        schema,
+        name,
+    ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+def _resolve_column_bindings(
+    table: str,
+    desired_columns: list[str],
+    required_columns: set[str],
+    available_columns: list[str] | None = None,
+) -> list[tuple[str, str]]:
+    if available_columns is None:
+        return [(column, column) for column in desired_columns]
+
+    available_lookup = {column.lower(): column for column in available_columns}
+    aliases = COLUMN_ALIASES.get(table, {})
+    bindings: list[tuple[str, str]] = []
+    missing_required: list[str] = []
+
+    for source_column in desired_columns:
+        candidates = [source_column, *aliases.get(source_column, [])]
+        actual_column = next((available_lookup.get(candidate.lower()) for candidate in candidates if available_lookup.get(candidate.lower())), None)
+        if actual_column:
+            bindings.append((actual_column, source_column))
+            continue
+        if source_column in required_columns:
+            missing_required.append(source_column)
+
+    if missing_required:
+        raise RuntimeError(
+            f"Missing required MSSQL columns in {table}: {', '.join(sorted(missing_required))}"
+        )
+
+    return bindings
+
+
+def _resolve_table_bindings(cursor: Any | None = None) -> dict[str, list[tuple[str, str]]]:
+    if cursor is None:
+        return {
+            HEADER_TABLE: _resolve_column_bindings(HEADER_TABLE, HEADER_COLUMNS, REQUIRED_HEADER_COLUMNS),
+            POSITION_TABLE: _resolve_column_bindings(POSITION_TABLE, POSITION_COLUMNS, REQUIRED_POSITION_COLUMNS),
+        }
+
+    header_columns = _fetch_table_columns(cursor, HEADER_TABLE)
+    position_columns = _fetch_table_columns(cursor, POSITION_TABLE)
+    return {
+        HEADER_TABLE: _resolve_column_bindings(HEADER_TABLE, HEADER_COLUMNS, REQUIRED_HEADER_COLUMNS, header_columns),
+        POSITION_TABLE: _resolve_column_bindings(POSITION_TABLE, POSITION_COLUMNS, REQUIRED_POSITION_COLUMNS, position_columns),
+    }
+
+
+def _binding_target_columns(bindings: list[tuple[str, str]]) -> list[str]:
+    return [target_column for target_column, _source_column in bindings]
+
+
+def _binding_row_values(row: dict[str, Any], bindings: list[tuple[str, str]]) -> list[Any]:
+    return [row.get(source_column) for _target_column, source_column in bindings]
+
+
+def _insert_statement_with_bindings(table: str, bindings: list[tuple[str, str]], row: dict[str, Any]) -> str:
+    values = ", ".join(_mssql_literal(row.get(source_column)) for _target_column, source_column in bindings)
+    return f"INSERT INTO {table} ({', '.join(_binding_target_columns(bindings))}) VALUES ({values});"
+
+
+def build_srtemp_insert_script(
+    vendoc_payload: dict[str, Any],
+    config: VendocMssqlConfig | None = None,
+) -> str:
     header = vendoc_payload.get("header") if isinstance(vendoc_payload.get("header"), dict) else {}
     positions = vendoc_payload.get("positions") if isinstance(vendoc_payload.get("positions"), list) else []
     external_document_id = header.get("external_document_id") or vendoc_payload.get("external_document_id")
     if not external_document_id:
         raise ValueError("Missing external_document_id for SRTemp export.")
+
+    bindings = _resolve_table_bindings()
+    if config is not None:
+        status = driver_status()
+        if status["available"]:
+            try:
+                with _connect(config) as conn:
+                    bindings = _resolve_table_bindings(conn.cursor())
+            except Exception:
+                bindings = _resolve_table_bindings()
 
     lines = [
         "SET XACT_ABORT ON;",
@@ -216,24 +330,37 @@ def build_srtemp_insert_script(vendoc_payload: dict[str, Any]) -> str:
         f"DELETE FROM {POSITION_TABLE} WHERE external_document_id = {_mssql_literal(external_document_id)};",
         f"DELETE FROM {HEADER_TABLE} WHERE external_document_id = {_mssql_literal(external_document_id)};",
         "",
-        _insert_statement(HEADER_TABLE, HEADER_COLUMNS, header),
+        _insert_statement_with_bindings(HEADER_TABLE, bindings[HEADER_TABLE], header),
     ]
     for position in positions:
         if isinstance(position, dict):
-            lines.append(_insert_statement(POSITION_TABLE, POSITION_COLUMNS, position))
+            lines.append(_insert_statement_with_bindings(POSITION_TABLE, bindings[POSITION_TABLE], position))
     lines.extend(["", "COMMIT TRANSACTION;"])
     return "\n".join(lines) + "\n"
 
 
-def build_srtemp_export_preview(vendoc_payload: dict[str, Any]) -> dict[str, Any]:
+def build_srtemp_export_preview(
+    vendoc_payload: dict[str, Any],
+    config: VendocMssqlConfig | None = None,
+) -> dict[str, Any]:
+    bindings = _resolve_table_bindings()
+    if config is not None:
+        status = driver_status()
+        if status["available"]:
+            try:
+                with _connect(config) as conn:
+                    bindings = _resolve_table_bindings(conn.cursor())
+            except Exception:
+                bindings = _resolve_table_bindings()
+
     return {
         "target_tables": {
             "header": HEADER_TABLE,
             "positions": POSITION_TABLE,
         },
-        "header_columns": HEADER_COLUMNS,
-        "position_columns": POSITION_COLUMNS,
-        "sql_script": build_srtemp_insert_script(vendoc_payload),
+        "header_columns": _binding_target_columns(bindings[HEADER_TABLE]),
+        "position_columns": _binding_target_columns(bindings[POSITION_TABLE]),
+        "sql_script": build_srtemp_insert_script(vendoc_payload, config=config),
     }
 
 
@@ -260,13 +387,20 @@ def write_srtemp_payload(vendoc_payload: dict[str, Any], config: VendocMssqlConf
     with _connect(config) as conn:
         cursor = conn.cursor()
         try:
+            bindings = _resolve_table_bindings(cursor)
             cursor.execute(f"DELETE FROM {POSITION_TABLE} WHERE external_document_id = ?;", external_document_id)
             cursor.execute(f"DELETE FROM {HEADER_TABLE} WHERE external_document_id = ?;", external_document_id)
-            cursor.execute(_insert_sql_with_placeholders(HEADER_TABLE, HEADER_COLUMNS), _row_values(header, HEADER_COLUMNS))
-            insert_position_sql = _insert_sql_with_placeholders(POSITION_TABLE, POSITION_COLUMNS)
+            cursor.execute(
+                _insert_sql_with_placeholders(HEADER_TABLE, _binding_target_columns(bindings[HEADER_TABLE])),
+                _binding_row_values(header, bindings[HEADER_TABLE]),
+            )
+            insert_position_sql = _insert_sql_with_placeholders(
+                POSITION_TABLE,
+                _binding_target_columns(bindings[POSITION_TABLE]),
+            )
             for position in positions:
                 if isinstance(position, dict):
-                    cursor.execute(insert_position_sql, _row_values(position, POSITION_COLUMNS))
+                    cursor.execute(insert_position_sql, _binding_row_values(position, bindings[POSITION_TABLE]))
             conn.commit()
         except Exception:
             conn.rollback()
