@@ -221,20 +221,29 @@ def _confidence_policy(parse_confidence: Any) -> dict[str, Any]:
 
 def _build_required_field_summary(document: dict[str, Any]) -> tuple[dict[str, bool], dict[str, bool]]:
     document_type = _normalized_text(document.get("document_type"))
+    provider_key = _provider_key(document)
+    net_present = _to_decimal(document.get("net_total")) is not None
+    koch_offer_net_only = (
+        provider_key == "koch"
+        and document_type == "angebot"
+        and net_present
+        and _to_decimal(document.get("vat_total")) is None
+        and _to_decimal(document.get("gross_total")) is None
+    )
     required_fields = {
         "supplier_name": _has_text(document.get("supplier_name")),
         "document_type": document_type in {"angebot", "auftragsbestaetigung"},
         "document_number": _has_text(document.get("document_number")),
         "document_date": document.get("document_date") is not None,
         "currency": _has_text(document.get("currency")),
-        "gross_total": _to_decimal(document.get("gross_total")) is not None,
+        "gross_total": koch_offer_net_only or _to_decimal(document.get("gross_total")) is not None,
     }
     if document_type == "auftragsbestaetigung":
         required_fields["offer_reference"] = _has_text(document.get("offer_reference"))
     recommended_fields = {
         "project_ref": _has_text(document.get("project_ref")),
         "net_total": _to_decimal(document.get("net_total")) is not None,
-        "vat_total": _to_decimal(document.get("vat_total")) is not None,
+        "vat_total": koch_offer_net_only or _to_decimal(document.get("vat_total")) is not None,
     }
     return required_fields, recommended_fields
 
@@ -261,6 +270,28 @@ def build_document_validation(
     required_fields, recommended_fields = _build_required_field_summary(document)
     provider_key = _provider_key(document)
     document_type = _normalized_text(document.get("document_type"))
+    net_total = _to_decimal(document.get("net_total"))
+    vat_total = _to_decimal(document.get("vat_total"))
+    gross_total = _to_decimal(document.get("gross_total"))
+    koch_offer_net_only = (
+        provider_key == "koch"
+        and document_type == "angebot"
+        and net_total is not None
+        and vat_total is None
+        and gross_total is None
+    )
+    field_policies: dict[str, dict[str, Any]] = {}
+    if koch_offer_net_only:
+        field_policies["gross_total"] = {
+            "level": "optional",
+            "status": "not_expected",
+            "reason": "koch_offer_net_only",
+        }
+        field_policies["vat_total"] = {
+            "level": "optional",
+            "status": "not_expected",
+            "reason": "koch_offer_net_only",
+        }
     component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
 
     if provider_key == "koch" and document_type in {"angebot", "auftragsbestaetigung"} and line_items and not images:
@@ -305,10 +336,6 @@ def build_document_validation(
                     message=f"Empfohlenes Feld {field_name} fehlt.",
                 )
             )
-
-    net_total = _to_decimal(document.get("net_total"))
-    vat_total = _to_decimal(document.get("vat_total"))
-    gross_total = _to_decimal(document.get("gross_total"))
 
     totals_summary: dict[str, Any] = {
         "tolerance": SUM_TOLERANCE,
@@ -721,6 +748,7 @@ def build_document_validation(
         "warning_count": warning_count,
         "required_fields": required_fields,
         "recommended_fields": recommended_fields,
+        "field_policies": field_policies,
         "missing_required_fields": [field for field, present in required_fields.items() if not present],
         "missing_recommended_fields": [field for field, present in recommended_fields.items() if not present],
         "document_issues": document_issues,

@@ -6,6 +6,15 @@ On-Prem-App fuer Angebots-PDFs: Upload, Parser, Bildextraktion, Validierung, Rev
 
 ## Quickstart
 
+Aus dem Repo-Root:
+
+```bash
+cp .env.example .env
+docker compose -f infra/docker-compose.yml up -d --build
+```
+
+Alternativ direkt aus `infra/`:
+
 ```bash
 cd infra
 cp .env.example .env
@@ -23,6 +32,40 @@ UI:
 
 ```text
 http://localhost:8000/ui
+```
+
+## Lokale `.env` fuer VPN / MSSQL
+
+Wenn du lokal mit VPN arbeitest und den VenDoc-Live-Write gegen `SRTemp` testen willst,
+nutze im Repo-Root eine `.env`, weil `docker compose -f infra/docker-compose.yml ...`
+die Variablen von dort liest.
+
+Start:
+
+```bash
+cp .env.example .env
+```
+
+Dann die MSSQL-Werte setzen:
+
+```dotenv
+VENDOC_MSSQL_ENABLED=true
+VENDOC_MSSQL_HOST=...
+VENDOC_MSSQL_PORT=57676
+VENDOC_MSSQL_DATABASE=SRTemp
+VENDOC_MSSQL_USER=VenDoc
+VENDOC_MSSQL_PASSWORD=...
+VENDOC_MSSQL_ENCRYPT=true
+VENDOC_MSSQL_TRUST_SERVER_CERTIFICATE=true
+VENDOC_MSSQL_TIMEOUT_SECONDS=30
+VENDOC_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
+```
+
+Danach:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build api
+curl -sS http://localhost:8000/vendoc/health
 ```
 
 ## CPU-only Server

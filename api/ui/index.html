@@ -5915,20 +5915,17 @@
     }
 
     .app-v3 .package-panel {
-      grid-area: package;
       position: relative;
       z-index: 1;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      gap: 10px;
+      gap: 8px 10px;
       width: 100%;
       min-width: 0;
-      padding: 7px 10px;
-      border-radius: 16px;
-      border: 1px solid rgba(60, 60, 67, 0.09);
-      background: rgba(255, 255, 255, 0.62);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70);
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(60, 60, 67, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 247, 249, 0.88));
       color: rgba(29, 29, 31, 0.72);
       font-size: 12px;
     }
@@ -5939,59 +5936,146 @@
 
     .app-v3 .package-panel strong {
       color: rgba(29, 29, 31, 0.88);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .app-v3 .package-docs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      min-width: 0;
-    }
-
-    .app-v3 .package-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      min-height: 26px;
-      max-width: 240px;
-      padding: 0 9px;
-      border-radius: 999px;
-      border: 1px solid rgba(60, 60, 67, 0.10);
-      background: rgba(255, 255, 255, 0.76);
-      color: rgba(29, 29, 31, 0.68);
       font-size: 11px;
-      font-weight: 720;
+      letter-spacing: 0.02em;
       white-space: nowrap;
-    }
-
-    .app-v3 .package-chip.is-main {
-      border-color: rgba(52, 199, 89, 0.30);
-      background: #eafaf0;
-      color: #147a3f;
-    }
-
-    .app-v3 .package-chip span {
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
+    .app-v3 .package-docs {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .app-v3 .package-doc-card {
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.84);
+      overflow: hidden;
+    }
+
+    .app-v3 .package-doc-card.is-main {
+      border-color: rgba(52, 199, 89, 0.30);
+      background: #f3fbf6;
+    }
+
+    .app-v3 .package-doc-card.is-preview {
+      border-color: rgba(0, 122, 255, 0.26);
+      box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.08);
+    }
+
+    .app-v3 .package-doc-summary {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 10px;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .app-v3 .package-doc-meta {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+
+    .app-v3 .package-doc-topline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .app-v3 .package-doc-id {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: rgba(255, 255, 255, 0.76);
+      color: rgba(29, 29, 31, 0.74);
+      font-size: 10px;
+      font-weight: 780;
+    }
+
+    .app-v3 .package-doc-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: rgba(60, 60, 67, 0.08);
+      color: rgba(29, 29, 31, 0.62);
+      font-size: 10px;
+      font-weight: 720;
+    }
+
+    .app-v3 .package-doc-card.is-main .package-doc-badge.is-main {
+      background: rgba(52, 199, 89, 0.14);
+      color: #147a3f;
+    }
+
+    .app-v3 .package-doc-name {
+      color: rgba(29, 29, 31, 0.88);
+      font-size: 11px;
+      font-weight: 760;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .app-v3 .package-doc-subline {
+      display: none;
+    }
+
+    .app-v3 .package-doc-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+    .app-v3 .package-doc-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: #ffffff;
+      color: rgba(29, 29, 31, 0.72);
+      font-size: 10px;
+      font-weight: 780;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .app-v3 .package-doc-btn:hover {
+      border-color: rgba(60, 60, 67, 0.20);
+    }
+
     .app-v3 .package-clear-btn {
       justify-self: end;
-      min-height: 28px;
-      padding: 0 10px;
+      min-height: 24px;
+      padding: 0 8px;
       border-radius: 999px;
       border: 1px solid rgba(60, 60, 67, 0.12);
       background: #ffffff;
       color: rgba(29, 29, 31, 0.64);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 780;
       cursor: pointer;
-    }
-
-    .topbar.is-collapsed .package-panel {
-      display: none;
     }
 
     .app-v3 .shell-controls select,
@@ -9927,11 +10011,6 @@
           <div class="control-hint" id="packageModeState">Multi-PDF: inaktiv</div>
         </div>
       </div>
-      <div class="package-panel" id="packagePanel" hidden>
-        <strong id="packageTitle">Multi-PDF-Paket</strong>
-        <div class="package-docs" id="packageDocs"></div>
-        <button class="package-clear-btn" id="packageClearBtn" type="button">Einzelmodus</button>
-      </div>
       <div class="action-bar shell-actions">
         <div class="action-group">
           <button class="btn btn-primary" id="processBtn">Neu verarbeiten</button>
@@ -9991,6 +10070,11 @@
               <button class="pdf-control-btn" id="pdfOpenBtn" type="button" aria-label="PDF in neuem Tab öffnen">↗</button>
             </span>
           </div>
+        </div>
+        <div class="package-panel" id="packagePanel" hidden>
+          <strong id="packageTitle">Multi-PDF-Paket</strong>
+          <button class="package-clear-btn" id="packageClearBtn" type="button">Einzelmodus</button>
+          <div class="package-docs" id="packageDocs"></div>
         </div>
         <div class="pdf-stage" id="pdfStage">
           <iframe id="pdfFrame" title="PDF Vorschau"></iframe>
@@ -10269,6 +10353,7 @@
       packageDocumentIds: [],
       packageMainDocumentId: null,
       packageAutoDisabledForDocumentId: null,
+      packagePreviewDocumentId: null,
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -10544,6 +10629,54 @@
       return maxPage || null;
     }
 
+    function currentPdfDocumentId() {
+      const packagePreviewId = Number(state.packagePreviewDocumentId);
+      if (Number.isFinite(packagePreviewId) && packagePreviewId > 0) return packagePreviewId;
+      const currentId = Number(state.documentId);
+      if (Number.isFinite(currentId) && currentId > 0) return currentId;
+      return null;
+    }
+
+    function packageDocumentMetaById(documentId) {
+      const targetId = Number(documentId);
+      if (!Number.isFinite(targetId) || targetId <= 0) return null;
+      const packageDocs = (
+        state.result
+        && state.result.package
+        && Array.isArray(state.result.package.documents)
+      ) ? state.result.package.documents : [];
+      return (
+        packageDocs.find((item) => Number(item && item.id) === targetId)
+        || state.documents.find((item) => Number(item && item.id) === targetId)
+        || null
+      );
+    }
+
+    function setPdfPageCountForDocument(documentId) {
+      const doc = packageDocumentMetaById(documentId);
+      state.pdf.pageCount = derivePdfPageCount(doc || {});
+      state.pdf.page = clampPdfPage(state.pdf.page);
+      syncPdfControls();
+    }
+
+    function setPackagePreviewDocument(documentId, options = {}) {
+      const nextId = Number(documentId);
+      if (!Number.isFinite(nextId) || nextId <= 0) return;
+      const resetPage = options.resetPage !== false;
+      const forceReload = options.forceReload !== false;
+      const silent = options.silent === true;
+      state.packagePreviewDocumentId = nextId;
+      if (resetPage) state.pdf.page = 1;
+      setPdfPageCountForDocument(nextId);
+      refreshPdfFrame({ forceReload });
+      updatePackageModeState();
+      if (!silent) {
+        const doc = packageDocumentMetaById(nextId);
+        const name = doc && doc.original_filename ? doc.original_filename : `Dokument #${nextId}`;
+        setStatus(`Viewer zeigt ${name}.`, "ok");
+      }
+    }
+
     function pdfDocumentUrl(documentId, options = {}) {
       const params = new URLSearchParams();
       params.set("toolbar", "0");
@@ -10561,6 +10694,7 @@
     }
 
     function syncPdfControls() {
+      const pdfDocumentId = currentPdfDocumentId();
       const page = clampPdfPage(state.pdf.page);
       const pageCount = finitePositiveInteger(state.pdf.pageCount);
       state.pdf.page = page;
@@ -10569,25 +10703,26 @@
         ui.pdfPageInput.max = pageCount ? String(pageCount) : "";
       }
       if (ui.pdfPageCount) ui.pdfPageCount.textContent = `/ ${pageCount || "-"}`;
-      if (ui.pdfPrevPageBtn) ui.pdfPrevPageBtn.disabled = !state.documentId || page <= 1;
-      if (ui.pdfNextPageBtn) ui.pdfNextPageBtn.disabled = !state.documentId || (pageCount ? page >= pageCount : false);
-      if (ui.pdfZoomOutBtn) ui.pdfZoomOutBtn.disabled = !state.documentId || state.pdf.zoom === PDF_ZOOM_LEVELS[0];
-      if (ui.pdfZoomInBtn) ui.pdfZoomInBtn.disabled = !state.documentId || state.pdf.zoom === PDF_ZOOM_LEVELS[PDF_ZOOM_LEVELS.length - 1];
+      if (ui.pdfPrevPageBtn) ui.pdfPrevPageBtn.disabled = !pdfDocumentId || page <= 1;
+      if (ui.pdfNextPageBtn) ui.pdfNextPageBtn.disabled = !pdfDocumentId || (pageCount ? page >= pageCount : false);
+      if (ui.pdfZoomOutBtn) ui.pdfZoomOutBtn.disabled = !pdfDocumentId || state.pdf.zoom === PDF_ZOOM_LEVELS[0];
+      if (ui.pdfZoomInBtn) ui.pdfZoomInBtn.disabled = !pdfDocumentId || state.pdf.zoom === PDF_ZOOM_LEVELS[PDF_ZOOM_LEVELS.length - 1];
       if (ui.pdfZoomLabel) ui.pdfZoomLabel.textContent = state.pdf.zoom === "fit" ? "Fit" : `${state.pdf.zoom}%`;
-      if (ui.pdfDownloadBtn) ui.pdfDownloadBtn.disabled = !state.documentId;
-      if (ui.pdfOpenBtn) ui.pdfOpenBtn.disabled = !state.documentId;
+      if (ui.pdfDownloadBtn) ui.pdfDownloadBtn.disabled = !pdfDocumentId;
+      if (ui.pdfOpenBtn) ui.pdfOpenBtn.disabled = !pdfDocumentId;
     }
 
     function refreshPdfFrame({ forceReload = false } = {}) {
       syncPdfControls();
-      if (!state.documentId || !ui.pdfFrame) return;
+      const pdfDocumentId = currentPdfDocumentId();
+      if (!pdfDocumentId || !ui.pdfFrame) return;
       if (forceReload) state.pdf.reloadToken += 1;
-      const nextSrc = pdfDocumentUrl(state.documentId);
+      const nextSrc = pdfDocumentUrl(pdfDocumentId);
       if (forceReload) {
         const reloadToken = state.pdf.reloadToken;
         ui.pdfFrame.src = "about:blank";
         window.setTimeout(() => {
-          if (state.documentId && state.pdf.reloadToken === reloadToken) ui.pdfFrame.src = nextSrc;
+          if (currentPdfDocumentId() && state.pdf.reloadToken === reloadToken) ui.pdfFrame.src = nextSrc;
         }, 0);
         return;
       }
@@ -10625,12 +10760,13 @@
     }
 
     function openCurrentPdf({ download = false } = {}) {
-      if (!state.documentId) return;
-      const url = `/document/${state.documentId}/file`;
+      const pdfDocumentId = currentPdfDocumentId();
+      if (!pdfDocumentId) return;
+      const url = `/document/${pdfDocumentId}/file`;
       if (download) {
         const link = document.createElement("a");
         link.href = url;
-        link.download = `document-${state.documentId}.pdf`;
+        link.download = `document-${pdfDocumentId}.pdf`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -11258,6 +11394,14 @@
       if (value === true) return { label: "ok", kind: "ok" };
       if (value === false) return { label: "abweichung", kind: "err" };
       return { label: "offen", kind: "neutral" };
+    }
+
+    function validationFieldPolicy(validation, fieldName) {
+      const policies = (validation && typeof validation === "object" && validation.field_policies && typeof validation.field_policies === "object")
+        ? validation.field_policies
+        : {};
+      const policy = policies[fieldName];
+      return (policy && typeof policy === "object") ? policy : null;
     }
 
     function buildSourceBreakdown(result) {
@@ -11944,12 +12088,17 @@
       for (const fieldName of ["supplier_name", "document_type", "document_number", "document_date", "currency", "gross_total"]) {
         const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
+        const policy = validationFieldPolicy(validation, fieldName);
+        const isOptional = policy && String(policy.level || "").toLowerCase() === "optional";
+        const flagHtml = isOptional
+          ? reviewFlagHtml("nicht erwartet", "neutral")
+          : reviewFlagHtml(required[fieldName] ? "vorhanden" : "fehlt", required[fieldName] ? "ok" : "err");
         fieldRows.push(
           reviewRowHtml(
-            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · Pflicht`,
+            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · ${isOptional ? "optional" : "Pflicht"}`,
             reviewFieldValue(document, fieldName),
-            `${reviewFlagHtml(required[fieldName] ? "vorhanden" : "fehlt", required[fieldName] ? "ok" : "err")}${sourceKey ? sourceTagHtml(source) : ""}`,
-            { required: true }
+            `${flagHtml}${sourceKey ? sourceTagHtml(source) : ""}`,
+            { required: !isOptional }
           )
         );
       }
@@ -11969,11 +12118,16 @@
       for (const fieldName of ["project_ref", "net_total", "vat_total"]) {
         const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
+        const policy = validationFieldPolicy(validation, fieldName);
+        const isOptional = policy && String(policy.level || "").toLowerCase() === "optional";
+        const flagHtml = isOptional
+          ? reviewFlagHtml("nicht erwartet", "neutral")
+          : reviewFlagHtml(recommended[fieldName] ? "vorhanden" : "offen", recommended[fieldName] ? "ok" : "review");
         fieldRows.push(
           reviewRowHtml(
-            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · empfohlen`,
+            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · ${isOptional ? "optional" : "empfohlen"}`,
             reviewFieldValue(document, fieldName),
-            `${reviewFlagHtml(recommended[fieldName] ? "vorhanden" : "offen", recommended[fieldName] ? "ok" : "review")}${sourceKey ? sourceTagHtml(source) : ""}`
+            `${flagHtml}${sourceKey ? sourceTagHtml(source) : ""}`
           )
         );
       }
@@ -12069,6 +12223,7 @@
         if (ui.packageModeState) ui.packageModeState.textContent = "Multi-PDF: inaktiv";
         if (ui.packagePanel) ui.packagePanel.setAttribute("hidden", "");
         if (ui.topbar) ui.topbar.classList.remove("has-package");
+        state.packagePreviewDocumentId = null;
         return;
       }
       const mainLabel = state.packageMainDocumentId ? `Master #${state.packageMainDocumentId}` : "Master automatisch";
@@ -12076,17 +12231,50 @@
       if (ui.packagePanel) ui.packagePanel.removeAttribute("hidden");
       if (ui.topbar) ui.topbar.classList.add("has-package");
       if (ui.packageTitle) ui.packageTitle.textContent = `Multi-PDF-Paket · ${mainLabel}`;
+      if (!Number.isFinite(Number(state.packagePreviewDocumentId)) || !ids.includes(Number(state.packagePreviewDocumentId))) {
+        state.packagePreviewDocumentId = Number(state.packageMainDocumentId) || Number(ids[0]) || null;
+      }
       if (ui.packageDocs) {
         clearNode(ui.packageDocs);
+        const packageDocs = (
+          state.result
+          && state.result.package
+          && Array.isArray(state.result.package.documents)
+          && state.result.package.documents.length
+        )
+          ? state.result.package.documents
+          : ids.map((id) => state.documents.find((item) => Number(item.id) === Number(id)) || { id });
         for (const id of ids) {
-          const doc = state.documents.find((item) => Number(item.id) === Number(id));
-          const chip = document.createElement("span");
-          chip.className = `package-chip${Number(id) === Number(state.packageMainDocumentId) ? " is-main" : ""}`;
-          const type = doc && doc.document_type ? doc.document_type : "PDF";
+          const doc = packageDocs.find((item) => Number(item.id) === Number(id)) || state.documents.find((item) => Number(item.id) === Number(id)) || { id };
+          const isMain = Number(id) === Number(state.packageMainDocumentId);
+          const isPreview = Number(id) === Number(state.packagePreviewDocumentId);
+          const type = doc && doc.document_type ? formatDocumentType(doc.document_type) : "PDF";
           const name = doc && doc.original_filename ? doc.original_filename : `Dokument #${id}`;
-          chip.title = `${fmt(type)} · ${fmt(name)}`;
-          chip.innerHTML = `<strong>#${escapeHtml(fmt(id))}</strong><span>${escapeHtml(type)}</span>`;
-          ui.packageDocs.appendChild(chip);
+          const number = doc && doc.document_number ? `Nr. ${doc.document_number}` : null;
+          const project = doc && doc.project_ref ? doc.project_ref : null;
+          const subtitleParts = [type, number, project].filter(Boolean);
+          const card = document.createElement("div");
+          card.className = `package-doc-card${isMain ? " is-main" : ""}${isPreview ? " is-preview" : ""}`;
+          card.dataset.documentId = String(id);
+          card.innerHTML = `
+            <button class="package-doc-summary" type="button" data-package-preview="${escapeHtml(fmt(id))}">
+              <div class="package-doc-meta">
+                <div class="package-doc-topline">
+                  <span class="package-doc-id">#${escapeHtml(fmt(id))}</span>
+                  <span class="package-doc-badge">${escapeHtml(type)}</span>
+                  ${isMain ? `<span class="package-doc-badge is-main">Master</span>` : ""}
+                  ${isPreview ? `<span class="package-doc-badge">im Viewer</span>` : ""}
+                </div>
+                <div class="package-doc-name">${escapeHtml(name)}</div>
+                <div class="package-doc-subline">${escapeHtml(subtitleParts.join(" · ") || "Zusatzdokument")}</div>
+              </div>
+              <div class="package-doc-actions">
+                <span class="package-doc-btn">anzeigen</span>
+                <a class="package-doc-btn" href="/document/${escapeHtml(fmt(id))}/file" target="_blank" rel="noopener">↗</a>
+              </div>
+            </button>
+          `;
+          ui.packageDocs.appendChild(card);
         }
       }
     }
@@ -12147,6 +12335,7 @@
     function clearPackageMode() {
       state.packageDocumentIds = [];
       state.packageMainDocumentId = null;
+      state.packagePreviewDocumentId = null;
       state.packageAutoDisabledForDocumentId = state.documentId ? Number(state.documentId) : null;
       updatePackageModeState();
       if (state.documentId) loadResult(state.documentId);
@@ -13135,6 +13324,7 @@
         const card = document.createElement("div");
         card.className = "img-card";
         card.dataset.imageId = String(image.id);
+        const resolvedImageUrl = imageUrl(state.documentId, image.id);
         const isAssigned = !!image.is_assigned;
         const assignedCount = Number(image.assigned_match_count || 0);
         const hasConflict = assignedCount > 1;
@@ -13156,19 +13346,19 @@
 
         const previewLink = document.createElement("a");
         previewLink.className = "img-preview-link";
-        previewLink.href = `/document/${state.documentId}/image/${image.id}`;
+        previewLink.href = resolvedImageUrl;
         previewLink.target = "_blank";
         previewLink.rel = "noopener";
         previewLink.title = `Bild ${image.id} öffnen`;
 
         const preview = document.createElement("img");
-        preview.src = `/document/${state.documentId}/image/${image.id}`;
+        preview.src = resolvedImageUrl;
         preview.alt = `Bild ${image.id}`;
         preview.loading = "lazy";
         preview.onerror = () => {
           const fallback = document.createElement("div");
           fallback.className = "fallback";
-          fallback.innerHTML = `Keine Browser-Vorschau fuer ${escapeHtml(fmt(image.mime_type))}<br><a href="/document/${state.documentId}/image/${image.id}" target="_blank" rel="noopener">Datei oeffnen</a>`;
+          fallback.innerHTML = `Keine Browser-Vorschau fuer ${escapeHtml(fmt(image.mime_type))}<br><a href="${resolvedImageUrl}" target="_blank" rel="noopener">Datei oeffnen</a>`;
           preview.replaceWith(fallback);
         };
 
@@ -13230,6 +13420,9 @@
           : await apiJson(`/result/${documentId}`);
         state.result = result;
         setPdfPageCountFromResult(result);
+        if (Number(currentPdfDocumentId()) !== Number(documentId)) {
+          setPdfPageCountForDocument(currentPdfDocumentId());
+        }
         syncCurrentDocumentIntoList(result.document || {});
         setDocumentApprovalPills(result);
         state.fieldSources = deriveFieldSources();
@@ -13284,6 +13477,7 @@
     async function selectDocument(documentId) {
       if (state.pdfCrop && state.pdfCrop.active) cancelPdfCrop({ silent: true });
       state.documentId = documentId;
+      state.packagePreviewDocumentId = documentId;
       ui.docSelect.value = String(documentId);
       state.pdf.page = 1;
       state.pdf.pageCount = null;
@@ -13631,6 +13825,26 @@
       ui.packageClearBtn.addEventListener("click", () => {
         clearPackageMode();
         setStatus("Multi-PDF-Paketmodus deaktiviert. Einzel-Dokumentansicht geladen.", "ok");
+      });
+    }
+    if (ui.packageDocs) {
+      ui.packageDocs.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const openLink = target.closest("a.package-doc-btn");
+        if (openLink) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(openLink.href, "_blank", "noopener");
+          return;
+        }
+        const previewButton = target.closest("[data-package-preview]");
+        if (!previewButton) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const documentId = Number(previewButton.getAttribute("data-package-preview"));
+        if (!Number.isFinite(documentId) || documentId <= 0) return;
+        setPackagePreviewDocument(documentId);
       });
     }
 

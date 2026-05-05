@@ -66,6 +66,37 @@ def test_alu_one_provider_policy_excludes_az_and_vorbemerkungen() -> None:
     assert validation["line_item_summary"]["warning_count"] == 0
 
 
+def test_koch_offer_net_only_is_not_blocked_for_missing_vat_and_gross() -> None:
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Koch Türen GmbH",
+            "document_type": "angebot",
+            "document_number": "1046184",
+            "document_date": "2024-11-29",
+            "project_ref": "Danzl Daniel",
+            "currency": "EUR",
+            "net_total": "9361.00",
+            "vat_total": None,
+            "gross_total": None,
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=[
+            {"position_no": "1", "description_short": "Stockelement Niveau", "quantity": "13", "unit_price": "1014.00", "line_total": "12772.00", "page_ref": 3, "is_alternative": False},
+            {"position_no": "2", "description_short": "Stockelement Niveau", "quantity": "1", "unit_price": "1648.00", "line_total": "1648.00", "page_ref": 3, "is_alternative": False},
+        ],
+        images=[{"id": 1, "page_ref": 1}, {"id": 2, "page_ref": 2}],
+    )
+
+    issue_codes = [issue.get("code") for issue in validation["document_issues"]]
+
+    assert "missing_gross_total" not in issue_codes
+    assert "missing_vat_total" not in issue_codes
+    assert validation["required_fields"]["gross_total"] is True
+    assert validation["recommended_fields"]["vat_total"] is True
+
+
 def test_alu_one_az_item_is_not_treated_as_visual_image_requirement() -> None:
     line_items = [
         {
