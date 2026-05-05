@@ -143,6 +143,7 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
     assert "dbo.vendoc_import_positions" in script
     assert "image_long_text_rtf" in script
     assert "\\pngblip" in script
+    assert "CONVERT(datetime, '20251110', 112)" in script
     assert "image_base64" not in script
     assert "image_mime_type" not in script
     assert "image_filename" not in script

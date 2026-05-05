@@ -77,6 +77,16 @@ COLUMN_ALIASES: dict[str, dict[str, list[str]]] = {
     },
 }
 
+DATE_COLUMNS: dict[str, set[str]] = {
+    HEADER_TABLE: {"document_date"},
+    POSITION_TABLE: set(),
+}
+
+DATETIME_COLUMNS: dict[str, set[str]] = {
+    HEADER_TABLE: {"created_at"},
+    POSITION_TABLE: {"created_at"},
+}
+
 
 @dataclass(frozen=True)
 class VendocMssqlConfig:
@@ -212,7 +222,11 @@ def _mssql_literal(value: Any) -> str:
     if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
         return str(value)
     if isinstance(value, (datetime, date)):
-        value = value.isoformat()
+        if isinstance(value, datetime):
+            text = value.strftime("%Y-%m-%dT%H:%M:%S")
+            return f"CAST('{text}' AS datetime2)"
+        text = value.strftime("%Y%m%d")
+        return f"CONVERT(datetime, '{text}', 112)"
     text = str(value).replace("'", "''")
     return f"N'{text}'"
 
@@ -294,12 +308,65 @@ def _binding_target_columns(bindings: list[tuple[str, str]]) -> list[str]:
     return [target_column for target_column, _source_column in bindings]
 
 
-def _binding_row_values(row: dict[str, Any], bindings: list[tuple[str, str]]) -> list[Any]:
-    return [row.get(source_column) for _target_column, source_column in bindings]
+def _parse_date_like(value: Any) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_datetime_like(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized = text.replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            return datetime.strptime(normalized, fmt)
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _coerce_value_for_column(table: str, target_column: str, value: Any) -> Any:
+    if target_column in DATE_COLUMNS.get(table, set()):
+        parsed = _parse_date_like(value)
+        return parsed if parsed is not None else value
+    if target_column in DATETIME_COLUMNS.get(table, set()):
+        parsed = _parse_datetime_like(value)
+        return parsed if parsed is not None else value
+    return value
+
+
+def _binding_row_values(table: str, row: dict[str, Any], bindings: list[tuple[str, str]]) -> list[Any]:
+    return [_coerce_value_for_column(table, target_column, row.get(source_column)) for target_column, source_column in bindings]
 
 
 def _insert_statement_with_bindings(table: str, bindings: list[tuple[str, str]], row: dict[str, Any]) -> str:
-    values = ", ".join(_mssql_literal(row.get(source_column)) for _target_column, source_column in bindings)
+    values = ", ".join(
+        _mssql_literal(_coerce_value_for_column(table, target_column, row.get(source_column)))
+        for target_column, source_column in bindings
+    )
     return f"INSERT INTO {table} ({', '.join(_binding_target_columns(bindings))}) VALUES ({values});"
 
 
@@ -392,7 +459,7 @@ def write_srtemp_payload(vendoc_payload: dict[str, Any], config: VendocMssqlConf
             cursor.execute(f"DELETE FROM {HEADER_TABLE} WHERE external_document_id = ?;", external_document_id)
             cursor.execute(
                 _insert_sql_with_placeholders(HEADER_TABLE, _binding_target_columns(bindings[HEADER_TABLE])),
-                _binding_row_values(header, bindings[HEADER_TABLE]),
+                _binding_row_values(HEADER_TABLE, header, bindings[HEADER_TABLE]),
             )
             insert_position_sql = _insert_sql_with_placeholders(
                 POSITION_TABLE,
@@ -400,7 +467,7 @@ def write_srtemp_payload(vendoc_payload: dict[str, Any], config: VendocMssqlConf
             )
             for position in positions:
                 if isinstance(position, dict):
-                    cursor.execute(insert_position_sql, _binding_row_values(position, bindings[POSITION_TABLE]))
+                    cursor.execute(insert_position_sql, _binding_row_values(POSITION_TABLE, position, bindings[POSITION_TABLE]))
             conn.commit()
         except Exception:
             conn.rollback()
