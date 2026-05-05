@@ -32,6 +32,7 @@ def test_rieder_regression() -> None:
     text = _read_text_fixture(ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt")
     parsed = parse_document_text(text)
     items = extract_line_items(text, parsed["template"])
+    item_by_pos = {item["position_no"]: item for item in items}
 
     assert parsed["template"] == "rieder"
     assert parsed["document_type"] == "angebot"
@@ -41,7 +42,11 @@ def test_rieder_regression() -> None:
     _assert_totals(parsed, ("€ 6.315,71", "€ 1.263,14", "€ 7.578,85"))
     assert len(items) == 5
     assert items[0]["description_short"] == "Balkontüre 2flg DKL DRS BS37mm"
-    assert any(item["is_alternative"] for item in items)
+    assert item_by_pos["1"]["is_alternative"] is False
+    assert item_by_pos["2"]["is_alternative"] is True
+    assert item_by_pos["3"]["is_alternative"] is False
+    assert item_by_pos["4"]["is_alternative"] is False
+    assert item_by_pos["5"]["is_alternative"] is False
 
 
 def test_entholzer_regression() -> None:

@@ -70,6 +70,17 @@ def _extract_prices(block_lines: list[str]) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _is_alternative_position(block_lines: list[str]) -> bool:
+    leading_lines = [normalize_line(line).lower() for line in block_lines[:6] if normalize_line(line)]
+    if any("alternativ für pos" in line for line in leading_lines):
+        return True
+    if any(line.startswith("alternativ") for line in leading_lines):
+        return True
+    if any("ku.pos.: variante" in line for line in leading_lines):
+        return True
+    return False
+
+
 def extract_line_items(text: str) -> list[dict[str, Any]]:
     normalized_text = normalize_text(text)
     items: list[dict[str, Any]] = []
@@ -105,7 +116,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
             preferred_words=("fenster", "tuer", "t\u00fcre", "fixfenster", "brandschutz", "schema", "dreh", "kipp"),
         )
         unit_price_raw, line_total_raw = _extract_prices(block_lines)
-        is_alternative = "alternativ" in block_text.lower() or "alternative" in block_text.lower()
+        is_alternative = _is_alternative_position(block_lines)
 
         items.append(
             {
