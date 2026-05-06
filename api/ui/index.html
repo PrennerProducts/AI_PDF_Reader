@@ -5918,9 +5918,7 @@
       position: relative;
       z-index: 1;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px 10px;
+      gap: 8px;
       width: 100%;
       min-width: 0;
       padding: 10px 12px;
@@ -5941,6 +5939,20 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .app-v3 .package-panel-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .app-v3 .package-panel-tools {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .app-v3 .package-docs {
@@ -5969,11 +5981,17 @@
 
     .app-v3 .package-doc-summary {
       display: flex;
-      align-items: flex-start;
+      align-items: stretch;
       justify-content: space-between;
       gap: 10px;
       width: 100%;
       padding: 8px 10px;
+    }
+
+    .app-v3 .package-doc-summary-main {
+      display: block;
+      min-width: 0;
+      flex: 1 1 auto;
       border: 0;
       background: transparent;
       text-align: left;
@@ -6040,9 +6058,12 @@
     .app-v3 .package-doc-actions {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
       gap: 6px;
       flex-shrink: 0;
       margin-left: auto;
+      max-width: 132px;
     }
 
     .app-v3 .package-doc-btn {
@@ -6059,6 +6080,18 @@
       font-weight: 780;
       cursor: pointer;
       text-decoration: none;
+    }
+
+    .app-v3 .package-doc-btn.is-danger {
+      color: #b42318;
+      border-color: rgba(180, 35, 24, 0.18);
+      background: rgba(180, 35, 24, 0.04);
+    }
+
+    .app-v3 .package-doc-btn.is-primary {
+      color: #0b63d1;
+      border-color: rgba(11, 99, 209, 0.16);
+      background: rgba(11, 99, 209, 0.05);
     }
 
     .app-v3 .package-doc-btn:hover {
@@ -10072,8 +10105,13 @@
           </div>
         </div>
         <div class="package-panel" id="packagePanel" hidden>
-          <strong id="packageTitle">Multi-PDF-Paket</strong>
-          <button class="package-clear-btn" id="packageClearBtn" type="button">Einzelmodus</button>
+          <div class="package-panel-head">
+            <strong id="packageTitle">Multi-PDF-Paket</strong>
+            <div class="package-panel-tools">
+              <button class="package-clear-btn" id="packageAddBtn" type="button">+ PDF</button>
+              <button class="package-clear-btn" id="packageClearBtn" type="button">Einzelmodus</button>
+            </div>
+          </div>
           <div class="package-docs" id="packageDocs"></div>
         </div>
         <div class="pdf-stage" id="pdfStage">
@@ -10354,6 +10392,7 @@
       packageMainDocumentId: null,
       packageAutoDisabledForDocumentId: null,
       packagePreviewDocumentId: null,
+      packageAppendOnNextUpload: false,
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -10389,6 +10428,7 @@
       packagePanel: document.getElementById("packagePanel"),
       packageTitle: document.getElementById("packageTitle"),
       packageDocs: document.getElementById("packageDocs"),
+      packageAddBtn: document.getElementById("packageAddBtn"),
       packageClearBtn: document.getElementById("packageClearBtn"),
       uploadBtn: document.getElementById("uploadBtn"),
       resetBtn: document.getElementById("resetBtn"),
@@ -12257,22 +12297,26 @@
           card.className = `package-doc-card${isMain ? " is-main" : ""}${isPreview ? " is-preview" : ""}`;
           card.dataset.documentId = String(id);
           card.innerHTML = `
-            <button class="package-doc-summary" type="button" data-package-preview="${escapeHtml(fmt(id))}">
-              <div class="package-doc-meta">
-                <div class="package-doc-topline">
-                  <span class="package-doc-id">#${escapeHtml(fmt(id))}</span>
-                  <span class="package-doc-badge">${escapeHtml(type)}</span>
-                  ${isMain ? `<span class="package-doc-badge is-main">Master</span>` : ""}
-                  ${isPreview ? `<span class="package-doc-badge">im Viewer</span>` : ""}
+            <div class="package-doc-summary">
+              <button class="package-doc-summary-main" type="button" data-package-preview="${escapeHtml(fmt(id))}">
+                <div class="package-doc-meta">
+                  <div class="package-doc-topline">
+                    <span class="package-doc-id">#${escapeHtml(fmt(id))}</span>
+                    <span class="package-doc-badge">${escapeHtml(type)}</span>
+                    ${isMain ? `<span class="package-doc-badge is-main">Master</span>` : ""}
+                    ${isPreview ? `<span class="package-doc-badge">im Viewer</span>` : ""}
+                  </div>
+                  <div class="package-doc-name">${escapeHtml(name)}</div>
+                  <div class="package-doc-subline">${escapeHtml(subtitleParts.join(" · ") || "Zusatzdokument")}</div>
                 </div>
-                <div class="package-doc-name">${escapeHtml(name)}</div>
-                <div class="package-doc-subline">${escapeHtml(subtitleParts.join(" · ") || "Zusatzdokument")}</div>
-              </div>
+              </button>
               <div class="package-doc-actions">
-                <span class="package-doc-btn">anzeigen</span>
+                <button class="package-doc-btn" type="button" data-package-preview="${escapeHtml(fmt(id))}">anzeigen</button>
+                ${!isMain ? `<button class="package-doc-btn is-primary" type="button" data-package-set-main="${escapeHtml(fmt(id))}">Master</button>` : ""}
+                <button class="package-doc-btn is-danger" type="button" data-package-remove="${escapeHtml(fmt(id))}">entfernen</button>
                 <a class="package-doc-btn" href="/document/${escapeHtml(fmt(id))}/file" target="_blank" rel="noopener">↗</a>
               </div>
-            </button>
+            </div>
           `;
           ui.packageDocs.appendChild(card);
         }
@@ -12336,9 +12380,48 @@
       state.packageDocumentIds = [];
       state.packageMainDocumentId = null;
       state.packagePreviewDocumentId = null;
+      state.packageAppendOnNextUpload = false;
       state.packageAutoDisabledForDocumentId = state.documentId ? Number(state.documentId) : null;
       updatePackageModeState();
       if (state.documentId) loadResult(state.documentId);
+    }
+
+    async function setPackageMainDocument(documentId) {
+      const nextId = Number(documentId);
+      const ids = Array.isArray(state.packageDocumentIds) ? state.packageDocumentIds.map((id) => Number(id)).filter(Number.isFinite) : [];
+      if (!Number.isFinite(nextId) || nextId <= 0 || !ids.includes(nextId)) return;
+      state.packageMainDocumentId = nextId;
+      state.packageAutoDisabledForDocumentId = null;
+      state.packagePreviewDocumentId = nextId;
+      await selectDocument(nextId);
+      setStatus(`Paket-Master auf Dokument #${nextId} gesetzt.`, "ok");
+    }
+
+    async function removeDocumentFromPackage(documentId) {
+      const removeId = Number(documentId);
+      const ids = Array.isArray(state.packageDocumentIds) ? state.packageDocumentIds.map((id) => Number(id)).filter(Number.isFinite) : [];
+      if (!Number.isFinite(removeId) || removeId <= 0 || !ids.includes(removeId)) return;
+      const remainingIds = ids.filter((id) => id !== removeId);
+      if (remainingIds.length <= 1) {
+        clearPackageMode();
+        setStatus(`Dokument #${removeId} aus dem Paket entfernt. Einzelmodus aktiv.`, "ok");
+        return;
+      }
+      state.packageDocumentIds = remainingIds;
+      const removedWasMain = Number(state.packageMainDocumentId) === removeId;
+      const removedWasPreview = Number(state.packagePreviewDocumentId) === removeId;
+      if (removedWasMain || !remainingIds.includes(Number(state.packageMainDocumentId))) {
+        state.packageMainDocumentId = inferPackageMainDocumentId(remainingIds) || remainingIds[0] || null;
+      }
+      if (removedWasPreview || !remainingIds.includes(Number(state.packagePreviewDocumentId))) {
+        state.packagePreviewDocumentId = Number(state.packageMainDocumentId) || remainingIds[0] || null;
+      }
+      if (Number(state.documentId) === removeId || removedWasMain) {
+        await selectDocument(Number(state.packageMainDocumentId));
+      } else {
+        updatePackageModeState();
+      }
+      setStatus(`Dokument #${removeId} aus dem Paket entfernt.`, "ok");
     }
 
     async function uploadSelectedPdfFile(file, { autoProcess = false, index = 1, total = 1 } = {}) {
@@ -12364,14 +12447,16 @@
       return newDocId;
     }
 
-    async function uploadSelectedPdfs({ autoProcess = false } = {}) {
+    async function uploadSelectedPdfs({ autoProcess = false, appendToPackage = false } = {}) {
       const files = selectedUploadFiles();
       if (!files.length) {
+        state.packageAppendOnNextUpload = false;
         setStatus("Bitte zuerst eine oder mehrere PDF-Dateien auswaehlen.", "warn");
         return;
       }
       const invalidFile = files.find((file) => !String(file.name || "").toLowerCase().endsWith(".pdf"));
       if (invalidFile) {
+        state.packageAppendOnNextUpload = false;
         setStatus("Nur PDF-Dateien sind erlaubt.", "warn");
         return;
       }
@@ -12390,18 +12475,34 @@
           uploadedIds.push(newDocId);
         }
         ui.uploadInput.value = "";
-        state.packageDocumentIds = uploadedIds;
+        const mergedIds = appendToPackage
+          ? Array.from(new Set([
+            ...(Array.isArray(state.packageDocumentIds) ? state.packageDocumentIds.map((id) => Number(id)).filter(Number.isFinite) : []),
+            ...uploadedIds,
+          ]))
+          : uploadedIds;
+        state.packageDocumentIds = mergedIds;
+        state.packageAppendOnNextUpload = false;
         state.packageAutoDisabledForDocumentId = null;
         await loadDocuments();
-        state.packageMainDocumentId = files.length > 1 ? inferPackageMainDocumentId(uploadedIds) : null;
+        const nextMainId = appendToPackage
+          ? (
+            mergedIds.includes(Number(state.packageMainDocumentId))
+              ? Number(state.packageMainDocumentId)
+              : (inferPackageMainDocumentId(mergedIds) || mergedIds[0] || null)
+          )
+          : (mergedIds.length > 1 ? inferPackageMainDocumentId(mergedIds) : null);
+        state.packageMainDocumentId = nextMainId;
         if (state.packageMainDocumentId) {
           await selectDocument(state.packageMainDocumentId);
         }
         updatePackageModeState();
         const label = files.length === 1 ? "PDF" : "PDFs";
-        const packageText = files.length > 1 ? ` Paket-Master: #${state.packageMainDocumentId || state.documentId}.` : "";
-        setStatus(`${uploadedIds.length} ${label} hochgeladen${autoProcess ? " und verarbeitet" : ""}.${packageText} Aktives Dokument: #${state.documentId}.`, "ok");
+        const packageText = mergedIds.length > 1 ? ` Paket-Master: #${state.packageMainDocumentId || state.documentId}.` : "";
+        const actionText = appendToPackage ? " zum Paket hinzugefuegt" : " hochgeladen";
+        setStatus(`${uploadedIds.length} ${label}${actionText}${autoProcess ? " und verarbeitet" : ""}.${packageText} Aktives Dokument: #${state.documentId}.`, "ok");
       } catch (error) {
+        state.packageAppendOnNextUpload = false;
         setStatus(`Upload fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
       } finally {
         ui.uploadBtn.disabled = false;
@@ -13827,8 +13928,14 @@
         setStatus("Multi-PDF-Paketmodus deaktiviert. Einzel-Dokumentansicht geladen.", "ok");
       });
     }
+    if (ui.packageAddBtn) {
+      ui.packageAddBtn.addEventListener("click", () => {
+        state.packageAppendOnNextUpload = true;
+        ui.uploadInput.click();
+      });
+    }
     if (ui.packageDocs) {
-      ui.packageDocs.addEventListener("click", (event) => {
+      ui.packageDocs.addEventListener("click", async (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
         const openLink = target.closest("a.package-doc-btn");
@@ -13836,6 +13943,24 @@
           event.preventDefault();
           event.stopPropagation();
           window.open(openLink.href, "_blank", "noopener");
+          return;
+        }
+        const setMainButton = target.closest("[data-package-set-main]");
+        if (setMainButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const documentId = Number(setMainButton.getAttribute("data-package-set-main"));
+          if (!Number.isFinite(documentId) || documentId <= 0) return;
+          await setPackageMainDocument(documentId);
+          return;
+        }
+        const removeButton = target.closest("[data-package-remove]");
+        if (removeButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const documentId = Number(removeButton.getAttribute("data-package-remove"));
+          if (!Number.isFinite(documentId) || documentId <= 0) return;
+          await removeDocumentFromPackage(documentId);
           return;
         }
         const previewButton = target.closest("[data-package-preview]");
@@ -13849,14 +13974,19 @@
     }
 
     ui.uploadBtn.addEventListener("click", async () => {
+      state.packageAppendOnNextUpload = false;
       await uploadSelectedPdfs();
     });
     ui.uploadInput.addEventListener("change", async () => {
       const files = selectedUploadFiles();
-      if (!files.length) return;
+      if (!files.length) {
+        state.packageAppendOnNextUpload = false;
+        return;
+      }
       const label = files.length === 1 ? files[0].name : `${files.length} PDFs`;
-      setStatus(`Ausgewaehlt: ${label}. Upload und Verarbeitung starten automatisch.`);
-      await uploadSelectedPdfs({ autoProcess: true });
+      const appendToPackage = state.packageAppendOnNextUpload === true;
+      setStatus(`Ausgewaehlt: ${label}. Upload und Verarbeitung starten automatisch${appendToPackage ? " (Paket erweitern)" : ""}.`);
+      await uploadSelectedPdfs({ autoProcess: true, appendToPackage });
     });
 
     ui.itemIssuesOnly.addEventListener("change", () => {

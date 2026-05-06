@@ -11,7 +11,9 @@ import psycopg
 from psycopg.rows import dict_row
 from image_assignment import (
     focused_image_ids,
+    image_aspect_difference,
     image_layout_sort_key,
+    item_dimension_ratio,
     is_non_visual_line_item,
     is_viable_auto_assignment_image,
     metadata_dict,
@@ -52,6 +54,37 @@ def _split_sql_statements(sql_text: str) -> list[str]:
         if stmt:
             statements.append(f"{stmt};")
     return statements
+
+
+def _prefer_next_page_for_aspect_fit(
+    item: dict[str, Any],
+    *,
+    current_image_id: int | None,
+    next_page_image_ids: list[int],
+    image_by_id: dict[int, dict[str, Any]],
+) -> bool:
+    if current_image_id is None or not next_page_image_ids:
+        return False
+    if item_dimension_ratio(item) is None:
+        return False
+
+    current_image = image_by_id.get(current_image_id)
+    if not current_image:
+        return False
+    current_diff = image_aspect_difference(item, current_image)
+    if current_diff is None:
+        return False
+
+    next_diffs = [
+        image_aspect_difference(item, image_by_id.get(image_id, {}))
+        for image_id in next_page_image_ids
+    ]
+    next_diffs = [diff for diff in next_diffs if diff is not None]
+    if not next_diffs:
+        return False
+
+    best_next_diff = min(next_diffs)
+    return current_diff >= 1.25 and best_next_diff + 0.35 < current_diff
 
 
 def apply_migrations() -> list[str]:
@@ -1319,9 +1352,18 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             slot_image_id = page_visual_slot_image_id(own_current_viable_page_ids, visual_item_offset)
             item_page_end_ref = _to_int(item.get("page_end_ref"))
             spans_to_next_page = bool(item_page_end_ref is not None and item_page_end_ref > page_ref)
+            aspect_prefers_next_page = _prefer_next_page_for_aspect_fit(
+                item,
+                current_image_id=slot_image_id,
+                next_page_image_ids=next_viable_page_ids,
+                image_by_id=image_by_id,
+            )
+            neighbor_pool_ids = carryover_neighbor_ids
+            if aspect_prefers_next_page:
+                neighbor_pool_ids = _dedupe_ints(carryover_neighbor_ids + next_viable_page_ids)
             allow_next_page_candidates = bool(
-                carryover_neighbor_ids
-                and (spans_to_next_page or item_idx == last_visual_item_idx)
+                neighbor_pool_ids
+                and (spans_to_next_page or item_idx == last_visual_item_idx or aspect_prefers_next_page)
             )
             item["image_next_page_allowed"] = allow_next_page_candidates
             if is_non_visual_line_item(item):
@@ -1355,7 +1397,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 if image_id != slot_image_id and is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
             ]
             focused_neighbor = focused_image_ids(
-                carryover_neighbor_ids if allow_next_page_candidates else [],
+                neighbor_pool_ids if allow_next_page_candidates else [],
                 item_count=max(1, visual_item_count),
                 item_index=visual_item_offset if visual_item_offset is not None else item_offset,
                 max_candidates=3,
@@ -1368,7 +1410,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             focused_fallback = focused_image_ids(
                 _dedupe_ints(
                     all_page_image_ids
-                    + (carryover_neighbor_ids if allow_next_page_candidates else [])
+                    + (neighbor_pool_ids if allow_next_page_candidates else [])
                 ),
                 item_count=max(1, visual_item_count),
                 item_index=visual_item_offset if visual_item_offset is not None else item_offset,
@@ -1376,9 +1418,14 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             )
             prefers_next_page = bool(
                 allow_next_page_candidates
-                and visual_item_offset is not None
-                and slot_image_id is None
                 and viable_neighbor
+                and (
+                    aspect_prefers_next_page
+                    or (
+                        visual_item_offset is not None
+                        and slot_image_id is None
+                    )
+                )
             )
             item["image_prefers_next_page"] = prefers_next_page
             if prefers_next_page:

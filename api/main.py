@@ -42,6 +42,8 @@ from extractor import extract_pdf_images, extract_pdf_text
 from document_package import build_document_package_result
 from exporter import build_export_content
 from image_assignment import (
+    image_aspect_difference,
+    item_dimension_ratio,
     is_non_visual_line_item,
     is_viable_auto_assignment_image,
     page_candidate_rank,
@@ -155,6 +157,39 @@ def _postprocess_image_rows(
     document_type: str | None,
     extracted_text: str,
 ) -> list[dict[str, Any]]:
+    def _image_signature(row: dict[str, Any]) -> tuple[Any, ...]:
+        metadata = row.get("metadata_json") or {}
+        return (
+            metadata.get("layout_source"),
+            int(row.get("width") or 0),
+            int(row.get("height") or 0),
+            int(row.get("bytes_size") or 0),
+            round(float(metadata.get("top_ratio") or 0), 6),
+            round(float(metadata.get("left_ratio") or 0), 6),
+            round(float(metadata.get("width_ratio") or 0), 6),
+            round(float(metadata.get("height_ratio") or 0), 6),
+        )
+
+    def _is_alu_one_header_logo(row: dict[str, Any]) -> bool:
+        metadata = row.get("metadata_json") or {}
+        return (
+            metadata.get("layout_source") == "fitz_image_block"
+            and int(row.get("width") or 0) == 230
+            and int(row.get("height") or 0) == 109
+            and int(row.get("bytes_size") or 0) == 9632
+            and float(metadata.get("top_ratio") or 0) <= 0.08
+            and float(metadata.get("left_ratio") or 0) <= 0.10
+            and float(metadata.get("width_ratio") or 0) >= 0.25
+            and float(metadata.get("height_ratio") or 0) <= 0.11
+        )
+
+    if template == "alu_one" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
+        return [
+            row
+            for row in image_rows
+            if not _is_alu_one_header_logo(row)
+        ]
+
     if template == "koch" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
         return [
             row
@@ -413,6 +448,32 @@ def _candidate_area_bonus(area: int, *, image_assignment_is_final: bool) -> floa
     return min(cap, area / 420_000.0)
 
 
+def _candidate_aspect_ratio_bonus(
+    item: dict[str, Any],
+    image: dict[str, Any],
+    *,
+    image_assignment_is_final: bool,
+) -> float:
+    diff = image_aspect_difference(item, image)
+    if diff is None:
+        return 0.0
+    if diff <= 0.12:
+        return 0.72 if not image_assignment_is_final else 0.54
+    if diff <= 0.28:
+        return 0.42 if not image_assignment_is_final else 0.30
+    if diff <= 0.55:
+        return 0.16 if not image_assignment_is_final else 0.10
+    if diff >= 1.25:
+        return -1.10 if not image_assignment_is_final else -0.80
+    if diff >= 0.85:
+        return -0.65 if not image_assignment_is_final else -0.46
+    return -0.18 if not image_assignment_is_final else -0.12
+
+
+def _item_has_size_hint(item: dict[str, Any]) -> bool:
+    return item_dimension_ratio(item) is not None
+
+
 def _candidate_images_for_item(
     item: dict[str, Any],
     image_by_id: dict[int, dict[str, Any]],
@@ -463,6 +524,7 @@ def _candidate_images_for_item(
     page_ref = _to_int_safe(item.get("page_ref"))
     next_page_allowed = bool(item.get("image_next_page_allowed"))
     prefers_next_page = bool(item.get("image_prefers_next_page"))
+    has_size_hint = _item_has_size_hint(item)
     primary_ids_raw = item.get("image_ids_primary")
     primary_ids = set()
     if image_assignment_is_final:
@@ -495,7 +557,7 @@ def _candidate_images_for_item(
             next_page_carryover = (
                 image_page == page_ref + 1
                 and next_page_allowed
-                and (prefers_next_page or not same_page_viable_exists)
+                and (prefers_next_page or not same_page_viable_exists or has_size_hint)
                 and is_viable_auto_assignment_image(image)
             )
             if not same_page and not next_page_carryover:
@@ -520,7 +582,20 @@ def _candidate_images_for_item(
         area_bonus = _candidate_area_bonus(area, image_assignment_is_final=image_assignment_is_final)
         primary_bonus = 0.20 if image_id in primary_ids else 0.0
         rank_bonus = _candidate_rank_bonus(candidate_index, image_assignment_is_final=image_assignment_is_final)
-        score = page_bonus + area_bonus + primary_bonus + rank_bonus + decorative_penalty + repeated_penalty
+        aspect_bonus = _candidate_aspect_ratio_bonus(
+            item,
+            image,
+            image_assignment_is_final=image_assignment_is_final,
+        )
+        score = (
+            page_bonus
+            + area_bonus
+            + primary_bonus
+            + rank_bonus
+            + aspect_bonus
+            + decorative_penalty
+            + repeated_penalty
+        )
         scored.append((score, page_candidate_rank(page_ref, image_page), image))
 
     scored.sort(key=lambda pair: (-pair[0], pair[1], _to_int_safe(pair[2].get("id")) or 0))
@@ -541,6 +616,7 @@ def _heuristic_match_for_item(
     page_ref = _to_int_safe(item.get("page_ref"))
     next_page_allowed = bool(item.get("image_next_page_allowed"))
     prefers_next_page = bool(item.get("image_prefers_next_page"))
+    has_size_hint = _item_has_size_hint(item)
     primary_ids_raw = item.get("image_ids_primary")
     image_assignment_is_final = bool(item.get("image_assignment_is_final"))
     primary_ids = set()
@@ -574,7 +650,7 @@ def _heuristic_match_for_item(
             next_page_carryover = (
                 image_page == page_ref + 1
                 and next_page_allowed
-                and (prefers_next_page or not same_page_viable_exists)
+                and (prefers_next_page or not same_page_viable_exists or has_size_hint)
                 and is_viable_auto_assignment_image(image)
             )
             if not same_page and not next_page_carryover:
@@ -596,6 +672,11 @@ def _heuristic_match_for_item(
                     score -= 0.22
         score += _candidate_area_bonus(area, image_assignment_is_final=image_assignment_is_final)
         score += _candidate_rank_bonus(candidate_index, image_assignment_is_final=image_assignment_is_final)
+        score += _candidate_aspect_ratio_bonus(
+            item,
+            image,
+            image_assignment_is_final=image_assignment_is_final,
+        )
         if image_id in primary_ids:
             score += 0.20
         if image.get("is_probably_decorative"):
@@ -606,7 +687,7 @@ def _heuristic_match_for_item(
             {
                 "image_id": image_id,
                 "score": round(score, 4),
-                "reason": "heuristic(page+layout_rank+area+decorative+primary)",
+                "reason": "heuristic(page+layout_rank+area+aspect+decorative+primary)",
                 "_page_rank": page_candidate_rank(page_ref, image_page),
             }
         )

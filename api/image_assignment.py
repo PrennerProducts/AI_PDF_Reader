@@ -16,6 +16,9 @@ def _to_float(value: Any) -> float | None:
     try:
         if value is None:
             return None
+        if isinstance(value, str):
+            normalized = value.strip().replace(".", "").replace(",", ".")
+            return float(normalized)
         return float(value)
     except (TypeError, ValueError):
         return None
@@ -72,6 +75,37 @@ def is_non_visual_line_item(item: dict[str, Any]) -> bool:
     if position_no in {"000", "0"} and description in {"vorbemerkungen", "vorbemerkung"}:
         return True
     return False
+
+
+def item_dimension_ratio(item: dict[str, Any]) -> float | None:
+    metadata = metadata_dict(item)
+    width_raw = item.get("width_raw")
+    height_raw = item.get("height_raw")
+    if width_raw in (None, ""):
+        width_raw = metadata.get("width_raw")
+    if height_raw in (None, ""):
+        height_raw = metadata.get("height_raw")
+    width = _to_float(width_raw)
+    height = _to_float(height_raw)
+    if width is None or height is None or width <= 0 or height <= 0:
+        return None
+    return max(width, height) / min(width, height)
+
+
+def image_dimension_ratio(image: dict[str, Any]) -> float | None:
+    width = _to_int(image.get("width")) or 0
+    height = _to_int(image.get("height")) or 0
+    if width <= 0 or height <= 0:
+        return None
+    return max(width, height) / min(width, height)
+
+
+def image_aspect_difference(item: dict[str, Any], image: dict[str, Any]) -> float | None:
+    item_ratio = item_dimension_ratio(item)
+    image_ratio = image_dimension_ratio(image)
+    if item_ratio is None or image_ratio is None:
+        return None
+    return abs(item_ratio - image_ratio)
 
 
 def is_viable_auto_assignment_image(image: dict[str, Any]) -> bool:

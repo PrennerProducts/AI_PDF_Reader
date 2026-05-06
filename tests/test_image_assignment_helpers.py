@@ -199,6 +199,39 @@ def test_candidate_images_prefer_same_page_visual_over_next_page_carryover() -> 
     assert [candidate["id"] for candidate in candidates] == [11]
 
 
+def test_candidate_images_keep_next_page_option_when_size_hint_exists() -> None:
+    item = {
+        "page_ref": 7,
+        "image_candidate_ids": [13814, 13815],
+        "image_assignment_is_final": False,
+        "image_next_page_allowed": True,
+        "width_raw": "2500",
+        "height_raw": "2135",
+    }
+    image_by_id = {
+        13814: {
+            "id": 13814,
+            "page_ref": 7,
+            "width": 1200,
+            "height": 219,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+        13815: {
+            "id": 13815,
+            "page_ref": 8,
+            "width": 1200,
+            "height": 1059,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+    }
+
+    candidates = _candidate_images_for_item(item, image_by_id, max_candidates=4)
+
+    assert [candidate["id"] for candidate in candidates] == [13815, 13814]
+
+
 def test_candidate_images_use_page_all_when_primary_candidates_miss_same_page_visual() -> None:
     item = {
         "page_ref": 1,
@@ -283,6 +316,39 @@ def test_heuristic_image_match_prefers_layout_candidate_over_larger_lower_image(
     match = _heuristic_match_for_item(item, candidates, allow_multiple=False)
 
     assert match["selected_image_ids"] == [9586]
+
+
+def test_heuristic_image_match_prefers_aspect_ratio_fit_over_same_page_strip() -> None:
+    item = {
+        "page_ref": 7,
+        "image_assignment_is_final": False,
+        "image_next_page_allowed": True,
+        "width_raw": "2500",
+        "height_raw": "2135",
+    }
+    candidates = [
+        {
+            "id": 13814,
+            "page_ref": 7,
+            "width": 1200,
+            "height": 219,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+        {
+            "id": 13815,
+            "page_ref": 8,
+            "width": 1200,
+            "height": 1059,
+            "is_probably_decorative": False,
+            "is_repeated_across_pages": False,
+        },
+    ]
+
+    match = _heuristic_match_for_item(item, candidates, allow_multiple=False)
+
+    assert match["selected_image_ids"] == [13815]
+    assert match["scores"][0]["image_id"] == 13815
 
 
 def test_heuristic_image_match_keeps_candidates_but_blocks_unsafe_auto_match() -> None:
