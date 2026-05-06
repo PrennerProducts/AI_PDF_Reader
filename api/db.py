@@ -13,9 +13,11 @@ from image_assignment import (
     focused_image_ids,
     image_aspect_difference,
     image_layout_sort_key,
+    image_within_item_vertical_window,
     item_dimension_ratio,
     is_non_visual_line_item,
     is_viable_auto_assignment_image,
+    is_viable_auto_assignment_image_for_item,
     metadata_dict,
     metadata_image_assignment,
     metadata_review_state,
@@ -1136,6 +1138,12 @@ def _is_probably_decorative_image(image: dict[str, Any], repeated_hashes: set[st
     return False
 
 
+def _has_image_geometry(image: dict[str, Any]) -> bool:
+    width = _to_int(image.get("width")) or 0
+    height = _to_int(image.get("height")) or 0
+    return width > 0 and height > 0
+
+
 def _pick_candidate_images_for_page(
     page_images: list[dict[str, Any]],
     repeated_hashes: set[str],
@@ -1334,6 +1342,16 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             for image_id in prev_candidates
             if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
         ]
+        current_page_pool_ids = [
+            image_id
+            for image_id in current_candidates
+            if _has_image_geometry(image_by_id.get(image_id, {}))
+        ]
+        next_page_pool_ids = [
+            image_id
+            for image_id in next_candidates
+            if _has_image_geometry(image_by_id.get(image_id, {}))
+        ]
         incoming_carryover_ids = (
             spare_carryover_image_ids(current_viable_page_ids, next_page_visual_item_count=visual_item_count)
             if prev_visual_item_count > len(prev_viable_page_ids)
@@ -1349,21 +1367,49 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         for item_offset, item_idx in enumerate(sorted_item_indexes):
             item = line_item_list[item_idx]
             visual_item_offset = visual_item_order.get(item_idx)
-            slot_image_id = page_visual_slot_image_id(own_current_viable_page_ids, visual_item_offset)
+            item_scoped_current_viable_page_ids = [
+                image_id
+                for image_id in current_page_pool_ids
+                if is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
+            ]
+            item_scoped_next_viable_page_ids = [
+                image_id
+                for image_id in next_page_pool_ids
+                if is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
+            ]
+            slot_image_id = page_visual_slot_image_id(item_scoped_current_viable_page_ids, visual_item_offset)
+            if slot_image_id is None and len(item_scoped_current_viable_page_ids) == 1:
+                slot_image_id = item_scoped_current_viable_page_ids[0]
             item_page_end_ref = _to_int(item.get("page_end_ref"))
             spans_to_next_page = bool(item_page_end_ref is not None and item_page_end_ref > page_ref)
             aspect_prefers_next_page = _prefer_next_page_for_aspect_fit(
                 item,
                 current_image_id=slot_image_id,
-                next_page_image_ids=next_viable_page_ids,
+                next_page_image_ids=item_scoped_next_viable_page_ids,
                 image_by_id=image_by_id,
             )
+            window_prefers_next_page = bool(
+                item_dimension_ratio(item) is not None
+                and not item_scoped_current_viable_page_ids
+                and item_scoped_next_viable_page_ids
+            )
+            carryover_window_prefers_next_page = bool(
+                metadata_dict(item).get("next_page_first_item_top_ratio") is not None
+                and not item_scoped_current_viable_page_ids
+                and item_scoped_next_viable_page_ids
+            )
             neighbor_pool_ids = carryover_neighbor_ids
-            if aspect_prefers_next_page:
-                neighbor_pool_ids = _dedupe_ints(carryover_neighbor_ids + next_viable_page_ids)
+            if aspect_prefers_next_page or window_prefers_next_page or carryover_window_prefers_next_page:
+                neighbor_pool_ids = _dedupe_ints(carryover_neighbor_ids + item_scoped_next_viable_page_ids)
             allow_next_page_candidates = bool(
                 neighbor_pool_ids
-                and (spans_to_next_page or item_idx == last_visual_item_idx or aspect_prefers_next_page)
+                and (
+                    spans_to_next_page
+                    or item_idx == last_visual_item_idx
+                    or aspect_prefers_next_page
+                    or window_prefers_next_page
+                    or carryover_window_prefers_next_page
+                )
             )
             item["image_next_page_allowed"] = allow_next_page_candidates
             if is_non_visual_line_item(item):
@@ -1383,7 +1429,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             has_assignment_decision = bool(assignment_meta.get("has_decision"))
 
             focused_current = focused_image_ids(
-                own_current_viable_page_ids,
+                item_scoped_current_viable_page_ids,
                 item_count=max(1, visual_item_count),
                 item_index=visual_item_offset if visual_item_offset is not None else item_offset,
                 max_candidates=4,
@@ -1394,7 +1440,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             manual_candidate_current = [
                 image_id
                 for image_id in focused_current
-                if image_id != slot_image_id and is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+                if image_id != slot_image_id and is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
             ]
             focused_neighbor = focused_image_ids(
                 neighbor_pool_ids if allow_next_page_candidates else [],
@@ -1405,7 +1451,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             viable_neighbor = [
                 image_id
                 for image_id in focused_neighbor
-                if is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+                if is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
             ]
             focused_fallback = focused_image_ids(
                 _dedupe_ints(
@@ -1421,6 +1467,8 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 and viable_neighbor
                 and (
                     aspect_prefers_next_page
+                    or window_prefers_next_page
+                    or carryover_window_prefers_next_page
                     or (
                         visual_item_offset is not None
                         and slot_image_id is None

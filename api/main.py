@@ -43,15 +43,18 @@ from document_package import build_document_package_result
 from exporter import build_export_content
 from image_assignment import (
     image_aspect_difference,
+    image_within_item_vertical_window,
     item_dimension_ratio,
     is_non_visual_line_item,
     is_viable_auto_assignment_image,
+    is_viable_auto_assignment_image_for_item,
     page_candidate_rank,
     rebalance_unique_primary_image_assignments,
 )
 from image_preview import browser_preview_for_image
 from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
+from template_alu_one import extract_line_item_layout_hints as extract_alu_one_line_item_layout_hints
 from template_koch_detail import parse_page_details as parse_koch_detail_page_details
 from vendoc_exporter import build_vendoc_payload
 from vendoc_mssql import build_srtemp_export_preview, check_connection, config_from_env, driver_status, write_srtemp_payload
@@ -430,6 +433,7 @@ def _item_for_image_matching(item: dict[str, Any]) -> dict[str, Any]:
     # previous bad heuristic result can become "final" input for the next run.
     clone = dict(item)
     clone["image_assignment_is_final"] = False
+    clone["image_auto_match_allowed"] = True
     clone["image_ids"] = []
     clone["image_ids_primary"] = []
     return clone
@@ -510,7 +514,7 @@ def _candidate_images_for_item(
         has_same_page_viable_primary = any(
             (
                 _to_int_safe(image_by_id.get(image_id, {}).get("page_ref")) == page_ref_for_matching
-                and is_viable_auto_assignment_image(image_by_id.get(image_id, {}))
+                and is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
             )
             for image_id in primary_ids_for_matching
         )
@@ -548,6 +552,8 @@ def _candidate_images_for_item(
         if image is None:
             continue
         image_page = _to_int_safe(image.get("page_ref"))
+        if not image_assignment_is_final and not image_within_item_vertical_window(item, image):
+            continue
         if (
             not image_assignment_is_final
             and page_ref is not None
@@ -558,7 +564,7 @@ def _candidate_images_for_item(
                 image_page == page_ref + 1
                 and next_page_allowed
                 and (prefers_next_page or not same_page_viable_exists or has_size_hint)
-                and is_viable_auto_assignment_image(image)
+                and is_viable_auto_assignment_image_for_item(item, image)
             )
             if not same_page and not next_page_carryover:
                 continue
@@ -630,7 +636,7 @@ def _heuristic_match_for_item(
     same_page_viable_exists = any(
         (
             _to_int_safe(image.get("page_ref")) == page_ref
-            and is_viable_auto_assignment_image(image)
+            and is_viable_auto_assignment_image_for_item(item, image)
         )
         for image in candidate_images
     )
@@ -641,6 +647,8 @@ def _heuristic_match_for_item(
         if image_id is None:
             continue
         image_page = _to_int_safe(image.get("page_ref"))
+        if not image_assignment_is_final and not image_within_item_vertical_window(item, image):
+            continue
         if (
             not image_assignment_is_final
             and page_ref is not None
@@ -651,7 +659,7 @@ def _heuristic_match_for_item(
                 image_page == page_ref + 1
                 and next_page_allowed
                 and (prefers_next_page or not same_page_viable_exists or has_size_hint)
-                and is_viable_auto_assignment_image(image)
+                and is_viable_auto_assignment_image_for_item(item, image)
             )
             if not same_page and not next_page_carryover:
                 continue
@@ -775,9 +783,57 @@ def _build_amount_line_rows(extracted_text: str, totals: dict[str, str | None]) 
     return rows
 
 
-def _build_line_item_rows(extracted_text: str, template: str) -> list[dict]:
+def _build_line_item_rows(extracted_text: str, template: str, source_path: Path | None = None) -> list[dict]:
     rows: list[dict] = []
-    for item in extract_line_items(extracted_text, template):
+    items = extract_line_items(extracted_text, template)
+    if template == "alu_one" and source_path is not None and source_path.exists():
+        try:
+            hints = extract_alu_one_line_item_layout_hints(source_path)
+        except Exception:
+            hints = []
+        hint_index = 0
+        for item in items:
+            position_no = str(item.get("position_no") or "").strip()
+            page_ref = _to_int_safe(item.get("page_ref"))
+            while hint_index < len(hints):
+                hint = hints[hint_index]
+                hint_pos = str(hint.get("position_no") or "").strip()
+                hint_page = _to_int_safe(hint.get("page_ref"))
+                if hint_pos == position_no and hint_page == page_ref:
+                    item["item_top_ratio"] = hint.get("item_top_ratio")
+                    hint_index += 1
+                    break
+                hint_index += 1
+        hinted_items = [item for item in items if item.get("item_top_ratio") is not None and _to_int_safe(item.get("page_ref")) is not None]
+        for idx, item in enumerate(hinted_items[:-1]):
+            next_item = hinted_items[idx + 1]
+            item["next_position_page_ref"] = _to_int_safe(next_item.get("page_ref"))
+            item["next_position_top_ratio"] = next_item.get("item_top_ratio")
+
+        page_groups: dict[int, list[dict[str, Any]]] = {}
+        for item in items:
+            page_ref = _to_int_safe(item.get("page_ref"))
+            if page_ref is None:
+                continue
+            if item.get("item_top_ratio") is None:
+                continue
+            page_groups.setdefault(page_ref, []).append(item)
+        for page_items in page_groups.values():
+            page_items.sort(key=lambda entry: float(entry.get("item_top_ratio") or 0.0))
+            for idx, item in enumerate(page_items[:-1]):
+                next_item = page_items[idx + 1]
+                item["next_item_top_ratio"] = next_item.get("item_top_ratio")
+        ordered_pages = sorted(page_groups)
+        for page_idx, page_ref in enumerate(ordered_pages[:-1]):
+            current_items = page_groups.get(page_ref) or []
+            next_page_items = page_groups.get(ordered_pages[page_idx + 1]) or []
+            if not current_items or not next_page_items:
+                continue
+            last_item = max(current_items, key=lambda entry: float(entry.get("item_top_ratio") or 0.0))
+            first_next_item = min(next_page_items, key=lambda entry: float(entry.get("item_top_ratio") or 0.0))
+            last_item["next_page_first_item_top_ratio"] = first_next_item.get("item_top_ratio")
+
+    for item in items:
         quantity = _parse_eu_decimal(item.get("quantity_raw"))
         width_mm = _parse_eu_decimal(item.get("width_raw"))
         height_mm = _parse_eu_decimal(item.get("height_raw"))
@@ -794,6 +850,16 @@ def _build_line_item_rows(extracted_text: str, template: str) -> list[dict]:
         if page_end_ref is not None:
             metadata["page_end_ref"] = page_end_ref
             metadata["spans_page_break"] = bool(item.get("spans_page_break"))
+        if item.get("item_top_ratio") is not None:
+            metadata["item_top_ratio"] = float(item.get("item_top_ratio"))
+        if item.get("next_item_top_ratio") is not None:
+            metadata["next_item_top_ratio"] = float(item.get("next_item_top_ratio"))
+        if item.get("next_page_first_item_top_ratio") is not None:
+            metadata["next_page_first_item_top_ratio"] = float(item.get("next_page_first_item_top_ratio"))
+        if item.get("next_position_page_ref") is not None:
+            metadata["next_position_page_ref"] = int(item.get("next_position_page_ref"))
+        if item.get("next_position_top_ratio") is not None:
+            metadata["next_position_top_ratio"] = float(item.get("next_position_top_ratio"))
         if "image_required" in item:
             metadata["image_required"] = bool(item.get("image_required"))
         referenced_lv_pos = _clean_optional_str(item.get("referenced_lv_pos"))
@@ -2168,7 +2234,7 @@ def process_document(
             extracted_text,
             parsed.get("totals") if isinstance(parsed.get("totals"), dict) else {},
         )
-        line_item_rows = _build_line_item_rows(extracted_text, template)
+        line_item_rows = _build_line_item_rows(extracted_text, template, source_path=source_path)
 
         _set_process_progress(
             document_id,

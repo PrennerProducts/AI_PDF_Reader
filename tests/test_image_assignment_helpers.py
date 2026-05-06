@@ -6,6 +6,7 @@ sys.path.insert(0, str(ROOT / "api"))
 
 from image_assignment import (
     focused_image_ids,
+    image_within_item_vertical_window,
     image_layout_sort_key,
     is_non_visual_line_item,
     metadata_image_assignment,
@@ -230,6 +231,72 @@ def test_candidate_images_keep_next_page_option_when_size_hint_exists() -> None:
     candidates = _candidate_images_for_item(item, image_by_id, max_candidates=4)
 
     assert [candidate["id"] for candidate in candidates] == [13815, 13814]
+
+
+def test_image_window_allows_next_page_image_before_next_item_header() -> None:
+    item = {
+        "page_ref": 6,
+        "metadata_json": {
+            "item_top_ratio": 0.85506,
+            "next_page_first_item_top_ratio": 0.603573,
+        },
+    }
+    image = {
+        "page_ref": 7,
+        "metadata_json": {
+            "top_ratio": 0.168014,
+            "center_y_ratio": 0.200773,
+        },
+    }
+
+    assert image_within_item_vertical_window(item, image) is True
+
+
+def test_image_window_blocks_next_page_image_after_next_item_header() -> None:
+    item = {
+        "page_ref": 6,
+        "metadata_json": {
+            "item_top_ratio": 0.85506,
+            "next_page_first_item_top_ratio": 0.603573,
+        },
+    }
+    image = {
+        "page_ref": 7,
+        "metadata_json": {
+            "top_ratio": 0.640000,
+            "center_y_ratio": 0.700000,
+        },
+    }
+
+    assert image_within_item_vertical_window(item, image) is False
+
+
+def test_image_window_uses_global_next_position_interval_across_pages() -> None:
+    item = {
+        "page_ref": 6,
+        "metadata_json": {
+            "item_top_ratio": 0.85506,
+            "next_position_page_ref": 7,
+            "next_position_top_ratio": 0.603573,
+        },
+    }
+    before_next_position = {
+        "page_ref": 7,
+        "metadata_json": {
+            "top_ratio": 0.168014,
+            "center_y_ratio": 0.200773,
+        },
+    }
+    after_next_position = {
+        "page_ref": 7,
+        "metadata_json": {
+            "top_ratio": 0.640000,
+            "center_y_ratio": 0.700000,
+        },
+    }
+
+    assert image_within_item_vertical_window(item, before_next_position) is True
+    assert image_within_item_vertical_window(item, after_next_position) is False
 
 
 def test_candidate_images_use_page_all_when_primary_candidates_miss_same_page_visual() -> None:

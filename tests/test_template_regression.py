@@ -397,10 +397,13 @@ def test_muigg_regression() -> None:
     assert items[0]["description_short"] == "Portal 4501 x 2500"
     assert items[0]["width_raw"] == "4501"
     assert items[0]["height_raw"] == "2500"
+    assert items[0]["image_required"] is True
     assert items[1]["position_no"] == "001.1"
     assert items[1]["description_short"] == 'Az "2-farbig RAL/RAL"'
+    assert items[1]["image_required"] is False
     assert items[-1]["position_no"] == "Z01"
     assert items[-1]["line_total_raw"] == "75,00"
+    assert items[-1]["image_required"] is False
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
 
 

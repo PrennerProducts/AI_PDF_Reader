@@ -89,6 +89,18 @@ def _extract_lv_pos(block_text: str) -> str | None:
     return None
 
 
+def _image_required(position_no: str, description_short: str, width_raw: str | None, height_raw: str | None) -> bool:
+    normalized_position = normalize_line(position_no).lower()
+    normalized_description = normalize_line(description_short).lower()
+    if normalized_position.startswith("z"):
+        return False
+    if normalized_description.startswith(("az ", "az-", "lieferung", "montage", "fracht", "transport")):
+        return False
+    if "." in normalized_position and (not width_raw or not height_raw):
+        return False
+    return True
+
+
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
     document_number = headers.get("document_number") or _normalize_document_number(
         first_match(
@@ -146,9 +158,10 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         width_raw, height_raw = _extract_dimensions(description_short)
         is_alternative = "(" in match.group("line_total") and ")" in match.group("line_total")
 
+        position_no = match.group("position").upper()
         items.append(
             {
-                "position_no": match.group("position").upper(),
+                "position_no": position_no,
                 "lv_pos": _extract_lv_pos(block_text),
                 "is_alternative": is_alternative,
                 "quantity_raw": match.group("qty"),
@@ -160,6 +173,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "unit_price_raw": _clean_amount(match.group("unit_price")),
                 "line_total_raw": _clean_amount(match.group("line_total")),
                 "page_ref": page_ref_from_offset(normalized_text, match.start()),
+                "image_required": _image_required(position_no, description_short, width_raw, height_raw),
             }
         )
 

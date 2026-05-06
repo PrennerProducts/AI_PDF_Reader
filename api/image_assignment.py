@@ -108,6 +108,42 @@ def image_aspect_difference(item: dict[str, Any], image: dict[str, Any]) -> floa
     return abs(item_ratio - image_ratio)
 
 
+def image_within_item_vertical_window(item: dict[str, Any], image: dict[str, Any]) -> bool:
+    item_meta = metadata_dict(item)
+    image_meta = metadata_dict(image)
+    item_page_ref = _to_int(item.get("page_ref"))
+    image_page_ref = _to_int(image.get("page_ref"))
+    item_top_ratio = _to_float(item_meta.get("item_top_ratio"))
+    next_item_top_ratio = _to_float(item_meta.get("next_item_top_ratio"))
+    next_page_first_item_top_ratio = _to_float(item_meta.get("next_page_first_item_top_ratio"))
+    next_position_page_ref = _to_int(item_meta.get("next_position_page_ref"))
+    next_position_top_ratio = _to_float(item_meta.get("next_position_top_ratio"))
+    image_anchor_ratio = _to_float(image_meta.get("center_y_ratio"))
+    if image_anchor_ratio is None:
+        image_anchor_ratio = _to_float(image_meta.get("top_ratio"))
+    if item_top_ratio is None or image_anchor_ratio is None:
+        return True
+    if item_page_ref is not None and image_page_ref is not None and next_position_page_ref is not None and next_position_top_ratio is not None:
+        if image_page_ref < item_page_ref or image_page_ref > next_position_page_ref:
+            return False
+        if image_page_ref == item_page_ref and image_anchor_ratio < max(0.0, item_top_ratio - 0.01):
+            return False
+        if next_position_page_ref == item_page_ref:
+            return image_anchor_ratio < max(0.0, next_position_top_ratio - 0.01)
+        if image_page_ref == next_position_page_ref:
+            return image_anchor_ratio < max(0.0, next_position_top_ratio - 0.01)
+        return True
+    if item_page_ref is not None and image_page_ref is not None and image_page_ref == item_page_ref + 1:
+        if next_page_first_item_top_ratio is None:
+            return True
+        return image_anchor_ratio < max(0.0, next_page_first_item_top_ratio - 0.01)
+    if image_anchor_ratio < max(0.0, item_top_ratio - 0.01):
+        return False
+    if next_item_top_ratio is not None and image_anchor_ratio >= max(0.0, next_item_top_ratio - 0.01):
+        return False
+    return True
+
+
 def is_viable_auto_assignment_image(image: dict[str, Any]) -> bool:
     if not isinstance(image, dict):
         return False
@@ -116,6 +152,28 @@ def is_viable_auto_assignment_image(image: dict[str, Any]) -> bool:
     width = _to_int(image.get("width")) or 0
     height = _to_int(image.get("height")) or 0
     return width > 0 and height > 0
+
+
+def is_viable_auto_assignment_image_for_item(item: dict[str, Any], image: dict[str, Any]) -> bool:
+    if not isinstance(image, dict):
+        return False
+    if not image_within_item_vertical_window(item, image):
+        return False
+    if is_viable_auto_assignment_image(image):
+        return True
+    if not image.get("is_probably_decorative"):
+        return False
+
+    item_ratio = item_dimension_ratio(item)
+    image_ratio = image_dimension_ratio(image)
+    width = _to_int(image.get("width")) or 0
+    height = _to_int(image.get("height")) or 0
+    if item_ratio is None or image_ratio is None:
+        return False
+
+    # Alu-one long facade elements can be legitimate ultra-wide line drawings.
+    # They look like decorative strips unless the item dimensions are also wide.
+    return item_ratio >= 4.0 and image_ratio >= 4.0 and width >= 500 and height >= 100
 
 
 def metadata_dict(row: dict[str, Any]) -> dict[str, Any]:

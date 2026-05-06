@@ -1,5 +1,8 @@
 import re
+from pathlib import Path
 from typing import Any
+
+import fitz
 
 from template_common import extract_first_description, normalize_line, normalize_text, page_ref_from_offset, trim_block_lines
 from template_headers import (
@@ -11,8 +14,9 @@ from template_headers import (
 )
 
 AMOUNT_PATTERN = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
+POSITION_PATTERN = r"\d{3}(?:[A-Za-z]|-\d+)?"
 ITEM_HEADER_RE = re.compile(
-    rf"^\s*(?P<position>\d{{3}}[A-Za-z]?)\s+"
+    rf"^\s*(?P<position>{POSITION_PATTERN})\s+"
     rf"(?P<qty>[0-9]+(?:[.,][0-9]+)?)\s+"
     rf"(?P<unit>Stk|Stück|LFM|lfm)\s+"
     rf"(?P<label>.+?)"
@@ -130,6 +134,97 @@ def _extract_description_short(header_label: str, body_lines: list[str]) -> str 
         ),
     )
     return fallback or clean_header or None
+
+
+def extract_line_item_layout_hints(pdf_path: Path) -> list[dict[str, Any]]:
+    hints: list[dict[str, Any]] = []
+    document = fitz.open(str(pdf_path))
+    try:
+        for page_idx in range(document.page_count):
+            page_ref = page_idx + 1
+            page = document.load_page(page_idx)
+            page_height = float(page.rect.height or 0)
+            if page_height <= 0:
+                continue
+            try:
+                text_dict = page.get_text("dict")
+            except Exception:
+                continue
+            line_entries: list[dict[str, float | str]] = []
+            for block in text_dict.get("blocks", []):
+                if not isinstance(block, dict) or block.get("type") != 0:
+                    continue
+                for line in block.get("lines", []):
+                    spans = line.get("spans", [])
+                    line_text = normalize_line("".join(str(span.get("text") or "") for span in spans))
+                    bbox = line.get("bbox")
+                    if not line_text or not isinstance(bbox, (tuple, list)) or len(bbox) < 4:
+                        continue
+                    try:
+                        x0 = float(bbox[0])
+                        y0 = float(bbox[1])
+                    except (TypeError, ValueError):
+                        continue
+                    line_entries.append({"text": line_text, "x0": x0, "y0": y0})
+
+            line_entries.sort(key=lambda entry: (float(entry["y0"]), float(entry["x0"])))
+            row_groups: list[dict[str, Any]] = []
+            for entry in line_entries:
+                if row_groups and abs(float(entry["y0"]) - float(row_groups[-1]["y0"])) <= 1.5:
+                    row_groups[-1]["entries"].append(entry)
+                    continue
+                row_groups.append({"y0": float(entry["y0"]), "entries": [entry]})
+
+            seen_positions: set[tuple[int, str]] = set()
+            for group in row_groups:
+                entries = sorted(group["entries"], key=lambda entry: float(entry["x0"]))
+                texts = [str(entry["text"]) for entry in entries]
+                position_text = next(
+                    (text for text in texts if re.fullmatch(POSITION_PATTERN, text)),
+                    None,
+                )
+                if not position_text:
+                    continue
+                qty_unit_text = next(
+                    (
+                        text
+                        for text in texts
+                        if re.fullmatch(r"[0-9]+(?:[.,][0-9]+)?\s+(?:Stk|Stück|LFM|lfm)", text)
+                    ),
+                    None,
+                )
+                if not qty_unit_text:
+                    continue
+                euro_count = sum(1 for text in texts if "€" in text or "EUR" in text.upper())
+                label_text = next(
+                    (
+                        text
+                        for text in texts
+                        if text not in {position_text, qty_unit_text}
+                        and "€" not in text
+                        and "eur" not in text.lower()
+                    ),
+                    None,
+                )
+                if not label_text:
+                    continue
+                if euro_count == 0 and " mm x " not in label_text.lower():
+                    continue
+                hint_key = (page_ref, position_text)
+                if hint_key in seen_positions:
+                    continue
+                seen_positions.add(hint_key)
+                top = float(group["y0"])
+                hints.append(
+                    {
+                        "position_no": position_text,
+                        "page_ref": page_ref,
+                        "item_top_ratio": round(max(0.0, min(1.0, top / page_height)), 6),
+                    }
+                )
+    finally:
+        document.close()
+    return hints
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:
