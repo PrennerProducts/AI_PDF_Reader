@@ -236,3 +236,22 @@ def test_strip_prices_from_long_text_removes_embedded_price_lines() -> None:
             "12 Stück B/H: 950,0 x 1300,0",
         ]
     )
+
+
+def test_strip_prices_from_long_text_keeps_weights_and_measurements() -> None:
+    raw = "\n".join(
+        [
+            "59,36 kg / Elementumfang 4,5 lfm",
+            "95,6 kg / Elementumfang 6,8 lfm",
+            "EP: 1 385,02 GP: € 16.620,24",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw)
+
+    assert cleaned == "\n".join(
+        [
+            "59,36 kg / Elementumfang 4,5 lfm",
+            "95,6 kg / Elementumfang 6,8 lfm",
+        ]
+    )

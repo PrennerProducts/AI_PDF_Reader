@@ -9,7 +9,7 @@ from vendoc_rtf import build_vendoc_long_text_rtf
 
 
 VENDOC_NAMESPACE = UUID("8f0f8c50-0f58-45d8-b8e5-83a0f7e79a11")
-PRICE_AMOUNT_PATTERN = re.compile(r"(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?")
+PRICE_AMOUNT_PATTERN = re.compile(r"(?:€\s*\d{1,3}(?:[ .]\d{3})*,\d{2}|\d{1,3}(?:[ .]\d{3})*,\d{2}\s*€)")
 PRICE_LABEL_PATTERN = re.compile(r"\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?", re.IGNORECASE)
 
 SUPPLIER_ID_ALIASES: dict[str, str] = {
