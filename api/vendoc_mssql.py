@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -10,6 +11,7 @@ from typing import Any
 HEADER_TABLE = "dbo.vendoc_import_headers"
 POSITION_TABLE = "dbo.vendoc_import_positions"
 ODBC_DRIVER = "ODBC Driver 18 for SQL Server"
+DEFAULT_CUSTOMER_VIEW = "dbo.Kundendaten"
 
 HEADER_COLUMNS = [
     "external_document_id",
@@ -29,6 +31,7 @@ HEADER_COLUMNS = [
     "created_at",
     "subject",
     "tax_type",
+    "customer_id",
 ]
 
 POSITION_COLUMNS = [
@@ -144,6 +147,10 @@ def config_from_env() -> VendocMssqlConfig | None:
     )
 
 
+def customer_view_from_env() -> str:
+    return _clean(os.getenv("VENDOC_MSSQL_CUSTOMER_VIEW")) or DEFAULT_CUSTOMER_VIEW
+
+
 def driver_status() -> dict[str, Any]:
     try:
         import pyodbc  # type: ignore
@@ -211,6 +218,62 @@ def check_connection(config: VendocMssqlConfig) -> dict[str, Any]:
         "message": "MSSQL connection ok.",
         "database": database_name,
         "driver": status,
+    }
+
+
+def _validated_sql_object_name(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("Missing MSSQL object name.")
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,2}", text):
+        raise ValueError(f"Unsupported MSSQL object name: {value!r}")
+    return text
+
+
+def list_customer_options(config: VendocMssqlConfig, *, view_name: str | None = None) -> dict[str, Any]:
+    status = driver_status()
+    if not status["available"]:
+        raise RuntimeError(status["error"] or f"{ODBC_DRIVER} not installed")
+
+    resolved_view = _validated_sql_object_name(view_name or customer_view_from_env())
+    query = f"""
+        SELECT
+            KontaktOid,
+            Inaktiv,
+            UIDNummer,
+            Kundennummer,
+            Anzeigename
+        FROM {resolved_view}
+        ORDER BY
+            CASE WHEN COALESCE(Inaktiv, 0) = 0 THEN 0 ELSE 1 END,
+            Anzeigename,
+            Kundennummer;
+    """
+
+    items: list[dict[str, Any]] = []
+    with _connect(config) as conn:
+        cursor = conn.cursor()
+        rows = cursor.execute(query).fetchall()
+        for row in rows:
+            contact_oid = _to_str(row[0])
+            inactive_raw = row[1]
+            uid_number = _to_str(row[2])
+            customer_number = _to_str(row[3])
+            display_name = _to_str(row[4])
+            items.append(
+                {
+                    "contact_oid": contact_oid,
+                    "inactive": bool(inactive_raw) if inactive_raw is not None else False,
+                    "uid_number": uid_number,
+                    "customer_number": customer_number,
+                    "display_name": display_name,
+                }
+            )
+
+    return {
+        "view_name": resolved_view,
+        "items": items,
+        "count": len(items),
     }
 
 

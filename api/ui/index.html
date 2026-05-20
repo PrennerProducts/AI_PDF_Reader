@@ -8028,6 +8028,46 @@
       line-height: 1.45;
     }
 
+    .app-v3 .vendoc-customer-controls {
+      display: grid;
+      gap: 8px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: #fbfbfd;
+    }
+
+    .app-v3 .vendoc-customer-controls label {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 760;
+      color: rgba(29, 29, 31, 0.72);
+    }
+
+    .app-v3 .vendoc-customer-controls select {
+      min-height: 42px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.14);
+      background: #fff;
+      color: rgba(29, 29, 31, 0.86);
+      font-size: 13px;
+      font-weight: 620;
+      padding: 0 12px;
+    }
+
+    .app-v3 .vendoc-customer-controls select:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      background: #f5f5f7;
+    }
+
+    .app-v3 .vendoc-customer-meta {
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .app-v3 .vendoc-export-actions {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -10274,6 +10314,15 @@
                     <span class="vendoc-status-pill pending" id="vendocExportState">Nicht geprüft</span>
                   </div>
                   <div class="vendoc-export-meta" id="vendocExportMeta">Noch kein Exportstatus geladen.</div>
+                  <div class="vendoc-customer-controls">
+                    <label for="vendocCustomerSelect">
+                      <span>Kunde in SRTemp</span>
+                      <select id="vendocCustomerSelect" aria-label="Kunde in SRTemp auswählen" disabled>
+                        <option value="">Kunden werden geladen ...</option>
+                      </select>
+                    </label>
+                    <div class="vendoc-customer-meta" id="vendocCustomerMeta">Noch keine Kundenliste geladen.</div>
+                  </div>
                   <div class="review-approval-actions vendoc-export-actions">
                     <button class="btn btn-ghost" id="vendocDryRunBtn" type="button">Dry-Run prüfen</button>
                     <button class="btn btn-ghost" id="vendocSqlPreviewBtn" type="button">SQL Vorschau</button>
@@ -10393,6 +10442,10 @@
       packageAutoDisabledForDocumentId: null,
       packagePreviewDocumentId: null,
       packageAppendOnNextUpload: false,
+      vendocCustomers: [],
+      vendocCustomersLoaded: false,
+      vendocCustomersViewName: "",
+      vendocCustomersError: "",
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -10434,6 +10487,8 @@
       resetBtn: document.getElementById("resetBtn"),
       vendocExportState: document.getElementById("vendocExportState"),
       vendocExportMeta: document.getElementById("vendocExportMeta"),
+      vendocCustomerSelect: document.getElementById("vendocCustomerSelect"),
+      vendocCustomerMeta: document.getElementById("vendocCustomerMeta"),
       vendocDryRunBtn: document.getElementById("vendocDryRunBtn"),
       vendocSqlPreviewBtn: document.getElementById("vendocSqlPreviewBtn"),
       vendocLiveExportBtn: document.getElementById("vendocLiveExportBtn"),
@@ -12590,6 +12645,7 @@
         [documentNumberLabel, document.document_number, "document_number", true],
         ["Datum", formatDate(document.document_date), "document_date", true],
         ["Projekt", document.project_ref, "project_ref", false],
+        ["Kunde (SRTemp)", document.customer_name, null, false],
         ["Waehrung", document.currency, "currency", true],
         ["Netto", euro(document.net_total), "totals.net_total", false],
         ["MwSt", euro(document.vat_total), "totals.vat_total", false],
@@ -13538,6 +13594,8 @@
         updateWorkflowNavigation();
         renderDiagnosticRun(null);
         syncFieldSources();
+        renderVendocCustomerSelect();
+        void loadVendocCustomers();
         const imageCount = (result.images || []).length;
         const itemCount = (result.line_items || []).length;
         const packagePrefix = usePackage ? `Multi-PDF-Paket #${documentId}` : `Dokument #${documentId}`;
@@ -13568,6 +13626,7 @@
         syncPdfControls();
         setDocumentApprovalPills(null);
         setVendocExportState("Nicht geprüft", "pending");
+        renderVendocCustomerSelect();
         updateWorkflowNavigation();
         renderReview(null);
         renderDocumentIssues(null);
@@ -13702,6 +13761,151 @@
       }
       if (ui.vendocExportMeta) {
         ui.vendocExportMeta.textContent = meta || "Noch kein Exportstatus geladen.";
+      }
+    }
+
+    function vendocCustomerKey(customer) {
+      if (!customer || typeof customer !== "object") return "";
+      return String(
+        customer.contact_oid
+        || customer.vendoc_customer_oid
+        || customer.customer_number
+        || customer.vendoc_customer_number
+        || customer.uid_number
+        || customer.vendoc_customer_uid_number
+        || customer.display_name
+        || customer.customer_name
+        || ""
+      ).trim();
+    }
+
+    function vendocCustomerOptionLabel(customer) {
+      const name = String(customer && (customer.display_name || customer.customer_name) || "").trim() || "Ohne Anzeigename";
+      const parts = [name];
+      if (customer && customer.customer_number) parts.push(`Kdnr ${customer.customer_number}`);
+      if (customer && customer.uid_number) parts.push(`UID ${customer.uid_number}`);
+      if (customer && customer.inactive) parts.push("inaktiv");
+      return parts.join(" · ");
+    }
+
+    function renderVendocCustomerSelect() {
+      if (!ui.vendocCustomerSelect || !ui.vendocCustomerMeta) return;
+      const documentPayload = state.result && state.result.document ? state.result.document : null;
+      const selectedKey = vendocCustomerKey(documentPayload);
+      const items = Array.isArray(state.vendocCustomers) ? state.vendocCustomers : [];
+      clearNode(ui.vendocCustomerSelect);
+
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = items.length
+        ? "Keinen Kunden auswählen"
+        : (state.vendocCustomersLoaded ? "Keine Kunden verfügbar" : "Kunden werden geladen ...");
+      ui.vendocCustomerSelect.appendChild(emptyOption);
+
+      for (const customer of items) {
+        const option = document.createElement("option");
+        option.value = vendocCustomerKey(customer);
+        option.textContent = vendocCustomerOptionLabel(customer);
+        if (option.value && option.value === selectedKey) option.selected = true;
+        ui.vendocCustomerSelect.appendChild(option);
+      }
+
+      ui.vendocCustomerSelect.disabled = !state.documentId || !items.length;
+      if (state.vendocCustomersError) {
+        ui.vendocCustomerMeta.textContent = `Kundenliste konnte nicht geladen werden: ${state.vendocCustomersError}`;
+      } else if (!state.vendocCustomersLoaded) {
+        ui.vendocCustomerMeta.textContent = "Kundenliste aus SRTemp wird geladen ...";
+      } else if (!items.length) {
+        ui.vendocCustomerMeta.textContent = "Keine Kunden aus SRTemp geladen.";
+      } else if (documentPayload && documentPayload.customer_name) {
+        ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen · ausgewählt: ${vendocCustomerOptionLabel(documentPayload)}`;
+      } else {
+        ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen.`;
+      }
+    }
+
+    async function loadVendocCustomers(force = false) {
+      if (state.vendocCustomersLoaded && !force) {
+        renderVendocCustomerSelect();
+        return state.vendocCustomers;
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+        let response;
+        try {
+          response = await fetch("/vendoc/customers", { signal: controller.signal });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+        const payload = text ? JSON.parse(text) : {};
+        state.vendocCustomers = Array.isArray(payload.items) ? payload.items : [];
+        state.vendocCustomersViewName = String(payload.view_name || "");
+        state.vendocCustomersLoaded = true;
+        state.vendocCustomersError = "";
+      } catch (error) {
+        state.vendocCustomers = [];
+        state.vendocCustomersLoaded = false;
+        state.vendocCustomersViewName = "";
+        state.vendocCustomersError = error && error.name === "AbortError"
+          ? "Zeitüberschreitung beim Laden aus SRTemp."
+          : String(error.message).slice(0, 220);
+      }
+      renderVendocCustomerSelect();
+      return state.vendocCustomers;
+    }
+
+    async function saveVendocCustomerSelection() {
+      if (!state.documentId || !ui.vendocCustomerSelect) return;
+      const selectedKey = String(ui.vendocCustomerSelect.value || "").trim();
+      const selectedCustomer = (state.vendocCustomers || []).find((item) => vendocCustomerKey(item) === selectedKey) || null;
+      ui.vendocCustomerSelect.disabled = true;
+      try {
+        const payload = selectedCustomer
+          ? {
+              contact_oid: selectedCustomer.contact_oid || null,
+              customer_number: selectedCustomer.customer_number || null,
+              uid_number: selectedCustomer.uid_number || null,
+              display_name: selectedCustomer.display_name || null,
+              inactive: !!selectedCustomer.inactive,
+            }
+          : {
+              contact_oid: null,
+              customer_number: null,
+              uid_number: null,
+              display_name: null,
+              inactive: null,
+            };
+        const response = await apiJson(`/documents/${state.documentId}/vendoc-customer`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (state.result && state.result.document) {
+          state.result.document.customer_name = response.customer_name || null;
+          state.result.document.vendoc_customer_oid = response.vendoc_customer_oid || null;
+          state.result.document.vendoc_customer_number = response.vendoc_customer_number || null;
+          state.result.document.vendoc_customer_uid_number = response.vendoc_customer_uid_number || null;
+          state.result.document.vendoc_customer_inactive = response.vendoc_customer_inactive;
+          syncCurrentDocumentIntoList(state.result.document);
+          renderSummary(state.result);
+        }
+        renderVendocCustomerSelect();
+        setStatus(
+          selectedCustomer
+            ? `VenDoc-Kunde gesetzt: ${vendocCustomerOptionLabel(selectedCustomer)}.`
+            : "VenDoc-Kunde zurückgesetzt.",
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`VenDoc-Kunde konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+        renderVendocCustomerSelect();
+      } finally {
+        ui.vendocCustomerSelect.disabled = !state.documentId || !state.vendocCustomers.length;
       }
     }
 
@@ -14263,6 +14467,11 @@
     ui.vendocLiveExportBtn.addEventListener("click", async () => {
       await runVendocLiveExport();
     });
+    if (ui.vendocCustomerSelect) {
+      ui.vendocCustomerSelect.addEventListener("change", async () => {
+        await saveVendocCustomerSelection();
+      });
+    }
     ui.copyPreviewBtn.addEventListener("click", async () => {
       await copyPreviewContent();
     });
@@ -14293,6 +14502,7 @@
 
     closePreviewModal();
     setExtractTab(state.activeExtractTab);
+    renderVendocCustomerSelect();
     renderReview(null);
     renderReviewWorkbench(null);
     renderDocumentIssues(null);

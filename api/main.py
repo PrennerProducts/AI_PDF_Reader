@@ -37,6 +37,7 @@ from db import (
     update_document_approval_state,
     update_document_parse_result,
     update_document_status,
+    update_document_vendoc_customer,
 )
 from extractor import extract_pdf_images, extract_pdf_text
 from document_package import build_document_package_result
@@ -57,7 +58,15 @@ from structured_parser import extract_amount_lines, extract_line_items
 from template_alu_one import extract_line_item_layout_hints as extract_alu_one_line_item_layout_hints
 from template_koch_detail import parse_page_details as parse_koch_detail_page_details
 from vendoc_exporter import build_vendoc_payload
-from vendoc_mssql import build_srtemp_export_preview, check_connection, config_from_env, driver_status, write_srtemp_payload
+from vendoc_mssql import (
+    build_srtemp_export_preview,
+    check_connection,
+    config_from_env,
+    customer_view_from_env,
+    driver_status,
+    list_customer_options,
+    write_srtemp_payload,
+)
 
 app = FastAPI(title="PDF Reader PoC API")
 
@@ -102,6 +111,14 @@ class PdfCropImageRequest(BaseModel):
 class DocumentApprovalRequest(BaseModel):
     reviewer_name: str | None = Field(default=None, max_length=160, description="Optional reviewer name.")
     note: str | None = Field(default=None, max_length=1000, description="Optional approval note.")
+
+
+class DocumentVendocCustomerRequest(BaseModel):
+    contact_oid: str | None = Field(default=None, max_length=120)
+    customer_number: str | None = Field(default=None, max_length=120)
+    uid_number: str | None = Field(default=None, max_length=120)
+    display_name: str | None = Field(default=None, max_length=255)
+    inactive: bool | None = Field(default=None)
 
 
 def _safe_filename(filename: str) -> str:
@@ -1718,6 +1735,53 @@ def vendoc_health(check_connection_live: bool = Query(default=False, alias="chec
                 else ((connection or {}).get("message") or "MSSQL live write is configured.")
             )
         ),
+    }
+
+
+@app.get("/vendoc/customers")
+def vendoc_customers():
+    config = config_from_env()
+    if not config:
+        raise HTTPException(status_code=503, detail="VenDoc MSSQL ist nicht konfiguriert.")
+    try:
+        return list_customer_options(config, view_name=customer_view_from_env())
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Kundenliste aus SRTemp konnte nicht geladen werden: {exc}") from exc
+
+
+@app.put("/documents/{document_id}/vendoc-customer")
+def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustomerRequest):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    has_selection = any(
+        [
+            _clean_optional_str(payload.contact_oid),
+            _clean_optional_str(payload.customer_number),
+            _clean_optional_str(payload.uid_number),
+            _clean_optional_str(payload.display_name),
+        ]
+    )
+    updated = update_document_vendoc_customer(
+        document_id,
+        customer_name=_clean_optional_str(payload.display_name) if has_selection else None,
+        vendoc_customer_oid=_clean_optional_str(payload.contact_oid) if has_selection else None,
+        vendoc_customer_number=_clean_optional_str(payload.customer_number) if has_selection else None,
+        vendoc_customer_uid_number=_clean_optional_str(payload.uid_number) if has_selection else None,
+        vendoc_customer_inactive=bool(payload.inactive) if has_selection and payload.inactive is not None else (False if has_selection else None),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "customer_name": updated.get("customer_name"),
+        "vendoc_customer_oid": updated.get("vendoc_customer_oid"),
+        "vendoc_customer_number": updated.get("vendoc_customer_number"),
+        "vendoc_customer_uid_number": updated.get("vendoc_customer_uid_number"),
+        "vendoc_customer_inactive": updated.get("vendoc_customer_inactive"),
+        "updated_at": updated.get("updated_at"),
     }
 
 

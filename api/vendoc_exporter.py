@@ -9,6 +9,31 @@ from vendoc_rtf import build_vendoc_long_text_rtf
 
 VENDOC_NAMESPACE = UUID("8f0f8c50-0f58-45d8-b8e5-83a0f7e79a11")
 
+SUPPLIER_ID_ALIASES: dict[str, str] = {
+    "rieder": "300774",
+    "rieder gmbh co kg fenster turen": "300774",
+    "newo": "300877",
+    "newo sonnen insektenschutz gmbh": "300877",
+    "entholzer": "301370",
+    "entholzer fenster und turen ges m b h": "301370",
+    "schachermayer": "300492",
+    "schachermayer gmbh beschlage befestigungstechnik": "300492",
+    "rekord vomp": "300798",
+    "rekord vomp gmbh kunststoff fenster u turen": "300798",
+    "schlotterer": "301347",
+    "schlotterer sonnenschutz systeme gmbh": "301347",
+    "schuchter": "301595",
+    "schuchter fenster gmbh fenster turen sonnenschutz": "301595",
+    "koch": "300735",
+    "koch turen gmbh": "300735",
+    "koch johann tischlerei": "300735",
+    "muigg": "300929",
+    "muigg schlosserei metallbau gmbh schlosserei metallbau gmbh": "300929",
+    "alu one": "301418",
+    "alu one metallbaupartner gmbh": "301418",
+    "aluone metallbaupartner gmbh": "301418",
+}
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(microsecond=0)
@@ -37,6 +62,28 @@ def _to_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _normalize_lookup_key(value: Any) -> str:
+    text = _to_str(value) or ""
+    lowered = text.lower().replace("&", " ")
+    return "".join(ch if ch.isalnum() else " " for ch in lowered).strip()
+
+
+def _supplier_id_for_document(document: dict[str, Any]) -> str | None:
+    supplier_name = document.get("supplier_name")
+    lookup = _normalize_lookup_key(supplier_name)
+    if not lookup:
+        return None
+    if lookup in SUPPLIER_ID_ALIASES:
+        return SUPPLIER_ID_ALIASES[lookup]
+    collapsed = " ".join(lookup.split())
+    if collapsed in SUPPLIER_ID_ALIASES:
+        return SUPPLIER_ID_ALIASES[collapsed]
+    for alias, supplier_id in SUPPLIER_ID_ALIASES.items():
+        if alias and alias in collapsed:
+            return supplier_id
+    return None
 
 
 def _to_bool(value: Any) -> bool:
@@ -211,7 +258,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         "external_document_id": ext_document_id,
         "source_document_id": _to_str(document_id),
         "supplier_name": _to_str(document.get("supplier_name")),
-        "supplier_id": None,
+        "supplier_id": _supplier_id_for_document(document),
         "document_type": _to_str(document.get("document_type")),
         "document_number": _to_str(document.get("document_number")),
         "offer_reference": _to_str(document.get("offer_reference")),
@@ -225,6 +272,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         "created_at": created_at,
         "subject": _to_str(document.get("project_ref")),
         "tax_type": None,
+        "customer_id": _to_str(document.get("vendoc_customer_number")),
     }
     errors.extend(
         _validate_required(

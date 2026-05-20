@@ -157,6 +157,8 @@ def list_documents(limit: int = 20) -> list[dict[str, Any]]:
                 file_size_bytes,
                 content_type,
                 supplier_name,
+                customer_name,
+                vendoc_customer_number,
                 document_type,
                 offer_reference,
                 linked_offer_document_id,
@@ -189,6 +191,11 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 file_size_bytes,
                 content_type,
                 supplier_name,
+                customer_name,
+                vendoc_customer_oid,
+                vendoc_customer_number,
+                vendoc_customer_uid_number,
+                vendoc_customer_inactive,
                 document_type,
                 offer_reference,
                 linked_offer_document_id,
@@ -214,6 +221,48 @@ def get_document(document_id: int) -> dict[str, Any] | None:
             WHERE id = %s;
             """,
             (document_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_document_vendoc_customer(
+    document_id: int,
+    *,
+    customer_name: str | None,
+    vendoc_customer_oid: str | None,
+    vendoc_customer_number: str | None,
+    vendoc_customer_uid_number: str | None,
+    vendoc_customer_inactive: bool | None,
+) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET
+                customer_name = %s,
+                vendoc_customer_oid = %s,
+                vendoc_customer_number = %s,
+                vendoc_customer_uid_number = %s,
+                vendoc_customer_inactive = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                customer_name,
+                vendoc_customer_oid,
+                vendoc_customer_number,
+                vendoc_customer_uid_number,
+                vendoc_customer_inactive,
+                updated_at;
+            """,
+            (
+                (customer_name or "").strip() or None,
+                (vendoc_customer_oid or "").strip() or None,
+                (vendoc_customer_number or "").strip() or None,
+                (vendoc_customer_uid_number or "").strip() or None,
+                vendoc_customer_inactive,
+                document_id,
+            ),
         ).fetchone()
     return dict(row) if row else None
 
