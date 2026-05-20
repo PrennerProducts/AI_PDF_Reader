@@ -120,6 +120,10 @@ def _clean(value: Any) -> str | None:
     return text or None
 
 
+def _to_str(value: Any) -> str | None:
+    return _clean(value)
+
+
 def _int_env(value: Any, *, default: int) -> int:
     try:
         parsed = int(str(value).strip())
