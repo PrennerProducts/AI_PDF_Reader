@@ -8037,6 +8037,13 @@
       background: #fbfbfd;
     }
 
+    .app-v3 .vendoc-customer-search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+    }
+
     .app-v3 .vendoc-customer-controls label {
       display: grid;
       gap: 6px;
@@ -8045,6 +8052,7 @@
       color: rgba(29, 29, 31, 0.72);
     }
 
+    .app-v3 .vendoc-customer-controls input[type="search"],
     .app-v3 .vendoc-customer-controls select {
       min-height: 42px;
       border-radius: 14px;
@@ -8056,10 +8064,29 @@
       padding: 0 12px;
     }
 
+    .app-v3 .vendoc-customer-controls input[type="search"]:disabled,
     .app-v3 .vendoc-customer-controls select:disabled {
       opacity: 0.7;
       cursor: not-allowed;
       background: #f5f5f7;
+    }
+
+    .app-v3 .vendoc-customer-controls select {
+      min-height: 180px;
+      padding: 8px 12px;
+    }
+
+    .app-v3 .vendoc-customer-search-tools {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .app-v3 .vendoc-customer-search-count {
+      font-size: 11px;
+      color: rgba(29, 29, 31, 0.52);
+      white-space: nowrap;
     }
 
     .app-v3 .vendoc-customer-meta {
@@ -10315,8 +10342,18 @@
                   </div>
                   <div class="vendoc-export-meta" id="vendocExportMeta">Noch kein Exportstatus geladen.</div>
                   <div class="vendoc-customer-controls">
+                    <div class="vendoc-customer-search-row">
+                      <label for="vendocCustomerSearch">
+                        <span>Kunde in SRTemp suchen</span>
+                        <input id="vendocCustomerSearch" type="search" placeholder="Name, Kundennummer oder UID eingeben" autocomplete="off" disabled>
+                      </label>
+                      <div class="vendoc-customer-search-tools">
+                        <span class="vendoc-customer-search-count" id="vendocCustomerSearchCount">0 Treffer</span>
+                        <button class="btn btn-ghost" id="vendocCustomerSearchClearBtn" type="button" disabled>Zurücksetzen</button>
+                      </div>
+                    </div>
                     <label for="vendocCustomerSelect">
-                      <span>Kunde in SRTemp</span>
+                      <span>Trefferliste</span>
                       <select id="vendocCustomerSelect" aria-label="Kunde in SRTemp auswählen" disabled>
                         <option value="">Kunden werden geladen ...</option>
                       </select>
@@ -10446,6 +10483,7 @@
       vendocCustomersLoaded: false,
       vendocCustomersViewName: "",
       vendocCustomersError: "",
+      vendocCustomerQuery: "",
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -10487,6 +10525,9 @@
       resetBtn: document.getElementById("resetBtn"),
       vendocExportState: document.getElementById("vendocExportState"),
       vendocExportMeta: document.getElementById("vendocExportMeta"),
+      vendocCustomerSearch: document.getElementById("vendocCustomerSearch"),
+      vendocCustomerSearchCount: document.getElementById("vendocCustomerSearchCount"),
+      vendocCustomerSearchClearBtn: document.getElementById("vendocCustomerSearchClearBtn"),
       vendocCustomerSelect: document.getElementById("vendocCustomerSelect"),
       vendocCustomerMeta: document.getElementById("vendocCustomerMeta"),
       vendocDryRunBtn: document.getElementById("vendocDryRunBtn"),
@@ -13788,35 +13829,100 @@
       return parts.join(" · ");
     }
 
+    function vendocCustomerSearchText(customer) {
+      return [
+        customer && customer.display_name,
+        customer && customer.customer_name,
+        customer && customer.customer_number,
+        customer && customer.uid_number,
+        customer && customer.contact_oid,
+      ]
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    function filteredVendocCustomers(items, query) {
+      const normalized = String(query || "").trim().toLowerCase();
+      if (!normalized || normalized.length < 2) {
+        return [];
+      }
+      return items.filter((customer) => vendocCustomerSearchText(customer).includes(normalized));
+    }
+
     function renderVendocCustomerSelect() {
       if (!ui.vendocCustomerSelect || !ui.vendocCustomerMeta) return;
       const documentPayload = state.result && state.result.document ? state.result.document : null;
       const selectedKey = vendocCustomerKey(documentPayload);
       const items = Array.isArray(state.vendocCustomers) ? state.vendocCustomers : [];
+      const query = String(state.vendocCustomerQuery || "").trim();
+      const matches = filteredVendocCustomers(items, query);
+      const selectedCustomer = items.find((item) => vendocCustomerKey(item) === selectedKey) || null;
       clearNode(ui.vendocCustomerSelect);
 
       const emptyOption = document.createElement("option");
       emptyOption.value = "";
-      emptyOption.textContent = items.length
-        ? "Keinen Kunden auswählen"
-        : (state.vendocCustomersLoaded ? "Keine Kunden verfügbar" : "Kunden werden geladen ...");
+      let renderItems = [];
+      if (!state.vendocCustomersLoaded) {
+        emptyOption.textContent = "Kunden werden geladen ...";
+      } else if (!items.length) {
+        emptyOption.textContent = "Keine Kunden verfügbar";
+      } else if (!query || query.length < 2) {
+        emptyOption.textContent = selectedCustomer
+          ? "Suchbegriff eingeben oder Auswahl zurücksetzen"
+          : "Mindestens 2 Zeichen eingeben";
+      } else if (!matches.length) {
+        emptyOption.textContent = "Keine Treffer";
+      } else {
+        emptyOption.textContent = "Keinen Kunden auswählen";
+        renderItems = matches.slice(0, 100);
+      }
       ui.vendocCustomerSelect.appendChild(emptyOption);
 
-      for (const customer of items) {
+      if (selectedCustomer && !renderItems.some((item) => vendocCustomerKey(item) === selectedKey)) {
+        renderItems = [selectedCustomer, ...renderItems];
+      }
+
+      for (const customer of renderItems) {
         const option = document.createElement("option");
         option.value = vendocCustomerKey(customer);
         option.textContent = vendocCustomerOptionLabel(customer);
+        if (selectedKey && option.value === selectedKey && query && query.length >= 2 && !matches.some((item) => vendocCustomerKey(item) === selectedKey)) {
+          option.textContent += " · aktuell gewählt";
+        }
         if (option.value && option.value === selectedKey) option.selected = true;
         ui.vendocCustomerSelect.appendChild(option);
       }
 
-      ui.vendocCustomerSelect.disabled = !state.documentId || !items.length;
+      if (ui.vendocCustomerSearch) {
+        ui.vendocCustomerSearch.value = state.vendocCustomerQuery || "";
+        ui.vendocCustomerSearch.disabled = !state.documentId || !items.length;
+      }
+      if (ui.vendocCustomerSearchClearBtn) {
+        ui.vendocCustomerSearchClearBtn.disabled = !state.documentId || !items.length || !state.vendocCustomerQuery;
+      }
+      if (ui.vendocCustomerSearchCount) {
+        if (!state.vendocCustomersLoaded) {
+          ui.vendocCustomerSearchCount.textContent = "lädt ...";
+        } else if (!items.length) {
+          ui.vendocCustomerSearchCount.textContent = "0 Treffer";
+        } else if (!query || query.length < 2) {
+          ui.vendocCustomerSearchCount.textContent = `${items.length} Kunden`;
+        } else {
+          ui.vendocCustomerSearchCount.textContent = `${matches.length} Treffer`;
+        }
+      }
+      ui.vendocCustomerSelect.disabled = !state.documentId || !items.length || (!renderItems.length && !!items.length);
       if (state.vendocCustomersError) {
         ui.vendocCustomerMeta.textContent = `Kundenliste konnte nicht geladen werden: ${state.vendocCustomersError}`;
       } else if (!state.vendocCustomersLoaded) {
         ui.vendocCustomerMeta.textContent = "Kundenliste aus SRTemp wird geladen ...";
       } else if (!items.length) {
         ui.vendocCustomerMeta.textContent = "Keine Kunden aus SRTemp geladen.";
+      } else if (!query || query.length < 2) {
+        ui.vendocCustomerMeta.textContent = selectedCustomer
+          ? `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen · aktuell gewählt: ${vendocCustomerOptionLabel(selectedCustomer)}`
+          : `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen · zum Suchen mindestens 2 Zeichen eingeben.`;
       } else if (documentPayload && documentPayload.customer_name) {
         ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen · ausgewählt: ${vendocCustomerOptionLabel(documentPayload)}`;
       } else {
@@ -13863,6 +13969,8 @@
       if (!state.documentId || !ui.vendocCustomerSelect) return;
       const selectedKey = String(ui.vendocCustomerSelect.value || "").trim();
       const selectedCustomer = (state.vendocCustomers || []).find((item) => vendocCustomerKey(item) === selectedKey) || null;
+      if (ui.vendocCustomerSearch) ui.vendocCustomerSearch.disabled = true;
+      if (ui.vendocCustomerSearchClearBtn) ui.vendocCustomerSearchClearBtn.disabled = true;
       ui.vendocCustomerSelect.disabled = true;
       try {
         const payload = selectedCustomer
@@ -13905,6 +14013,7 @@
         setStatus(`VenDoc-Kunde konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
         renderVendocCustomerSelect();
       } finally {
+        if (ui.vendocCustomerSearch) ui.vendocCustomerSearch.disabled = !state.documentId || !state.vendocCustomers.length;
         ui.vendocCustomerSelect.disabled = !state.documentId || !state.vendocCustomers.length;
       }
     }
@@ -14470,6 +14579,21 @@
     if (ui.vendocCustomerSelect) {
       ui.vendocCustomerSelect.addEventListener("change", async () => {
         await saveVendocCustomerSelection();
+      });
+    }
+    if (ui.vendocCustomerSearch) {
+      ui.vendocCustomerSearch.addEventListener("input", () => {
+        state.vendocCustomerQuery = String(ui.vendocCustomerSearch.value || "");
+        renderVendocCustomerSelect();
+      });
+    }
+    if (ui.vendocCustomerSearchClearBtn) {
+      ui.vendocCustomerSearchClearBtn.addEventListener("click", () => {
+        state.vendocCustomerQuery = "";
+        renderVendocCustomerSelect();
+        if (ui.vendocCustomerSearch && !ui.vendocCustomerSearch.disabled) {
+          ui.vendocCustomerSearch.focus();
+        }
       });
     }
     ui.copyPreviewBtn.addEventListener("click", async () => {
