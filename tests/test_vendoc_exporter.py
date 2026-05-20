@@ -7,7 +7,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 
-from vendoc_exporter import build_vendoc_payload, external_document_id, external_line_item_id
+from vendoc_exporter import (
+    _strip_price_tokens,
+    _strip_prices_from_long_text,
+    build_vendoc_payload,
+    external_document_id,
+    external_line_item_id,
+)
 from vendoc_mssql import POSITION_COLUMNS, build_srtemp_export_preview, build_srtemp_insert_script
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 
@@ -205,3 +211,28 @@ def test_srtemp_preview_uses_runtime_resolved_column_names(monkeypatch, tmp_path
     ]
     assert "INSERT INTO dbo.vendoc_import_headers (external_document_id, source_document_id, is_alternative)" in preview["sql_script"]
     assert "is_alternate" not in preview["sql_script"]
+
+
+def test_strip_price_tokens_removes_trailing_short_text_price() -> None:
+    assert _strip_price_tokens("Fenster 2flg DLS DKR € 1.090,00 €") == "Fenster 2flg DLS DKR"
+
+
+def test_strip_prices_from_long_text_removes_embedded_price_lines() -> None:
+    raw = "\n".join(
+        [
+            "Fenster 2flg DLS DKR € 1.090,00 €",
+            "EP: 1 385,02 GP: € 16.620,24",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 119,90 GP: € 1.438,80",
+            "12 Stück B/H: 950,0 x 1300,0",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw)
+
+    assert cleaned == "\n".join(
+        [
+            "Fenster 2flg DLS DKR",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt",
+            "12 Stück B/H: 950,0 x 1300,0",
+        ]
+    )

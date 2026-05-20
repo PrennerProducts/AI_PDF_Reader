@@ -3,11 +3,14 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
+import re
 
 from vendoc_rtf import build_vendoc_long_text_rtf
 
 
 VENDOC_NAMESPACE = UUID("8f0f8c50-0f58-45d8-b8e5-83a0f7e79a11")
+PRICE_AMOUNT_PATTERN = re.compile(r"(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?")
+PRICE_LABEL_PATTERN = re.compile(r"\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?", re.IGNORECASE)
 
 SUPPLIER_ID_ALIASES: dict[str, str] = {
     "rieder": "300774",
@@ -62,6 +65,43 @@ def _to_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _normalize_inline_spacing(text: str) -> str:
+    compact = re.sub(r"[ \t]{2,}", " ", text)
+    compact = re.sub(r"\s+([,:;)\]])", r"\1", compact)
+    compact = re.sub(r"([(\[])\s+", r"\1", compact)
+    return compact.strip(" -,\t")
+
+
+def _strip_price_tokens(text: str | None) -> str | None:
+    raw = _to_str(text)
+    if not raw:
+        return raw
+    cleaned = PRICE_LABEL_PATTERN.sub("", raw)
+    cleaned = PRICE_AMOUNT_PATTERN.sub("", cleaned)
+    cleaned = re.sub(r"\s*€\s*", " ", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([,:;])", r"\1", cleaned)
+    return cleaned.strip(" -,\t") or None
+
+
+def _strip_prices_from_long_text(text: str | None) -> str | None:
+    raw = _to_str(text)
+    if not raw:
+        return raw
+    cleaned_lines: list[str] = []
+    for original_line in raw.splitlines():
+        line = original_line.strip()
+        if not line:
+            continue
+        sanitized = _strip_price_tokens(line)
+        if not sanitized:
+            continue
+        sanitized = _normalize_inline_spacing(sanitized)
+        if sanitized:
+            cleaned_lines.append(sanitized)
+    return "\n".join(cleaned_lines) or None
 
 
 def _normalize_lookup_key(value: Any) -> str:
@@ -296,7 +336,8 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             images_by_id=images_by_id,
             warnings=warnings,
         )
-        description_long = _to_str(raw_item.get("description_long"))
+        description_short = _strip_price_tokens(raw_item.get("description_short"))
+        description_long = _strip_prices_from_long_text(raw_item.get("description_long"))
         image_bytes = image_payload.pop("image_bytes", None)
         image_name = image_payload.pop("image_name", None)
         try:
@@ -328,7 +369,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             "unit_code": _to_str(raw_item.get("unit")),
             "width_mm": _to_float(raw_item.get("width_mm")),
             "height_mm": _to_float(raw_item.get("height_mm")),
-            "description_short": _to_str(raw_item.get("description_short")),
+            "description_short": description_short,
             "description_long": description_long,
             "image_long_text_rtf": image_long_text_rtf,
             "unit_price": _to_float(raw_item.get("unit_price")),
