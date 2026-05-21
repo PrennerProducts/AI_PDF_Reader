@@ -19,6 +19,7 @@ from db import (
     apply_migrations,
     get_document,
     get_document_image,
+    get_vendoc_import_state,
     get_document_result,
     get_latest_vendoc_export_job,
     insert_document,
@@ -2187,6 +2188,14 @@ def vendoc_latest_export_job(
         "document_id": document_id,
         "job": _vendoc_job_response(job, include_payload=include_payload),
     }
+
+
+@app.get("/vendoc/import-state/{document_id}")
+def vendoc_import_state(document_id: int):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    return get_vendoc_import_state(document_id)
 
 
 @app.get("/preview/{document_id}")

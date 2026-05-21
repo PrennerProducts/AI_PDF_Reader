@@ -1051,6 +1051,34 @@ def get_latest_vendoc_export_job(document_id: int) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
+def get_vendoc_import_state(document_id: int) -> dict[str, Any]:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                EXISTS (
+                    SELECT 1
+                    FROM vendoc_export_jobs
+                    WHERE document_id = %s
+                      AND dry_run = FALSE
+                      AND status = 'exported'
+                ) AS already_imported,
+                MAX(created_at) FILTER (
+                    WHERE dry_run = FALSE
+                      AND status = 'exported'
+                ) AS latest_imported_at
+            FROM vendoc_export_jobs
+            WHERE document_id = %s;
+            """,
+            (document_id, document_id),
+        ).fetchone()
+    return {
+        "document_id": document_id,
+        "already_imported": bool(row.get("already_imported")) if row else False,
+        "latest_imported_at": row.get("latest_imported_at") if row else None,
+    }
+
+
 def reset_document_results(document_id: int) -> dict[str, Any] | None:
     with get_db() as conn:
         document = conn.execute(

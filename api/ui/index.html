@@ -10624,6 +10624,8 @@
       vendocCustomersError: "",
       vendocCustomerQuery: "",
       vendocCustomerPickerOpen: false,
+      vendocAlreadyImported: false,
+      vendocLatestImportedAt: null,
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -14282,17 +14284,39 @@
       };
     }
 
+    async function fetchVendocImportState(documentId) {
+      if (!documentId) {
+        return { already_imported: false, latest_imported_at: null };
+      }
+      try {
+        return await apiJson(`/vendoc/import-state/${documentId}`);
+      } catch (error) {
+        return {
+          already_imported: false,
+          latest_imported_at: null,
+          _error: String(error.message || error || ""),
+        };
+      }
+    }
+
     async function loadVendocExportStatus(documentId) {
       if (!documentId) {
+        state.vendocAlreadyImported = false;
+        state.vendocLatestImportedAt = null;
         setVendocExportState("Nicht geprüft", "pending");
         return;
       }
       try {
-        const [health, latest] = await Promise.all([
+        const [health, latest, importState] = await Promise.all([
           apiJson("/vendoc/health").catch((error) => ({ status: "error", message: error.message })),
           apiJson(`/vendoc/export-jobs/${documentId}/latest`).catch(() => null),
+          fetchVendocImportState(documentId),
         ]);
         const latestJob = latest && latest.job ? latest.job : null;
+        state.vendocAlreadyImported = !!(importState && importState.already_imported);
+        state.vendocLatestImportedAt = importState && importState.latest_imported_at
+          ? String(importState.latest_imported_at)
+          : null;
         const liveReady = !!health.live_write_available;
         const approvalStatus = currentDocumentApprovalStatus();
         const latestText = latestJob
@@ -14302,7 +14326,10 @@
         const configText = health.status === "disabled"
           ? "Live-Write deaktiviert"
           : (liveReady ? "Live-Write konfiguriert" : `Live-Write nicht bereit: ${fmt(health.message)}`);
-        const meta = `${configText}. Ziel: ${fmt(health.target_database || "SRTemp")}. Driver: ${driver.available ? "ok" : "fehlt"}. ${latestText}`;
+        const importText = state.vendocAlreadyImported
+          ? `Bereits importiert: ja${state.vendocLatestImportedAt ? ` · ${fmt(state.vendocLatestImportedAt)}` : ""}. Ein erneuter Import erzeugt einen zusätzlichen Beleg.`
+          : "Bereits importiert: nein.";
+        const meta = `${configText}. Ziel: ${fmt(health.target_database || "SRTemp")}. Driver: ${driver.available ? "ok" : "fehlt"}. ${latestText} ${importText}`;
         if (latestJob && latestJob.status === "exported") {
           setVendocExportState("Übergeben", "ok", meta);
         } else if (latestJob && latestJob.status === "failed") {
@@ -14374,10 +14401,24 @@
         setStatus("VenDoc Live-Export ist erst nach Freigabe möglich.", "warn");
         return;
       }
+      const importState = await fetchVendocImportState(packageMode ? packageBody.main_document_id : state.documentId);
+      const alreadyImported = !!(importState && importState.already_imported);
+      state.vendocAlreadyImported = alreadyImported;
+      state.vendocLatestImportedAt = importState && importState.latest_imported_at
+        ? String(importState.latest_imported_at)
+        : null;
       const ok = window.confirm(
-        packageMode
-          ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach SRTemp übergeben?`
-          : `Dokument #${state.documentId} wirklich nach SRTemp übergeben?`
+        alreadyImported
+          ? (
+              packageMode
+                ? `Dieses Multi-PDF-Paket wurde bereits einmal in VenDoc importiert.\n\nEin erneuter Import überschreibt keinen bestehenden Beleg.\nEs wird ein zusätzlicher Beleg im ERP erzeugt.\n\nTrotzdem erneut importieren?`
+                : `Dieses Dokument wurde bereits einmal in VenDoc importiert.\n\nEin erneuter Import überschreibt keinen bestehenden Beleg.\nEs wird ein zusätzlicher Beleg im ERP erzeugt.\n\nTrotzdem erneut importieren?`
+            )
+          : (
+              packageMode
+                ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach SRTemp übergeben?`
+                : `Dokument #${state.documentId} wirklich nach SRTemp übergeben?`
+            )
       );
       if (!ok) return;
       setVendocButtonsBusy(true);
