@@ -36,6 +36,10 @@ def _database_url() -> str:
     return database_url
 
 
+def _normalize_username(username: str) -> str:
+    return re.sub(r"\s+", " ", str(username or "").strip()).lower()
+
+
 @contextmanager
 def get_db() -> psycopg.Connection:
     conn = psycopg.connect(_database_url(), row_factory=dict_row)
@@ -146,6 +150,222 @@ def insert_document(
     return dict(row)
 
 
+def get_app_user_by_username(username: str) -> dict[str, Any] | None:
+    normalized = _normalize_username(username)
+    if not normalized:
+        return None
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                id,
+                username,
+                username_normalized,
+                display_name,
+                password_hash,
+                is_active,
+                created_at,
+                updated_at
+            FROM app_users
+            WHERE username_normalized = %s;
+            """,
+            (normalized,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def count_app_users() -> int:
+    with get_db() as conn:
+        row = conn.execute("SELECT COUNT(*) AS count FROM app_users;").fetchone()
+    return int(row["count"] if row else 0)
+
+
+def create_app_user(
+    *,
+    username: str,
+    password_hash: str,
+    display_name: str | None = None,
+) -> dict[str, Any]:
+    cleaned_username = str(username or "").strip()
+    normalized = _normalize_username(cleaned_username)
+    if not normalized:
+        raise ValueError("username is required")
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO app_users (
+                username,
+                username_normalized,
+                display_name,
+                password_hash
+            )
+            VALUES (%s, %s, %s, %s)
+            RETURNING
+                id,
+                username,
+                username_normalized,
+                display_name,
+                is_active,
+                created_at,
+                updated_at;
+            """,
+            (
+                cleaned_username,
+                normalized,
+                (display_name or "").strip() or cleaned_username,
+                password_hash,
+            ),
+        ).fetchone()
+    return dict(row)
+
+
+def ensure_app_user(
+    *,
+    username: str,
+    password_hash: str,
+    display_name: str | None = None,
+) -> dict[str, Any]:
+    existing = get_app_user_by_username(username)
+    if existing:
+        return existing
+    return create_app_user(username=username, password_hash=password_hash, display_name=display_name)
+
+
+def create_app_session(
+    *,
+    user_id: int,
+    session_token_hash: str,
+    expires_at: datetime,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> dict[str, Any]:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO app_sessions (
+                user_id,
+                session_token_hash,
+                ip_address,
+                user_agent,
+                expires_at
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING
+                id,
+                user_id,
+                expires_at,
+                created_at,
+                last_seen_at;
+            """,
+            (
+                user_id,
+                session_token_hash,
+                (ip_address or "").strip() or None,
+                (user_agent or "").strip()[:500] or None,
+                expires_at,
+            ),
+        ).fetchone()
+    return dict(row)
+
+
+def get_app_session_user(session_token_hash: str) -> dict[str, Any] | None:
+    if not session_token_hash:
+        return None
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                s.id AS session_id,
+                s.expires_at,
+                u.id,
+                u.username,
+                u.display_name,
+                u.is_active
+            FROM app_sessions s
+            JOIN app_users u ON u.id = s.user_id
+            WHERE s.session_token_hash = %s
+              AND s.revoked_at IS NULL
+              AND s.expires_at > NOW()
+              AND u.is_active = TRUE;
+            """,
+            (session_token_hash,),
+        ).fetchone()
+        if row:
+            conn.execute(
+                """
+                UPDATE app_sessions
+                SET last_seen_at = NOW()
+                WHERE id = %s;
+                """,
+                (row["session_id"],),
+            )
+    return dict(row) if row else None
+
+
+def revoke_app_session(session_token_hash: str) -> int:
+    if not session_token_hash:
+        return 0
+    with get_db() as conn:
+        updated = conn.execute(
+            """
+            UPDATE app_sessions
+            SET revoked_at = NOW()
+            WHERE session_token_hash = %s
+              AND revoked_at IS NULL;
+            """,
+            (session_token_hash,),
+        ).rowcount or 0
+    return int(updated)
+
+
+def insert_audit_event(
+    *,
+    action: str,
+    actor_user_id: int | None = None,
+    actor_username: str | None = None,
+    actor_ip: str | None = None,
+    document_id: int | None = None,
+    line_item_id: int | None = None,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload_json = json.dumps(details or {}, ensure_ascii=True, default=str)
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO audit_events (
+                actor_user_id,
+                actor_username,
+                actor_ip,
+                action,
+                document_id,
+                line_item_id,
+                details_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+            RETURNING
+                id,
+                actor_user_id,
+                actor_username,
+                actor_ip,
+                action,
+                document_id,
+                line_item_id,
+                details_json,
+                created_at;
+            """,
+            (
+                actor_user_id,
+                (actor_username or "").strip() or None,
+                (actor_ip or "").strip() or None,
+                action,
+                document_id,
+                line_item_id,
+                payload_json,
+            ),
+        ).fetchone()
+    return dict(row)
+
+
 def list_documents(limit: int = 20) -> list[dict[str, Any]]:
     with get_db() as conn:
         rows = conn.execute(
@@ -166,6 +386,7 @@ def list_documents(limit: int = 20) -> list[dict[str, Any]]:
                 document_date,
                 project_ref,
                 document_notes,
+                alternative_position_mode,
                 approval_status,
                 reviewed_by,
                 reviewed_at,
@@ -212,6 +433,7 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 reviewed_at,
                 approval_note,
                 document_notes,
+                alternative_position_mode,
                 status,
                 error_message,
                 raw_text_path,
@@ -263,6 +485,26 @@ def update_document_vendoc_customer(
                 vendoc_customer_inactive,
                 document_id,
             ),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_document_alternative_position_mode(document_id: int, *, mode: str) -> dict[str, Any] | None:
+    normalized_mode = "append" if str(mode or "").strip().lower() == "append" else "nested"
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET
+                alternative_position_mode = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                alternative_position_mode,
+                updated_at;
+            """,
+            (normalized_mode, document_id),
         ).fetchone()
     return dict(row) if row else None
 

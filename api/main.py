@@ -1,7 +1,9 @@
 import re
-from datetime import date, datetime
+import hmac
+import secrets
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from hashlib import sha256
+from hashlib import pbkdf2_hmac, sha256
 import json
 import os
 from pathlib import Path
@@ -11,18 +13,25 @@ from typing import Any, Literal
 from uuid import UUID, uuid4
 
 import fitz
-from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from db import (
     apply_migrations,
+    count_app_users,
+    create_app_session,
+    create_app_user,
+    ensure_app_user,
+    get_app_session_user,
+    get_app_user_by_username,
     get_document,
     get_document_image,
     get_vendoc_import_state,
     get_document_result,
     get_latest_vendoc_export_job,
     insert_document,
+    insert_audit_event,
     insert_document_image,
     insert_vendoc_export_job,
     list_documents,
@@ -35,7 +44,9 @@ from db import (
     replace_document_images,
     replace_document_amount_lines,
     replace_line_items,
+    revoke_app_session,
     update_document_approval_state,
+    update_document_alternative_position_mode,
     update_document_parse_result,
     update_document_status,
     update_document_vendoc_customer,
@@ -86,6 +97,18 @@ AI_DISABLED_DETAIL = (
 
 PROCESS_PROGRESS: dict[int, dict[str, Any]] = {}
 PROCESS_PROGRESS_LOCK = Lock()
+SESSION_COOKIE_NAME = "pdr_session"
+PASSWORD_HASH_ITERATIONS = 260_000
+AUTH_EXEMPT_PATHS = {
+    "/",
+    "/ui",
+    "/health",
+    "/auth/login",
+    "/auth/logout",
+    "/auth/me",
+    "/auth/setup-status",
+    "/auth/register",
+}
 
 
 class ParseTextRequest(BaseModel):
@@ -122,6 +145,21 @@ class DocumentVendocCustomerRequest(BaseModel):
     inactive: bool | None = Field(default=None)
 
 
+class DocumentAlternativePositionModeRequest(BaseModel):
+    mode: Literal["nested", "append"] = "nested"
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=160)
+    password: str = Field(min_length=1, max_length=500)
+
+
+class CreateUserRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=160)
+    password: str = Field(min_length=4, max_length=500)
+    display_name: str | None = Field(default=None, max_length=160)
+
+
 def _safe_filename(filename: str) -> str:
     base_name = Path(filename).name.strip()
     if not base_name:
@@ -130,6 +168,239 @@ def _safe_filename(filename: str) -> str:
     if not sanitized:
         return "upload.pdf"
     return sanitized
+
+
+def _auth_enabled() -> bool:
+    return _is_truthy(os.getenv("APP_AUTH_ENABLED"), default=False)
+
+
+def _session_ttl_hours() -> int:
+    raw = str(os.getenv("APP_SESSION_TTL_HOURS") or "12").strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return 12
+    return max(1, min(parsed, 24 * 30))
+
+
+def _client_ip(request: Request) -> str | None:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",", 1)[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else None
+
+
+def _hash_session_token(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
+
+
+def _hash_password(password: str, *, salt_hex: str | None = None, iterations: int = PASSWORD_HASH_ITERATIONS) -> str:
+    salt = bytes.fromhex(salt_hex) if salt_hex else secrets.token_bytes(16)
+    digest = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
+
+
+def _verify_password(password: str, stored_hash: str | None) -> bool:
+    if not stored_hash:
+        return False
+    parts = str(stored_hash).split("$")
+    if len(parts) != 4 or parts[0] != "pbkdf2_sha256":
+        return False
+    try:
+        iterations = int(parts[1])
+        expected = _hash_password(password, salt_hex=parts[2], iterations=iterations)
+    except (TypeError, ValueError):
+        return False
+    return hmac.compare_digest(expected, stored_hash)
+
+
+def _public_user(user: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": user.get("id"),
+        "username": user.get("username"),
+        "display_name": user.get("display_name") or user.get("username"),
+    }
+
+
+def _current_user_from_request(request: Request) -> dict[str, Any] | None:
+    user = getattr(request.state, "user", None)
+    return user if isinstance(user, dict) else None
+
+
+def _require_user(request: Request) -> dict[str, Any]:
+    if not _auth_enabled():
+        return {"id": None, "username": "dev", "display_name": "Dev"}
+    user = _current_user_from_request(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Login erforderlich.")
+    return user
+
+
+def _audit(
+    request: Request,
+    action: str,
+    *,
+    document_id: int | None = None,
+    line_item_id: int | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    user = _current_user_from_request(request)
+    if not user and not _auth_enabled():
+        user = {"id": None, "username": "dev", "display_name": "Dev"}
+    try:
+        insert_audit_event(
+            action=action,
+            actor_user_id=int(user["id"]) if user and user.get("id") is not None else None,
+            actor_username=str(user.get("username")) if user and user.get("username") else None,
+            actor_ip=_client_ip(request),
+            document_id=document_id,
+            line_item_id=line_item_id,
+            details=details or {},
+        )
+    except Exception as exc:
+        print(f"Audit event failed for {action}: {exc}")
+
+
+def _bootstrap_auth_user() -> None:
+    username = _clean_optional_str(os.getenv("APP_BOOTSTRAP_USERNAME"))
+    password = os.getenv("APP_BOOTSTRAP_PASSWORD")
+    if not username or not password:
+        return
+    display_name = _clean_optional_str(os.getenv("APP_BOOTSTRAP_DISPLAY_NAME")) or username
+    ensure_app_user(
+        username=username,
+        password_hash=_hash_password(password),
+        display_name=display_name,
+    )
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if not _auth_enabled() or request.url.path in AUTH_EXEMPT_PATHS:
+        return await call_next(request)
+
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    user = get_app_session_user(_hash_session_token(token)) if token else None
+    if not user:
+        return JSONResponse({"detail": "Login erforderlich."}, status_code=401)
+
+    request.state.user = user
+    return await call_next(request)
+
+
+@app.get("/auth/me")
+def auth_me(request: Request):
+    if not _auth_enabled():
+        return {"ok": True, "auth_enabled": False, "user": {"id": None, "username": "dev", "display_name": "Dev"}}
+
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    user = get_app_session_user(_hash_session_token(token)) if token else None
+    if not user:
+        raise HTTPException(status_code=401, detail="Login erforderlich.")
+    return {"ok": True, "auth_enabled": True, "user": _public_user(user)}
+
+
+@app.post("/auth/login")
+def auth_login(payload: LoginRequest, request: Request, response: Response):
+    user = get_app_user_by_username(payload.username)
+    if not user or not _verify_password(payload.password, str(user.get("password_hash") or "")):
+        raise HTTPException(status_code=401, detail="Benutzername oder Passwort ist falsch.")
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="Benutzer ist deaktiviert.")
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=_session_ttl_hours())
+    create_app_session(
+        user_id=int(user["id"]),
+        session_token_hash=_hash_session_token(token),
+        expires_at=expires_at,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite="lax",
+        max_age=_session_ttl_hours() * 3600,
+    )
+    request.state.user = user
+    _audit(request, "auth_login")
+    return {"ok": True, "user": _public_user(user)}
+
+
+@app.get("/auth/setup-status")
+def auth_setup_status():
+    if not _auth_enabled():
+        return {"ok": True, "auth_enabled": False, "needs_setup": False}
+    return {"ok": True, "auth_enabled": True, "needs_setup": count_app_users() == 0}
+
+
+@app.post("/auth/register")
+def auth_register(payload: CreateUserRequest, request: Request, response: Response):
+    if not _auth_enabled():
+        raise HTTPException(status_code=400, detail="Login ist nicht aktiv.")
+    if count_app_users() > 0:
+        raise HTTPException(status_code=403, detail="Registrierung ist nur fuer den ersten Benutzer offen.")
+
+    try:
+        user = create_app_user(
+            username=payload.username,
+            password_hash=_hash_password(payload.password),
+            display_name=_clean_optional_str(payload.display_name),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=409, detail=f"Benutzer konnte nicht angelegt werden: {exc}") from exc
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=_session_ttl_hours())
+    create_app_session(
+        user_id=int(user["id"]),
+        session_token_hash=_hash_session_token(token),
+        expires_at=expires_at,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite="lax",
+        max_age=_session_ttl_hours() * 3600,
+    )
+    request.state.user = user
+    _audit(request, "auth_first_user_registered")
+    return {"ok": True, "user": _public_user(user)}
+
+
+@app.post("/auth/logout")
+def auth_logout(request: Request, response: Response):
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token:
+        user = get_app_session_user(_hash_session_token(token))
+        if user:
+            request.state.user = user
+            _audit(request, "auth_logout")
+        revoke_app_session(_hash_session_token(token))
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return {"ok": True}
+
+
+@app.post("/auth/users")
+def auth_create_user(payload: CreateUserRequest, request: Request):
+    _require_user(request)
+    try:
+        created = create_app_user(
+            username=payload.username,
+            password_hash=_hash_password(payload.password),
+            display_name=_clean_optional_str(payload.display_name),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=409, detail=f"Benutzer konnte nicht angelegt werden: {exc}") from exc
+    _audit(request, "user_created", details={"username": created.get("username")})
+    return {"ok": True, "user": _public_user(created)}
 
 
 def _parse_eu_decimal(value: str | None) -> Decimal | None:
@@ -914,6 +1185,7 @@ def startup() -> None:
     applied = apply_migrations()
     if applied:
         print(f"Applied DB migrations: {', '.join(applied)}")
+    _bootstrap_auth_user()
 
 
 def _write_export_file(document_id: int, extension: str, content: str) -> Path:
@@ -1116,7 +1388,7 @@ def document_image(document_id: int, image_id: int):
 
 
 @app.post("/documents/{document_id}/line-items/{line_item_id}/assign-image")
-def assign_line_item_image(document_id: int, line_item_id: int, payload: AssignImageRequest):
+def assign_line_item_image(document_id: int, line_item_id: int, payload: AssignImageRequest, request: Request):
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
@@ -1150,6 +1422,13 @@ def assign_line_item_image(document_id: int, line_item_id: int, payload: AssignI
     if updated <= 0:
         raise HTTPException(status_code=500, detail="Image assignment could not be persisted.")
 
+    _audit(
+        request,
+        "line_item_image_assigned",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={"image_id": payload.image_id},
+    )
     return {
         "ok": True,
         "document_id": document_id,
@@ -1162,7 +1441,7 @@ def assign_line_item_image(document_id: int, line_item_id: int, payload: AssignI
 
 
 @app.post("/documents/{document_id}/line-items/{line_item_id}/crop-image")
-def crop_line_item_image(document_id: int, line_item_id: int, payload: PdfCropImageRequest):
+def crop_line_item_image(document_id: int, line_item_id: int, payload: PdfCropImageRequest, request: Request):
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
@@ -1226,6 +1505,13 @@ def crop_line_item_image(document_id: int, line_item_id: int, payload: PdfCropIm
     if updated <= 0:
         raise HTTPException(status_code=500, detail="Manual PDF crop could not be assigned to the line item.")
 
+    _audit(
+        request,
+        "line_item_image_cropped",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={"image_id": image_id, "page_ref": payload.page_ref, "width": width, "height": height},
+    )
     return {
         "ok": True,
         "document_id": document_id,
@@ -1241,7 +1527,7 @@ def crop_line_item_image(document_id: int, line_item_id: int, payload: PdfCropIm
 
 
 @app.delete("/documents/{document_id}/line-items/{line_item_id}/assign-image")
-def clear_line_item_image_assignment(document_id: int, line_item_id: int):
+def clear_line_item_image_assignment(document_id: int, line_item_id: int, request: Request):
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
@@ -1269,6 +1555,7 @@ def clear_line_item_image_assignment(document_id: int, line_item_id: int):
     if updated <= 0:
         raise HTTPException(status_code=500, detail="Image assignment could not be cleared.")
 
+    _audit(request, "line_item_image_cleared", document_id=document_id, line_item_id=line_item_id)
     return {
         "ok": True,
         "document_id": document_id,
@@ -1281,7 +1568,7 @@ def clear_line_item_image_assignment(document_id: int, line_item_id: int):
 
 
 @app.post("/documents/{document_id}/line-items/{line_item_id}/review-check")
-def check_line_item_review(document_id: int, line_item_id: int):
+def check_line_item_review(document_id: int, line_item_id: int, request: Request):
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
@@ -1301,6 +1588,7 @@ def check_line_item_review(document_id: int, line_item_id: int):
     if updated <= 0:
         raise HTTPException(status_code=500, detail="Review state could not be persisted.")
 
+    _audit(request, "line_item_review_checked", document_id=document_id, line_item_id=line_item_id)
     return {
         "ok": True,
         "document_id": document_id,
@@ -1311,7 +1599,7 @@ def check_line_item_review(document_id: int, line_item_id: int):
 
 
 @app.delete("/documents/{document_id}/line-items/{line_item_id}/review-check")
-def clear_line_item_review(document_id: int, line_item_id: int):
+def clear_line_item_review(document_id: int, line_item_id: int, request: Request):
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
@@ -1331,6 +1619,7 @@ def clear_line_item_review(document_id: int, line_item_id: int):
     if updated <= 0:
         raise HTTPException(status_code=500, detail="Review state could not be cleared.")
 
+    _audit(request, "line_item_review_cleared", document_id=document_id, line_item_id=line_item_id)
     return {
         "ok": True,
         "document_id": document_id,
@@ -1341,7 +1630,8 @@ def clear_line_item_review(document_id: int, line_item_id: int):
 
 
 @app.post("/documents/{document_id}/approval")
-def approve_document(document_id: int, payload: DocumentApprovalRequest):
+def approve_document(document_id: int, payload: DocumentApprovalRequest, request: Request):
+    user = _require_user(request)
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
@@ -1364,12 +1654,13 @@ def approve_document(document_id: int, payload: DocumentApprovalRequest):
     updated = update_document_approval_state(
         document_id,
         approval_status="approved",
-        reviewed_by=_clean_optional_str(payload.reviewer_name),
+        reviewed_by=str(user.get("display_name") or user.get("username") or "").strip() or _clean_optional_str(payload.reviewer_name),
         approval_note=_clean_optional_str(payload.note),
     )
     if not updated:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
 
+    _audit(request, "document_approved", document_id=document_id, details={"note_present": bool(_clean_optional_str(payload.note))})
     return {
         "ok": True,
         "document_id": document_id,
@@ -1381,7 +1672,7 @@ def approve_document(document_id: int, payload: DocumentApprovalRequest):
 
 
 @app.delete("/documents/{document_id}/approval")
-def reset_document_approval(document_id: int):
+def reset_document_approval(document_id: int, request: Request):
     document = get_document(document_id)
     if not document:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
@@ -1390,6 +1681,7 @@ def reset_document_approval(document_id: int):
     if not updated:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
 
+    _audit(request, "document_approval_reset", document_id=document_id)
     return {
         "ok": True,
         "document_id": document_id,
@@ -1401,7 +1693,7 @@ def reset_document_approval(document_id: int):
 
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(request: Request, file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename.")
 
@@ -1440,6 +1732,12 @@ async def upload(file: UploadFile = File(...)):
         destination.unlink(missing_ok=True)
         raise
 
+    _audit(
+        request,
+        "document_uploaded",
+        document_id=int(doc_row["id"]),
+        details={"filename": file.filename, "file_size_bytes": size_bytes},
+    )
     return {
         "document_id": doc_row["id"],
         "status": doc_row["status"],
@@ -1458,7 +1756,7 @@ def documents(limit: int = Query(default=20, ge=1, le=200)):
 
 
 @app.post("/reset/{document_id}")
-def reset_document(document_id: int, delete_logs: bool = Query(default=True)):
+def reset_document(document_id: int, request: Request, delete_logs: bool = Query(default=True)):
     reset_info = reset_document_results(document_id)
     if not reset_info:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
@@ -1476,6 +1774,18 @@ def reset_document(document_id: int, delete_logs: bool = Query(default=True)):
         removed_files += int(_remove_file(TEXT_DUMP_DIR / f"document_{document_id}.txt"))
         removed_files += _remove_dir(IMAGE_DUMP_DIR / f"document_{document_id}")
 
+    _audit(
+        request,
+        "document_reset",
+        document_id=document_id,
+        details={
+            "delete_logs": delete_logs,
+            "deleted_amount_lines": reset_info["deleted_amount_lines"],
+            "deleted_line_items": reset_info["deleted_line_items"],
+            "deleted_images": reset_info["deleted_images"],
+            "deleted_log_files": removed_files,
+        },
+    )
     return {
         "document_id": reset_info["id"],
         "status": reset_info["status"],
@@ -1751,7 +2061,7 @@ def vendoc_customers():
 
 
 @app.put("/documents/{document_id}/vendoc-customer")
-def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustomerRequest):
+def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustomerRequest, request: Request):
     document = get_document(document_id)
     if not document:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
@@ -1774,6 +2084,16 @@ def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustom
     )
     if not updated:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    _audit(
+        request,
+        "vendoc_customer_changed",
+        document_id=document_id,
+        details={
+            "has_selection": has_selection,
+            "customer_number": updated.get("vendoc_customer_number"),
+            "display_name": updated.get("customer_name"),
+        },
+    )
     return {
         "ok": True,
         "document_id": document_id,
@@ -1782,6 +2102,32 @@ def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustom
         "vendoc_customer_number": updated.get("vendoc_customer_number"),
         "vendoc_customer_uid_number": updated.get("vendoc_customer_uid_number"),
         "vendoc_customer_inactive": updated.get("vendoc_customer_inactive"),
+        "updated_at": updated.get("updated_at"),
+    }
+
+
+@app.put("/documents/{document_id}/alternative-position-mode")
+def set_document_alternative_position_mode(
+    document_id: int,
+    payload: DocumentAlternativePositionModeRequest,
+    request: Request,
+):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    updated = update_document_alternative_position_mode(document_id, mode=payload.mode)
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    _audit(
+        request,
+        "alternative_position_mode_changed",
+        document_id=document_id,
+        details={"mode": updated.get("alternative_position_mode")},
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "alternative_position_mode": updated.get("alternative_position_mode"),
         "updated_at": updated.get("updated_at"),
     }
 
@@ -1804,11 +2150,12 @@ def document_package_preview(request: DocumentPackageRequest):
 
 @app.post("/vendoc/export-package")
 def vendoc_export_document_package(
-    request: DocumentPackageRequest,
+    package_request: DocumentPackageRequest,
+    http_request: Request,
     dry_run: bool = Query(default=True),
     include_sql: bool = Query(default=False),
 ):
-    result_data = _load_package_result(request)
+    result_data = _load_package_result(package_request)
     document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
     document_id = int(document.get("id") or result_data.get("package", {}).get("main_document_id") or 0)
     if document_id <= 0:
@@ -1831,6 +2178,12 @@ def vendoc_export_document_package(
             dry_run=True,
             status=status,
             error_text=error_text,
+        )
+        _audit(
+            http_request,
+            "vendoc_package_dry_run",
+            document_id=document_id,
+            details={"status": status, "include_sql": include_sql, "error_count": len(errors)},
         )
         return _json_safe(
             {
@@ -1874,6 +2227,12 @@ def vendoc_export_document_package(
             status="failed",
             error_text=error_text,
         )
+        _audit(
+            http_request,
+            "vendoc_package_live_export_failed",
+            document_id=document_id,
+            details={"error_count": len(live_errors), "message": error_text},
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -1901,6 +2260,12 @@ def vendoc_export_document_package(
             dry_run=False,
             status="failed",
             error_text=live_error["message"],
+        )
+        _audit(
+            http_request,
+            "vendoc_package_live_export_failed",
+            document_id=document_id,
+            details={"error_count": 1, "message": live_error["message"]},
         )
         raise HTTPException(
             status_code=503,
@@ -1930,6 +2295,12 @@ def vendoc_export_document_package(
             status="failed",
             error_text=live_error["message"],
         )
+        _audit(
+            http_request,
+            "vendoc_package_live_export_failed",
+            document_id=document_id,
+            details={"error_count": 1, "message": live_error["message"]},
+        )
         raise HTTPException(
             status_code=502,
             detail={
@@ -1948,6 +2319,12 @@ def vendoc_export_document_package(
         status="exported",
         error_text=None,
     )
+    _audit(
+        http_request,
+        "vendoc_package_live_exported",
+        document_id=document_id,
+        details={"job_id": job.get("id"), "position_count": vendoc_payload.get("summary", {}).get("position_count")},
+    )
     return _json_safe(
         {
             "ok": True,
@@ -1965,6 +2342,7 @@ def vendoc_export_document_package(
 @app.post("/vendoc/export/{document_id}")
 def vendoc_export_document(
     document_id: int,
+    request: Request,
     dry_run: bool = Query(default=True),
     include_sql: bool = Query(default=False),
 ):
@@ -2002,6 +2380,12 @@ def vendoc_export_document(
             dry_run=True,
             status=status,
             error_text=error_text,
+        )
+        _audit(
+            request,
+            "vendoc_dry_run",
+            document_id=document_id,
+            details={"status": status, "include_sql": include_sql, "error_count": len(errors)},
         )
         return _json_safe(
             {
@@ -2046,6 +2430,12 @@ def vendoc_export_document(
             status="failed",
             error_text=error_text,
         )
+        _audit(
+            request,
+            "vendoc_live_export_failed",
+            document_id=document_id,
+            details={"error_count": len(live_errors), "message": error_text},
+        )
         raise HTTPException(
             status_code=409,
             detail={
@@ -2072,6 +2462,12 @@ def vendoc_export_document(
             status="failed",
             error_text=live_error["message"],
         )
+        _audit(
+            request,
+            "vendoc_live_export_failed",
+            document_id=document_id,
+            details={"error_count": 1, "message": live_error["message"]},
+        )
         raise HTTPException(
             status_code=503,
             detail={
@@ -2097,6 +2493,12 @@ def vendoc_export_document(
             dry_run=False,
             status="failed",
             error_text=live_error["message"],
+        )
+        _audit(
+            request,
+            "vendoc_live_export_failed",
+            document_id=document_id,
+            details={"error_count": 1, "message": live_error["message"]},
         )
         raise HTTPException(
             status_code=503,
@@ -2125,6 +2527,12 @@ def vendoc_export_document(
             status="failed",
             error_text=live_error["message"],
         )
+        _audit(
+            request,
+            "vendoc_live_export_failed",
+            document_id=document_id,
+            details={"error_count": 1, "message": live_error["message"]},
+        )
         raise HTTPException(
             status_code=502,
             detail={
@@ -2141,6 +2549,12 @@ def vendoc_export_document(
         dry_run=False,
         status="exported",
         error_text=None,
+    )
+    _audit(
+        request,
+        "vendoc_live_exported",
+        document_id=document_id,
+        details={"job_id": job.get("id"), "position_count": vendoc_payload.get("summary", {}).get("position_count")},
     )
     return _json_safe(
         {
@@ -2237,6 +2651,7 @@ def export_document(
 @app.post("/process/{document_id}")
 def process_document(
     document_id: int,
+    request: Request,
     process_mode: str | None = Query(default="parser_only"),
     use_ai: bool = Query(default=False, alias="use_llm", include_in_schema=False),
     ai_override: bool = Query(default=False, alias="llm_override", include_in_schema=False),
@@ -2244,15 +2659,19 @@ def process_document(
     document = get_document(document_id)
     if not document:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    if str(document.get("status") or "").strip().lower() == "processing":
+        raise HTTPException(status_code=409, detail="Dokument wird bereits verarbeitet.")
 
     source_path = Path(document["source_file"])
     if not source_path.exists():
         update_document_status(document_id, status="failed", error_message=f"File missing: {source_path}")
+        _audit(request, "document_processing_failed", document_id=document_id, details={"message": f"File missing: {source_path}"})
         raise HTTPException(status_code=400, detail=f"Source file does not exist: {source_path}")
 
     requested_mode = _resolve_process_mode(process_mode=process_mode, use_ai=use_ai, ai_override=ai_override)
     update_document_status(document_id, status="processing", error_message=None)
     update_document_approval_state(document_id, approval_status="pending")
+    _audit(request, "document_processing_started", document_id=document_id, details={"mode": requested_mode})
 
     _set_process_progress(
         document_id,
@@ -2382,6 +2801,7 @@ def process_document(
             mode=requested_mode,
             status="failed",
         )
+        _audit(request, "document_processing_failed", document_id=document_id, details={"mode": requested_mode, "message": "HTTP error"})
         raise
     except Exception as exc:
         update_document_status(document_id, status="failed", error_message=str(exc)[:1000])
@@ -2393,8 +2813,15 @@ def process_document(
             status="failed",
             error=str(exc)[:1000],
         )
+        _audit(request, "document_processing_failed", document_id=document_id, details={"mode": requested_mode, "message": str(exc)[:1000]})
         raise HTTPException(status_code=500, detail=f"Processing failed: {exc}") from exc
 
+    _audit(
+        request,
+        "document_processed",
+        document_id=document_id,
+        details={"mode": requested_mode, "line_item_count": len(line_item_rows), "image_count": len(image_rows)},
+    )
     return {
         "document_id": updated["id"],
         "status": updated["status"],

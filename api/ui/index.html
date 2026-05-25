@@ -3046,6 +3046,177 @@
       flex: 1;
     }
 
+    .confirm-modal {
+      width: min(560px, 100%);
+      height: auto;
+      max-height: min(84vh, 900px);
+    }
+
+    .confirm-modal-body {
+      padding: 18px 20px 20px;
+      background: #faf7f4;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: auto;
+    }
+
+    .confirm-modal-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      color: #2b2828;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .confirm-modal-copy p {
+      margin: 0;
+      white-space: normal;
+    }
+
+    .confirm-modal-copy.is-warning p:first-child {
+      color: var(--warn);
+      font-weight: 700;
+    }
+
+    .confirm-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .auth-user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      padding: 4px 6px 4px 10px;
+      border-radius: 999px;
+      color: #2d2828;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(35, 32, 32, 0.10);
+      box-shadow: 0 8px 18px rgba(8, 8, 10, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .auth-user-chip button {
+      border: 1px solid rgba(35, 32, 32, 0.10);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #2d2828;
+      background: #f7f4f1;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .auth-user-chip button:hover {
+      background: #ece7e3;
+    }
+
+    .auth-modal {
+      width: min(420px, 100%);
+      height: auto;
+      max-height: min(84vh, 720px);
+    }
+
+    .auth-modal-body {
+      display: grid;
+      gap: 14px;
+      padding: 20px;
+      background: #faf7f4;
+    }
+
+    .auth-field {
+      display: grid;
+      gap: 6px;
+      color: #2d2828;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .auth-field input {
+      width: 100%;
+      border: 1px solid rgba(35, 32, 32, 0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: #2d2828;
+      background: #ffffff;
+      font: inherit;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .auth-field input:focus {
+      border-color: rgba(213, 26, 15, 0.42);
+      box-shadow: 0 0 0 3px rgba(213, 26, 15, 0.10);
+    }
+
+    .auth-error {
+      min-height: 18px;
+      color: #a12a1b;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .auth-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .auth-secondary {
+      border: 0;
+      padding: 0;
+      color: #7c2d21;
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .auth-secondary[hidden] {
+      display: none;
+    }
+
+    .admin-user-panel {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(35, 32, 32, 0.10);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .admin-user-panel h3 {
+      margin: 0;
+      color: #2d2828;
+      font-size: 13px;
+    }
+
+    .admin-user-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .admin-user-grid .auth-field {
+      font-size: 11px;
+    }
+
+    .admin-user-grid .auth-field input {
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
     @keyframes heroGlow {
       from {
         transform: translate3d(0, 0, 0) scale(1);
@@ -7354,6 +7525,34 @@
       line-height: 1.35;
     }
 
+    .app-v3 .position-meta-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .app-v3 .position-meta-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: #f5f5f7;
+      color: rgba(29, 29, 31, 0.62);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .app-v3 .position-meta-chip.warn {
+      border-color: rgba(213, 26, 15, 0.20);
+      background: #fff2ed;
+      color: #b42318;
+    }
+
     .app-v3 .position-description {
       max-width: 420px;
       color: #1d1d1f;
@@ -8225,6 +8424,92 @@
       color: rgba(29, 29, 31, 0.56);
       font-size: 12px;
       line-height: 1.45;
+    }
+
+    .app-v3 .alternative-mode-control {
+      display: grid;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: #fbfbfd;
+    }
+
+    .app-v3 .alternative-mode-head {
+      display: grid;
+      gap: 2px;
+    }
+
+    .app-v3 .alternative-mode-head strong {
+      color: rgba(29, 29, 31, 0.88);
+      font-size: 14px;
+      font-weight: 780;
+    }
+
+    .app-v3 .alternative-mode-head span {
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .app-v3 .alternative-mode-segment {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .app-v3 .alternative-mode-button {
+      display: grid;
+      gap: 4px;
+      min-height: 58px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: #fff;
+      color: rgba(29, 29, 31, 0.72);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+    }
+
+    .app-v3 .alternative-mode-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(213, 26, 15, 0.18);
+      box-shadow: 0 10px 20px rgba(23, 20, 20, 0.06);
+    }
+
+    .app-v3 .alternative-mode-button.is-selected {
+      border-color: rgba(52, 199, 89, 0.28);
+      background: #f1fbf5;
+      color: rgba(29, 29, 31, 0.88);
+      box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.12);
+    }
+
+    .app-v3 .alternative-mode-button:disabled {
+      opacity: 0.62;
+      cursor: not-allowed;
+      background: #f5f5f7;
+    }
+
+    .app-v3 .alternative-mode-button strong {
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .app-v3 .alternative-mode-button span {
+      font-size: 11px;
+      line-height: 1.35;
+      color: rgba(29, 29, 31, 0.56);
+    }
+
+    .app-v3 .alternative-mode-meta {
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .app-v3 .position-alternative-mode-control {
+      margin-top: -2px;
     }
 
     .app-v3 .vendoc-export-actions {
@@ -10256,6 +10541,10 @@
           <span class="live-label">Run</span>
           <span id="processLiveState" class="debug-state">idle</span>
         </div>
+        <div class="auth-user-chip" id="authUserChip" hidden>
+          <span id="currentUserLabel">Nicht angemeldet</span>
+          <button id="logoutBtn" type="button">Logout</button>
+        </div>
       </div>
       <details class="advanced-tools shell-advanced v3-admin-menu">
         <summary aria-label="Admin-Menü">Admin</summary>
@@ -10268,6 +10557,27 @@
           <button class="btn btn-ghost" id="csvPreviewBtn">CSV Vorschau</button>
           <button class="btn btn-danger" id="resetBtn">Verarbeitung zurücksetzen</button>
         </div>
+        <form class="admin-user-panel" id="adminCreateUserForm">
+          <h3>Benutzer anlegen</h3>
+          <div class="admin-user-grid">
+            <label class="auth-field" for="adminCreateUsername">
+              Benutzer
+              <input id="adminCreateUsername" autocomplete="off" required>
+            </label>
+            <label class="auth-field" for="adminCreateDisplayName">
+              Anzeigename
+              <input id="adminCreateDisplayName" autocomplete="off">
+            </label>
+            <label class="auth-field" for="adminCreatePassword">
+              Passwort
+              <input id="adminCreatePassword" type="password" autocomplete="new-password" required minlength="4">
+            </label>
+          </div>
+          <div class="auth-actions">
+            <div class="auth-error" id="adminCreateUserMessage"></div>
+            <button class="btn btn-primary" id="adminCreateUserBtn" type="submit">Anlegen</button>
+          </div>
+        </form>
         <div class="debug-panel">
           <div class="debug-head">
             <div>Live Debug</div>
@@ -10365,6 +10675,40 @@
                 <div class="review-hero tab-pane-lead">
                   <div class="review-main" id="reviewHero"></div>
                   <div class="review-metrics" id="reviewMetrics"></div>
+                </div>
+                <div class="review-card vendoc-start-customer-card">
+                  <div class="review-card-head">
+                    <div>
+                      <h2>Kunde in SRTemp</h2>
+                      <div class="small">Kundenzuordnung vor Prüfung und Export festlegen.</div>
+                    </div>
+                  </div>
+                  <div class="vendoc-customer-controls">
+                    <label for="vendocCustomerTrigger">
+                      <span>Kunde in SRTemp</span>
+                    </label>
+                    <div class="vendoc-customer-picker" id="vendocCustomerPicker">
+                      <button class="vendoc-customer-trigger" id="vendocCustomerTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
+                        <span class="vendoc-customer-trigger-text" id="vendocCustomerTriggerText">Kunden werden geladen ...</span>
+                        <span class="vendoc-customer-trigger-caret">▾</span>
+                      </button>
+                      <div class="vendoc-customer-panel" id="vendocCustomerPanel" hidden>
+                        <div class="vendoc-customer-search-row">
+                          <label for="vendocCustomerSearch">
+                            <span>Kunde suchen</span>
+                            <input id="vendocCustomerSearch" type="search" placeholder="Name, Kundennummer oder UID eingeben" autocomplete="off" disabled>
+                          </label>
+                          <div class="vendoc-customer-search-tools">
+                            <span class="vendoc-customer-search-count" id="vendocCustomerSearchCount">0 Treffer</span>
+                            <button class="btn btn-ghost" id="vendocCustomerSearchClearBtn" type="button" disabled>Zurücksetzen</button>
+                          </div>
+                        </div>
+                        <div class="vendoc-customer-results" id="vendocCustomerResults" role="listbox" aria-label="Kundenliste SRTemp"></div>
+                        <div class="vendoc-customer-empty" id="vendocCustomerEmpty">Kunden werden geladen ...</div>
+                      </div>
+                    </div>
+                    <div class="vendoc-customer-meta" id="vendocCustomerMeta">Noch keine Kundenliste geladen.</div>
+                  </div>
                 </div>
                 <div class="approval-guide" id="approvalGuide"></div>
                 <details class="overview-details">
@@ -10473,32 +10817,6 @@
                     <span class="vendoc-status-pill pending" id="vendocExportState">Nicht geprüft</span>
                   </div>
                   <div class="vendoc-export-meta" id="vendocExportMeta">Noch kein Exportstatus geladen.</div>
-                  <div class="vendoc-customer-controls">
-                    <label for="vendocCustomerTrigger">
-                      <span>Kunde in SRTemp</span>
-                    </label>
-                    <div class="vendoc-customer-picker" id="vendocCustomerPicker">
-                      <button class="vendoc-customer-trigger" id="vendocCustomerTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
-                        <span class="vendoc-customer-trigger-text" id="vendocCustomerTriggerText">Kunden werden geladen ...</span>
-                        <span class="vendoc-customer-trigger-caret">▾</span>
-                      </button>
-                      <div class="vendoc-customer-panel" id="vendocCustomerPanel" hidden>
-                        <div class="vendoc-customer-search-row">
-                          <label for="vendocCustomerSearch">
-                            <span>Kunde suchen</span>
-                            <input id="vendocCustomerSearch" type="search" placeholder="Name, Kundennummer oder UID eingeben" autocomplete="off" disabled>
-                          </label>
-                          <div class="vendoc-customer-search-tools">
-                            <span class="vendoc-customer-search-count" id="vendocCustomerSearchCount">0 Treffer</span>
-                            <button class="btn btn-ghost" id="vendocCustomerSearchClearBtn" type="button" disabled>Zurücksetzen</button>
-                          </div>
-                        </div>
-                        <div class="vendoc-customer-results" id="vendocCustomerResults" role="listbox" aria-label="Kundenliste SRTemp"></div>
-                        <div class="vendoc-customer-empty" id="vendocCustomerEmpty">Kunden werden geladen ...</div>
-                      </div>
-                    </div>
-                    <div class="vendoc-customer-meta" id="vendocCustomerMeta">Noch keine Kundenliste geladen.</div>
-                  </div>
                   <div class="review-approval-actions vendoc-export-actions">
                     <button class="btn btn-ghost" id="vendocDryRunBtn" type="button">Dry-Run prüfen</button>
                     <button class="btn btn-ghost" id="vendocSqlPreviewBtn" type="button">SQL Vorschau</button>
@@ -10539,13 +10857,30 @@
                 <div class="filter-tools">
                   <label class="filter-toggle" for="itemIssuesOnly">
                     <input id="itemIssuesOnly" type="checkbox">
-                    Nur Auffällige
+                    Nur mit Fehlern/Warnungen
                   </label>
                   <select id="itemSourceFilter" class="filter-select" aria-label="Positionsquelle filtern">
                     <option value="all">Alle Quellen</option>
                     <option value="parser">Nur Parser</option>
                   </select>
                 </div>
+              </div>
+              <div class="alternative-mode-control position-alternative-mode-control">
+                <div class="alternative-mode-head">
+                  <strong>Alternative Positionen</strong>
+                  <span>Darstellung und Nummerierung für den VenDoc-Export.</span>
+                </div>
+                <div class="alternative-mode-segment" id="alternativeModeSegmentItems" role="group" aria-label="Alternative Positionen in der Positionsansicht">
+                  <button class="alternative-mode-button" type="button" data-alternative-mode="nested" disabled>
+                    <strong>Unter Hauptposition</strong>
+                    <span>z.B. 1.1, 1.2 direkt nach Position 1</span>
+                  </button>
+                  <button class="alternative-mode-button" type="button" data-alternative-mode="append" disabled>
+                    <strong>Am Ende anhängen</strong>
+                    <span>z.B. nach 7 Positionen als 8, 9</span>
+                  </button>
+                </div>
+                <div class="alternative-mode-meta" id="alternativeModeMetaItems">Noch kein Dokument geladen.</div>
               </div>
               <div class="items-table-wrap">
                 <table class="items-table">
@@ -10592,6 +10927,48 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="confirmModal" hidden>
+    <div class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-head">
+        <div class="modal-title" id="confirmModalTitle">Bestätigung</div>
+      </div>
+      <div class="confirm-modal-body">
+        <div class="confirm-modal-copy" id="confirmModalBody"></div>
+        <div class="confirm-modal-footer">
+          <button class="btn btn-ghost" id="confirmModalCancelBtn" type="button">Abbrechen</button>
+          <button class="btn btn-primary" id="confirmModalConfirmBtn" type="button">Bestätigen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="authGate" hidden>
+    <form class="modal auth-modal" id="loginForm" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div class="modal-head">
+        <div class="modal-title" id="authTitle">Anmelden</div>
+      </div>
+      <div class="auth-modal-body">
+        <label class="auth-field" id="loginDisplayNameWrap" for="loginDisplayName" hidden>
+          Anzeigename
+          <input id="loginDisplayName" name="display_name" autocomplete="name">
+        </label>
+        <label class="auth-field" for="loginUsername">
+          Benutzer
+          <input id="loginUsername" name="username" autocomplete="username" required>
+        </label>
+        <label class="auth-field" for="loginPassword">
+          Passwort
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <div class="auth-error" id="loginError"></div>
+        <div class="auth-actions">
+          <button class="auth-secondary" id="setupBackBtn" type="button" hidden>Zur Anmeldung</button>
+          <button class="btn btn-primary" id="loginBtn" type="submit">Anmelden</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <div class="image-hover-preview" id="imageHoverPreview" hidden>
     <img id="imageHoverPreviewImg" alt="Bildvorschau">
     <div class="image-hover-preview-meta" id="imageHoverPreviewMeta"></div>
@@ -10626,6 +11003,10 @@
       vendocCustomerPickerOpen: false,
       vendocAlreadyImported: false,
       vendocLatestImportedAt: null,
+      currentUser: null,
+      authSetupRequired: false,
+      authMode: "login",
+      confirmModalResolver: null,
       itemFilters: {
         issuesOnly: false,
         source: "all",
@@ -10677,6 +11058,10 @@
       vendocCustomerResults: document.getElementById("vendocCustomerResults"),
       vendocCustomerEmpty: document.getElementById("vendocCustomerEmpty"),
       vendocCustomerMeta: document.getElementById("vendocCustomerMeta"),
+      alternativeModeSegment: document.getElementById("alternativeModeSegment"),
+      alternativeModeSegmentItems: document.getElementById("alternativeModeSegmentItems"),
+      alternativeModeMeta: document.getElementById("alternativeModeMeta"),
+      alternativeModeMetaItems: document.getElementById("alternativeModeMetaItems"),
       vendocDryRunBtn: document.getElementById("vendocDryRunBtn"),
       vendocSqlPreviewBtn: document.getElementById("vendocSqlPreviewBtn"),
       vendocLiveExportBtn: document.getElementById("vendocLiveExportBtn"),
@@ -10686,6 +11071,25 @@
       csvPreviewBtn: document.getElementById("csvPreviewBtn"),
       statusBar: document.getElementById("statusBar"),
       processLiveState: document.getElementById("processLiveState"),
+      authUserChip: document.getElementById("authUserChip"),
+      currentUserLabel: document.getElementById("currentUserLabel"),
+      logoutBtn: document.getElementById("logoutBtn"),
+      authGate: document.getElementById("authGate"),
+      loginForm: document.getElementById("loginForm"),
+      authTitle: document.getElementById("authTitle"),
+      loginDisplayNameWrap: document.getElementById("loginDisplayNameWrap"),
+      loginDisplayName: document.getElementById("loginDisplayName"),
+      loginUsername: document.getElementById("loginUsername"),
+      loginPassword: document.getElementById("loginPassword"),
+      loginError: document.getElementById("loginError"),
+      loginBtn: document.getElementById("loginBtn"),
+      setupBackBtn: document.getElementById("setupBackBtn"),
+      adminCreateUserForm: document.getElementById("adminCreateUserForm"),
+      adminCreateUsername: document.getElementById("adminCreateUsername"),
+      adminCreateDisplayName: document.getElementById("adminCreateDisplayName"),
+      adminCreatePassword: document.getElementById("adminCreatePassword"),
+      adminCreateUserMessage: document.getElementById("adminCreateUserMessage"),
+      adminCreateUserBtn: document.getElementById("adminCreateUserBtn"),
       clearDebugBtn: document.getElementById("clearDebugBtn"),
       debugLog: document.getElementById("debugLog"),
       pdfStage: document.getElementById("pdfStage"),
@@ -10730,6 +11134,11 @@
       extractPanes: Array.from(document.querySelectorAll("[data-extract-pane]")),
       extractPanelBody: document.querySelector(".panel-body"),
       workflowHint: document.getElementById("workflowHint"),
+      confirmModal: document.getElementById("confirmModal"),
+      confirmModalTitle: document.getElementById("confirmModalTitle"),
+      confirmModalBody: document.getElementById("confirmModalBody"),
+      confirmModalCancelBtn: document.getElementById("confirmModalCancelBtn"),
+      confirmModalConfirmBtn: document.getElementById("confirmModalConfirmBtn"),
       tabBadgeOverview: document.getElementById("tabBadgeOverview"),
       tabBadgeReview: document.getElementById("tabBadgeReview"),
       tabBadgeItems: document.getElementById("tabBadgeItems"),
@@ -12160,6 +12569,7 @@
       clearNode(ui.sourceBreakdown);
       renderApprovalGuidance(result);
       renderReviewWorkbench(result);
+      renderAlternativePositionMode(result);
 
       if (!result || typeof result !== "object") {
         ui.reviewHero.innerHTML = `
@@ -12476,20 +12886,187 @@
       ].join("");
     }
 
-    async function apiJson(path, options) {
+    function parseApiError(text, fallback) {
+      if (!text) return fallback;
+      try {
+        const payload = JSON.parse(text);
+        if (typeof payload.detail === "string") return payload.detail;
+        if (payload.detail && typeof payload.detail.message === "string") return payload.detail.message;
+        if (typeof payload.message === "string") return payload.message;
+      } catch (_) {
+        return text;
+      }
+      return text;
+    }
+
+    function syncAuthUser() {
+      const user = state.currentUser || null;
+      if (ui.currentUserLabel) {
+        ui.currentUserLabel.textContent = user ? (user.display_name || user.username || "Angemeldet") : "Nicht angemeldet";
+      }
+      if (ui.authUserChip) {
+        if (user) ui.authUserChip.removeAttribute("hidden");
+        else ui.authUserChip.setAttribute("hidden", "");
+      }
+      if (ui.documentReviewerInput && user && !ui.documentReviewerInput.value) {
+        ui.documentReviewerInput.value = user.display_name || user.username || "";
+      }
+    }
+
+    function setAuthMode(mode) {
+      state.authMode = mode === "setup" ? "setup" : "login";
+      const isSetup = state.authMode === "setup";
+      if (ui.authTitle) ui.authTitle.textContent = isSetup ? "Ersten Benutzer anlegen" : "Anmelden";
+      if (ui.loginBtn) ui.loginBtn.textContent = isSetup ? "Benutzer anlegen" : "Anmelden";
+      if (ui.loginDisplayNameWrap) {
+        if (isSetup) ui.loginDisplayNameWrap.removeAttribute("hidden");
+        else ui.loginDisplayNameWrap.setAttribute("hidden", "");
+      }
+      if (ui.setupBackBtn) {
+        if (isSetup && !state.authSetupRequired) ui.setupBackBtn.removeAttribute("hidden");
+        else ui.setupBackBtn.setAttribute("hidden", "");
+      }
+    }
+
+    function showAuthGate(message) {
+      state.currentUser = null;
+      syncAuthUser();
+      setAuthMode(state.authSetupRequired ? "setup" : "login");
+      if (ui.loginError) ui.loginError.textContent = message || "";
+      if (ui.authGate) ui.authGate.removeAttribute("hidden");
+      window.setTimeout(() => {
+        if (ui.loginUsername && !ui.loginUsername.value) ui.loginUsername.focus();
+        else if (ui.loginPassword) ui.loginPassword.focus();
+      }, 0);
+    }
+
+    function hideAuthGate() {
+      if (ui.authGate) ui.authGate.setAttribute("hidden", "");
+      if (ui.loginError) ui.loginError.textContent = "";
+    }
+
+    async function loadCurrentUser() {
+      try {
+        const payload = await apiJson("/auth/me", { method: "GET" }, { skipAuthRedirect: true });
+        state.currentUser = payload && payload.user ? payload.user : null;
+        state.authSetupRequired = false;
+        syncAuthUser();
+        hideAuthGate();
+        return true;
+      } catch (error) {
+        try {
+          const setup = await apiJson("/auth/setup-status", { method: "GET" }, { skipAuthRedirect: true });
+          state.authSetupRequired = !!(setup && setup.needs_setup);
+        } catch (_) {
+          state.authSetupRequired = false;
+        }
+        showAuthGate(state.authSetupRequired ? "Lege den ersten Benutzer an." : "Bitte anmelden.");
+        return false;
+      }
+    }
+
+    async function submitLogin(event) {
+      event.preventDefault();
+      const username = ui.loginUsername ? String(ui.loginUsername.value || "").trim() : "";
+      const password = ui.loginPassword ? String(ui.loginPassword.value || "") : "";
+      const displayName = ui.loginDisplayName ? String(ui.loginDisplayName.value || "").trim() : "";
+      if (!username || !password) {
+        if (ui.loginError) ui.loginError.textContent = "Benutzer und Passwort eingeben.";
+        return;
+      }
+      if (ui.loginBtn) ui.loginBtn.disabled = true;
+      if (ui.loginError) ui.loginError.textContent = "";
+      try {
+        const isSetup = state.authMode === "setup";
+        const payload = await apiJson(
+          isSetup ? "/auth/register" : "/auth/login",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(isSetup ? { username, password, display_name: displayName || null } : { username, password }),
+          },
+          { skipAuthRedirect: true }
+        );
+        state.currentUser = payload && payload.user ? payload.user : null;
+        state.authSetupRequired = false;
+        setAuthMode("login");
+        if (ui.loginPassword) ui.loginPassword.value = "";
+        if (ui.loginDisplayName) ui.loginDisplayName.value = "";
+        syncAuthUser();
+        hideAuthGate();
+        await loadDocuments();
+      } catch (error) {
+        if (ui.loginError) ui.loginError.textContent = String(error.message || "Login fehlgeschlagen.");
+      } finally {
+        if (ui.loginBtn) ui.loginBtn.disabled = false;
+      }
+    }
+
+    async function logoutCurrentUser() {
+      try {
+        await apiJson("/auth/logout", { method: "POST" }, { skipAuthRedirect: true });
+      } catch (_) {
+        // Session is cleared locally either way.
+      }
+      state.currentUser = null;
+      syncAuthUser();
+      showAuthGate("Abgemeldet.");
+    }
+
+    async function submitAdminCreateUser(event) {
+      event.preventDefault();
+      const username = ui.adminCreateUsername ? String(ui.adminCreateUsername.value || "").trim() : "";
+      const displayName = ui.adminCreateDisplayName ? String(ui.adminCreateDisplayName.value || "").trim() : "";
+      const password = ui.adminCreatePassword ? String(ui.adminCreatePassword.value || "") : "";
+      if (!username || !password) {
+        if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = "Benutzer und Passwort eingeben.";
+        return;
+      }
+      if (password.length < 4) {
+        if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = "Passwort braucht mindestens 4 Zeichen.";
+        return;
+      }
+      if (ui.adminCreateUserBtn) ui.adminCreateUserBtn.disabled = true;
+      if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = "";
+      try {
+        await apiJson("/auth/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password, display_name: displayName || null }),
+        });
+        if (ui.adminCreateUsername) ui.adminCreateUsername.value = "";
+        if (ui.adminCreateDisplayName) ui.adminCreateDisplayName.value = "";
+        if (ui.adminCreatePassword) ui.adminCreatePassword.value = "";
+        if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = `Benutzer ${username} wurde angelegt.`;
+      } catch (error) {
+        if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = String(error.message || "Benutzer konnte nicht angelegt werden.");
+      } finally {
+        if (ui.adminCreateUserBtn) ui.adminCreateUserBtn.disabled = false;
+      }
+    }
+
+    async function apiJson(path, options, meta = {}) {
       const response = await fetch(path, options);
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
+        const message = parseApiError(text, `HTTP ${response.status}`);
+        if (response.status === 401 && !meta.skipAuthRedirect) {
+          showAuthGate(message || "Login erforderlich.");
+        }
+        throw new Error(message);
       }
       return response.json();
     }
 
-    async function apiText(path, options) {
+    async function apiText(path, options, meta = {}) {
       const response = await fetch(path, options);
       const text = await response.text();
       if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
+        const message = parseApiError(text, `HTTP ${response.status}`);
+        if (response.status === 401 && !meta.skipAuthRedirect) {
+          showAuthGate(message || "Login erforderlich.");
+        }
+        throw new Error(message);
       }
       return text;
     }
@@ -13393,32 +13970,74 @@
       state.itemFilters.issuesOnly = issuesOnly;
       state.itemFilters.source = sourceFilter;
 
-      const itemsWithIssues = items.filter((item) => Number(item.validation_issue_count || 0) > 0);
-      const filteredItems = items.filter((item) => {
-        const source = lineItemSource(item);
-        const hasIssues = Number(item.validation_issue_count || 0) > 0;
-        if (issuesOnly && !hasIssues) return false;
-        if (sourceFilter !== "all" && source !== sourceFilter) return false;
-        return true;
+      const documentPayload = state.result && state.result.document ? state.result.document : {};
+      const alternativeMode = documentPayload.alternative_position_mode === "append" ? "append" : "nested";
+      const expandedItems = expandEmbeddedAlternativesForDisplay(items);
+      const displayItems = buildAlternativeDisplayItems(expandedItems, alternativeMode);
+      const exportPreview = buildAlternativeExportPreview(displayItems, alternativeMode);
+      const itemKeyByItem = new Map();
+      displayItems.forEach((item, index) => {
+        if (item && typeof item === "object") itemKeyByItem.set(item, positionItemKey(item, index));
       });
+      const existingAlternativeCount = items.filter((item) => item && item.is_alternative).length;
+      const embeddedAlternativeTotal = items.reduce((sum, item) => sum + embeddedAlternativeCount(item), 0);
+      const alternativeTotal = existingAlternativeCount + embeddedAlternativeTotal;
+      const groupedAlternativeCount = displayItems.filter((item) => item && item.__aggregated_alternative).length;
+      const itemsWithIssues = displayItems.filter((item) => Number(item.validation_issue_count || 0) > 0);
+      const filteredItems = displayItems
+        .filter((item) => {
+          const source = lineItemSource(item);
+          const hasIssues = Number(item.validation_issue_count || 0) > 0;
+          if (issuesOnly && !hasIssues) return false;
+          if (sourceFilter !== "all" && source !== sourceFilter) return false;
+          return true;
+        })
+        .sort((left, right) => {
+          const leftOrder = Number((exportPreview.get(left) || {}).order_index || 0);
+          const rightOrder = Number((exportPreview.get(right) || {}).order_index || 0);
+          if (leftOrder && rightOrder && leftOrder !== rightOrder) return leftOrder - rightOrder;
+          return displayItems.indexOf(left) - displayItems.indexOf(right);
+        });
 
       if (ui.itemFilterInfo) {
+        const alternativeHint = alternativeTotal
+          ? `<span class="item-stat-pill">Export ${escapeHtml(alternativePositionModeLabel(alternativeMode))}, lückenlos</span><span class="item-stat-pill${existingAlternativeCount ? " warn" : ""}">${escapeHtml(fmt(alternativeTotal))} Alternative(n)</span>`
+          : `<span class="item-stat-pill">Exportnummern lückenlos</span>`;
+        const embeddedHint = embeddedAlternativeTotal
+          ? `<span class="item-stat-pill warn">${escapeHtml(fmt(embeddedAlternativeTotal))} eingebettet, sichtbar in SQL/Dry-Run</span>`
+          : "";
+        const groupedHint = groupedAlternativeCount
+          ? `<span class="item-stat-pill warn">${escapeHtml(fmt(groupedAlternativeCount))} Sammelposition(en)</span>`
+          : "";
         ui.itemFilterInfo.innerHTML = `
-          <span class="item-stat-pill">${escapeHtml(fmt(filteredItems.length))}/${escapeHtml(fmt(items.length))} sichtbar</span>
+          <span class="item-stat-pill">${escapeHtml(fmt(filteredItems.length))}/${escapeHtml(fmt(displayItems.length))} in Exportansicht</span>
           <span class="item-stat-pill${itemsWithIssues.length ? " warn" : ""}">${escapeHtml(fmt(itemsWithIssues.length))} auffällig</span>
+          ${alternativeHint}
+          ${embeddedHint}
+          ${groupedHint}
         `;
       }
 
       if (!filteredItems.length) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td colspan="7" class="small">${items.length ? "Keine Positionen passen zum aktuellen Filter." : "Keine Positionen extrahiert."}</td>`;
+        row.innerHTML = `<td colspan="7" class="small">${displayItems.length ? "Keine Positionen passen zum aktuellen Filter." : "Keine Positionen extrahiert."}</td>`;
         ui.itemRows.appendChild(row);
         return;
       }
 
       filteredItems.forEach((item, index) => {
-        const itemKey = positionItemKey(item, index);
+        const itemKey = itemKeyByItem.get(item) || positionItemKey(item, index);
         const lineItemId = Number(item && item.id);
+        const exportMeta = exportPreview.get(item) || {};
+        const exportPositionNo = fmt(exportMeta.position_no || item.position_no);
+        const exportDiffers = String(exportPositionNo || "") !== String(fmt(item.position_no));
+        const exportMetaChips = [];
+        if (item.is_alternative) exportMetaChips.push({ label: "Alternative", css: "" });
+        if (exportDiffers) exportMetaChips.push({ label: `Original ${fmt(item.position_no)}`, css: "" });
+        if (exportDiffers) exportMetaChips.push({ label: "neu nummeriert", css: "warn" });
+        const exportMetaHtml = exportMetaChips.length
+          ? `<div class="position-meta-chips">${exportMetaChips.map((chip) => `<span class="position-meta-chip ${escapeHtml(chip.css)}">${escapeHtml(chip.label)}</span>`).join("")}</div>`
+          : `<span>Exportposition</span>`;
         const isExpanded = state.expandedItemKeys.has(itemKey);
         const openIssues = itemOpenIssues(item);
         const resolvedIssues = itemResolvedIssues(item);
@@ -13491,6 +14110,7 @@
         const extractedFieldHtml = detailMetaCellsHtml([
           ["Datensatz-ID", item.id],
           ["Position", item.position_no],
+          ["Export-Position", exportPositionNo],
           ["LV / Arch.-Pos.", item.lv_pos],
           ["Referenz-LV", itemMetadata.referenced_lv_pos],
           ["Alternativ", item.is_alternative],
@@ -13522,7 +14142,8 @@
           </td>
           <td>
             <div class="position-ident">
-              <strong>Pos. ${escapeHtml(fmt(item.position_no))}</strong>
+              <strong>Pos. ${escapeHtml(exportPositionNo)}</strong>
+              ${exportMetaHtml}
               <span>LV ${escapeHtml(fmt(item.lv_pos))} · Seite ${escapeHtml(fmt(item.page_ref))}</span>
             </div>
           </td>
@@ -13905,6 +14526,39 @@
       document.body.style.overflow = "";
     }
 
+    function openConfirmModal({ title, paragraphs = [], confirmLabel = "Bestätigen", confirmKind = "primary" } = {}) {
+      if (!ui.confirmModal || !ui.confirmModalTitle || !ui.confirmModalBody || !ui.confirmModalConfirmBtn) {
+        return Promise.resolve(window.confirm(String(paragraphs || []).join("\n\n") || String(title || "Bestätigung")));
+      }
+      ui.confirmModalTitle.textContent = String(title || "Bestätigung");
+      clearNode(ui.confirmModalBody);
+      const copy = document.createElement("div");
+      copy.className = `confirm-modal-copy${confirmKind === "danger" ? " is-warning" : ""}`;
+      for (const text of paragraphs) {
+        const p = document.createElement("p");
+        p.textContent = String(text || "");
+        copy.appendChild(p);
+      }
+      ui.confirmModalBody.appendChild(copy);
+      ui.confirmModalConfirmBtn.textContent = String(confirmLabel || "Bestätigen");
+      ui.confirmModalConfirmBtn.className = confirmKind === "danger" ? "btn btn-danger" : "btn btn-primary";
+      ui.confirmModal.removeAttribute("hidden");
+      document.body.style.overflow = "hidden";
+      return new Promise((resolve) => {
+        state.confirmModalResolver = resolve;
+      });
+    }
+
+    function closeConfirmModal(result = false) {
+      if (ui.confirmModal) ui.confirmModal.setAttribute("hidden", "");
+      document.body.style.overflow = ui.previewModal && !ui.previewModal.hidden ? "hidden" : "";
+      const resolver = state.confirmModalResolver;
+      state.confirmModalResolver = null;
+      if (typeof resolver === "function") {
+        resolver(!!result);
+      }
+    }
+
     function downloadPreviewContent() {
       if (!state.previewContent || !state.previewFormat) return;
       const blob = new Blob([state.previewContent], { type: "text/plain;charset=utf-8" });
@@ -14147,6 +14801,304 @@
         ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen · ausgewählt: ${vendocCustomerOptionLabel(documentPayload)}`;
       } else {
         ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen.`;
+      }
+    }
+
+    function countAlternativePositions(result) {
+      const items = Array.isArray(result && result.line_items) ? result.line_items : [];
+      let count = 0;
+      for (const item of items) {
+        if (!item || typeof item !== "object") continue;
+        if (item.is_alternative) count += 1;
+        const longText = String(item.description_long || "");
+        const embedded = longText.split(/\r?\n/).filter((line) => /^\s*Alternativ(?:e|position)?\s*:/i.test(line));
+        count += embedded.length;
+      }
+      return count;
+    }
+
+    function embeddedAlternativeCount(item) {
+      const longText = String(item && item.description_long || "");
+      return longText.split(/\r?\n/).filter((line) => /^\s*Alternativ(?:e|position)?\s*:/i.test(line)).length;
+    }
+
+    function uiNumberValue(value) {
+      if (value === null || value === undefined || value === "") return null;
+      if (typeof value === "number") return Number.isFinite(value) ? value : null;
+      const normalized = String(value).trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+      const number = Number(normalized);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function stripAlternativePriceTokens(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      return raw
+        .replace(/\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?/gi, "")
+        .replace(/(?:€\s*\d{1,3}(?:[ .]\d{3})*,\d{2}|\d{1,3}(?:[ .]\d{3})*,\d{2}\s*€)/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\s+([,:;])/g, "$1")
+        .trim()
+        .replace(/^[-,\s]+|[-,\s]+$/g, "");
+    }
+
+    function embeddedAlternativeLines(item) {
+      const longText = String(item && item.description_long || "");
+      return longText
+        .split(/\r?\n/)
+        .map((line) => line.match(/^\s*Alternativ(?:e|position)?\s*:\s*(.+?)\s*$/i))
+        .filter(Boolean)
+        .map((match) => match[1].trim())
+        .filter(Boolean);
+    }
+
+    function metadataObject(item) {
+      const raw = item && item.metadata_json;
+      if (raw && typeof raw === "object") return { ...raw };
+      if (raw && typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? { ...parsed } : {};
+        } catch (_error) {
+          return {};
+        }
+      }
+      return {};
+    }
+
+    function epPriceFromText(value) {
+      const match = String(value || "").match(/\bEP\s*:\s*(?:€\s*)?(\d{1,3}(?:[ .]\d{3})*,\d{2})(?:\s*€)?/i);
+      return match ? uiNumberValue(match[1]) : null;
+    }
+
+    function expandEmbeddedAlternativesForDisplay(items) {
+      const expanded = [];
+      (Array.isArray(items) ? items : []).forEach((item, itemIndex) => {
+        if (!item || typeof item !== "object") return;
+        expanded.push(item);
+        if (item.is_alternative) return;
+        embeddedAlternativeLines(item).forEach((altText, altIndex) => {
+          const parentId = fmt(item.id || item.position_no || itemIndex, "position");
+          const metadata = metadataObject(item);
+          metadata.alternative_source = "embedded_long_text";
+          metadata.main_line_item_id = parentId;
+          expanded.push({
+            ...item,
+            id: `${parentId}:alt:${altIndex + 1}`,
+            is_alternative: true,
+            description_short: stripAlternativePriceTokens(altText) || "Alternative",
+            description_long: altText,
+            unit_price: epPriceFromText(altText),
+            line_total: null,
+            metadata_json: metadata,
+            image_ids_primary: [],
+            image_ids: [],
+            image_count: 0,
+            image_candidate_count: 0,
+            validation_issue_count: 0,
+            validation_status: "auto_accept",
+            __embedded_alternative: true,
+          });
+        });
+      });
+      return expanded;
+    }
+
+    function alternativeGroupLabel(item) {
+      const shortLabel = stripAlternativePriceTokens(item && item.description_short);
+      if (shortLabel) return shortLabel;
+      const longText = String(item && item.description_long || "");
+      for (const line of longText.split(/\r?\n/)) {
+        const cleaned = stripAlternativePriceTokens(line);
+        if (cleaned) return cleaned;
+      }
+      return "";
+    }
+
+    function alternativeGroupKey(item) {
+      const label = normalizedUiText(alternativeGroupLabel(item)).replace(/[^a-z0-9äöüß]+/g, " ").trim();
+      if (!label) return "";
+      const unit = normalizedUiText(item && item.unit);
+      return `${label}|${unit}`;
+    }
+
+    function lineTotalForDisplayItem(item) {
+      const lineTotal = uiNumberValue(item && item.line_total);
+      if (lineTotal !== null) return lineTotal;
+      const quantity = uiNumberValue(item && item.quantity);
+      const unitPrice = uiNumberValue(item && item.unit_price);
+      if (quantity === null || unitPrice === null) return null;
+      return quantity * unitPrice;
+    }
+
+    function aggregateAppendAlternativesForDisplay(alternatives) {
+      const groups = new Map();
+      const passthrough = [];
+      (Array.isArray(alternatives) ? alternatives : []).forEach((item) => {
+        const key = alternativeGroupKey(item);
+        if (!key) {
+          passthrough.push(item);
+          return;
+        }
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+      });
+
+      const aggregated = [];
+      Array.from(groups.values()).forEach((groupItems, groupIndex) => {
+        if (groupItems.length === 1) {
+          aggregated.push(groupItems[0]);
+          return;
+        }
+        const first = groupItems[0];
+        const label = alternativeGroupLabel(first) || "Alternative";
+        const quantitySum = groupItems.reduce((sum, item) => sum + (uiNumberValue(item.quantity) || 0), 0);
+        const totalValues = groupItems.map(lineTotalForDisplayItem);
+        const hasTotal = totalValues.some((value) => value !== null);
+        const totalSum = totalValues.reduce((sum, value) => sum + (value || 0), 0);
+        const unitPrice = hasTotal && quantitySum ? totalSum / quantitySum : uiNumberValue(first.unit_price);
+        const metadata = metadataObject(first);
+        metadata.alternative_source = "aggregated_append";
+        metadata.alternative_group_source_count = groupItems.length;
+        metadata.alternative_group_source_ids = groupItems.map((item) => fmt(item.id, "")).filter(Boolean);
+        metadata.alternative_group_source_positions = groupItems.map((item) => fmt(item.position_no, "")).filter(Boolean);
+        aggregated.push({
+          ...first,
+          id: `aggregate:alt:${groupIndex + 1}:${normalizedUiText(label).slice(0, 48)}`,
+          is_alternative: true,
+          quantity: quantitySum || null,
+          description_short: label,
+          description_long: [
+            `Gesammelte Alternative: ${label}`,
+            `Anzahl Quellpositionen: ${groupItems.length}`,
+          ].join("\n"),
+          unit_price: unitPrice,
+          line_total: hasTotal ? totalSum : null,
+          metadata_json: metadata,
+          image_ids_primary: [],
+          image_ids: [],
+          image_count: 0,
+          image_candidate_count: 0,
+          validation_issue_count: 0,
+          validation_status: "auto_accept",
+          __aggregated_alternative: true,
+        });
+      });
+      return aggregated.concat(passthrough);
+    }
+
+    function buildAlternativeDisplayItems(items, mode) {
+      if (mode !== "append") return Array.isArray(items) ? items : [];
+      const mains = [];
+      const alternatives = [];
+      (Array.isArray(items) ? items : []).forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        if (item.is_alternative) alternatives.push(item);
+        else mains.push(item);
+      });
+      return mains.concat(aggregateAppendAlternativesForDisplay(alternatives));
+    }
+
+    function buildAlternativeExportPreview(items, mode) {
+      const preview = new Map();
+      const normalizedMode = mode === "append" ? "append" : "nested";
+      const appendItems = [];
+      const parentAltCounts = new Map();
+      let parentIndex = 0;
+      let orderIndex = 0;
+      let parentExportNo = "";
+
+      for (const item of Array.isArray(items) ? items : []) {
+        if (!item || typeof item !== "object") continue;
+        if (!item.is_alternative) {
+          parentIndex += 1;
+          orderIndex += 1;
+          parentExportNo = String(parentIndex);
+          preview.set(item, { position_no: parentExportNo, is_alternative: false, order_index: orderIndex });
+          continue;
+        }
+
+        const parentKey = parentExportNo || String(Math.max(1, parentIndex));
+        const nextAltNo = Number(parentAltCounts.get(parentKey) || 0) + 1;
+        parentAltCounts.set(parentKey, nextAltNo);
+        if (normalizedMode === "nested") {
+          orderIndex += 1;
+          preview.set(item, { position_no: `${parentKey}.${nextAltNo}`, is_alternative: true, order_index: orderIndex });
+        } else {
+          appendItems.push(item);
+        }
+      }
+
+      if (normalizedMode === "append") {
+        let nextPosition = parentIndex + 1;
+        for (const item of appendItems) {
+          orderIndex += 1;
+          preview.set(item, { position_no: String(nextPosition), is_alternative: true, order_index: orderIndex });
+          nextPosition += 1;
+        }
+      }
+
+      return preview;
+    }
+
+    function alternativePositionModeLabel(mode) {
+      return mode === "append" ? "am Ende angehängt" : "unter der Hauptposition";
+    }
+
+    function alternativeModeSegments() {
+      return [ui.alternativeModeSegment, ui.alternativeModeSegmentItems].filter(Boolean);
+    }
+
+    function alternativeModeMetas() {
+      return [ui.alternativeModeMeta, ui.alternativeModeMetaItems].filter(Boolean);
+    }
+
+    function renderAlternativePositionMode(result) {
+      const documentPayload = result && result.document ? result.document : null;
+      const mode = documentPayload && documentPayload.alternative_position_mode === "append" ? "append" : "nested";
+      const altCount = countAlternativePositions(result);
+      const buttons = alternativeModeSegments()
+        .flatMap((segment) => Array.from(segment.querySelectorAll("[data-alternative-mode]")));
+      for (const button of buttons) {
+        const buttonMode = button.getAttribute("data-alternative-mode");
+        button.classList.toggle("is-selected", buttonMode === mode);
+        button.disabled = !state.documentId || !documentPayload;
+      }
+      for (const meta of alternativeModeMetas()) {
+        if (!documentPayload) {
+          meta.textContent = "Noch kein Dokument geladen.";
+        } else if (altCount > 0) {
+          meta.textContent = `${altCount} Alternative(n) erkannt · Export aktuell ${alternativePositionModeLabel(mode)}.`;
+        } else {
+          meta.textContent = `Keine Alternativen erkannt · Exportmodus ist trotzdem gespeichert: ${alternativePositionModeLabel(mode)}.`;
+        }
+      }
+    }
+
+    async function saveAlternativePositionMode(mode) {
+      if (!state.documentId) return;
+      const normalizedMode = mode === "append" ? "append" : "nested";
+      for (const segment of alternativeModeSegments()) {
+        segment.querySelectorAll("[data-alternative-mode]").forEach((button) => {
+          button.disabled = true;
+        });
+      }
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/alternative-position-mode`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: normalizedMode }),
+        });
+        if (state.result && state.result.document) {
+          state.result.document.alternative_position_mode = response.alternative_position_mode || normalizedMode;
+          syncCurrentDocumentIntoList(state.result.document);
+        }
+        renderAlternativePositionMode(state.result);
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(`Alternativpositionen werden ${alternativePositionModeLabel(normalizedMode)} exportiert.`, "ok");
+      } catch (error) {
+        setStatus(`Einstellung für Alternativpositionen konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+        renderAlternativePositionMode(state.result);
       }
     }
 
@@ -14407,18 +15359,31 @@
       state.vendocLatestImportedAt = importState && importState.latest_imported_at
         ? String(importState.latest_imported_at)
         : null;
-      const ok = window.confirm(
+      const ok = await openConfirmModal(
         alreadyImported
-          ? (
-              packageMode
-                ? `Dieses Multi-PDF-Paket wurde bereits einmal in VenDoc importiert.\n\nEin erneuter Import überschreibt keinen bestehenden Beleg.\nEs wird ein zusätzlicher Beleg im ERP erzeugt.\n\nTrotzdem erneut importieren?`
-                : `Dieses Dokument wurde bereits einmal in VenDoc importiert.\n\nEin erneuter Import überschreibt keinen bestehenden Beleg.\nEs wird ein zusätzlicher Beleg im ERP erzeugt.\n\nTrotzdem erneut importieren?`
-            )
-          : (
-              packageMode
-                ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach SRTemp übergeben?`
-                : `Dokument #${state.documentId} wirklich nach SRTemp übergeben?`
-            )
+          ? {
+              title: "Dokument bereits importiert",
+              paragraphs: [
+                packageMode
+                  ? "Für dieses Multi-PDF-Paket wurde bereits ein erfolgreicher VenDoc-Import ausgelöst."
+                  : "Für dieses Dokument wurde bereits ein erfolgreicher VenDoc-Import ausgelöst.",
+                "Ein erneuter Import überschreibt keinen bestehenden Beleg.",
+                "Es wird ein zusätzlicher Beleg im ERP erzeugt.",
+                "Bitte nur erneut importieren, wenn der zusätzliche Beleg bewusst erzeugt werden soll.",
+              ],
+              confirmLabel: "Trotzdem erneut importieren",
+              confirmKind: "danger",
+            }
+          : {
+              title: "VenDoc-Import starten",
+              paragraphs: [
+                packageMode
+                  ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach SRTemp übergeben?`
+                  : `Dokument #${state.documentId} wirklich nach SRTemp übergeben?`,
+              ],
+              confirmLabel: "Import starten",
+              confirmKind: "primary",
+            }
       );
       if (!ok) return;
       setVendocButtonsBusy(true);
@@ -14820,6 +15785,22 @@
     ui.processBtn.addEventListener("click", async () => {
       await processCurrent();
     });
+    if (ui.loginForm) {
+      ui.loginForm.addEventListener("submit", submitLogin);
+    }
+    if (ui.setupBackBtn) {
+      ui.setupBackBtn.addEventListener("click", () => {
+        state.authSetupRequired = false;
+        setAuthMode("login");
+        if (ui.loginError) ui.loginError.textContent = "";
+      });
+    }
+    if (ui.logoutBtn) {
+      ui.logoutBtn.addEventListener("click", logoutCurrentUser);
+    }
+    if (ui.adminCreateUserForm) {
+      ui.adminCreateUserForm.addEventListener("submit", submitAdminCreateUser);
+    }
 
     ui.jsonPreviewBtn.addEventListener("click", async () => {
       await previewExport("json");
@@ -14857,6 +15838,13 @@
         }
       });
     }
+    alternativeModeSegments().forEach((segment) => {
+      segment.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-alternative-mode]");
+        if (!button || button.disabled) return;
+        await saveAlternativePositionMode(button.getAttribute("data-alternative-mode"));
+      });
+    });
     document.addEventListener("click", (event) => {
       if (!state.vendocCustomerPickerOpen) return;
       if (ui.vendocCustomerPicker && ui.vendocCustomerPicker.contains(event.target)) return;
@@ -14881,8 +15869,29 @@
         closePreviewModal();
       }
     });
+    if (ui.confirmModalCancelBtn) {
+      ui.confirmModalCancelBtn.addEventListener("click", () => {
+        closeConfirmModal(false);
+      });
+    }
+    if (ui.confirmModalConfirmBtn) {
+      ui.confirmModalConfirmBtn.addEventListener("click", () => {
+        closeConfirmModal(true);
+      });
+    }
+    if (ui.confirmModal) {
+      ui.confirmModal.addEventListener("click", (event) => {
+        if (event.target === ui.confirmModal) {
+          closeConfirmModal(false);
+        }
+      });
+    }
     document.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
+      if (ui.confirmModal && !ui.confirmModal.hidden) {
+        closeConfirmModal(false);
+        return;
+      }
       if (!ui.previewModal.hidden) {
         closePreviewModal();
         return;
@@ -14890,6 +15899,7 @@
       closeAdminMenu();
     });
 
+    closeConfirmModal(false);
     closePreviewModal();
     setExtractTab(state.activeExtractTab);
     renderVendocCustomerSelect();
@@ -14901,9 +15911,14 @@
     syncPdfControls();
     addDebug("UI initialisiert.");
 
-    loadDocuments().catch((error) => {
-      setStatus(`Initialisierung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
-    });
+    loadCurrentUser()
+      .then((isAuthenticated) => {
+        if (!isAuthenticated) return null;
+        return loadDocuments();
+      })
+      .catch((error) => {
+        setStatus(`Initialisierung fehlgeschlagen: ${String(error.message).slice(0, 220)}`, "err");
+      });
   </script>
 </body>
 </html>

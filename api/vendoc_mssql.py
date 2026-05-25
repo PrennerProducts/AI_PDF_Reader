@@ -47,9 +47,11 @@ POSITION_COLUMNS = [
     "height_mm",
     "description_short",
     "description_long",
+    "text_only_rtf",
     "unit_price",
     "page_ref",
     "image_long_text_rtf",
+    "image_only_rtf",
     "image_is_primary",
     "created_at",
     "article_no",
@@ -77,6 +79,8 @@ COLUMN_ALIASES: dict[str, dict[str, list[str]]] = {
     },
     POSITION_TABLE: {
         "is_alternative": ["is_alternate"],
+        "text_only_rtf": ["text_rtf"],
+        "image_only_rtf": ["image_rtf", "img_rtf"],
     },
 }
 

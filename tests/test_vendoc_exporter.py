@@ -93,14 +93,21 @@ def test_vendoc_payload_maps_header_positions_and_primary_image(tmp_path: Path) 
     assert position["external_line_item_id"] == external_line_item_id(33, {"id": 77}, 1)
     assert position["external_document_id"] == payload["header"]["external_document_id"]
     assert position["source_line_item_id"] == "77"
-    assert position["position_no"] == "001"
+    assert position["position_no"] == "1"
     assert position["quantity"] == 1.0
     assert position["unit_code"] == "Stk"
     assert position["description_long"] == "Tuerelement mit Seitenteil"
+    assert position["text_only_rtf"].startswith("{\\rtf1")
+    assert "\\pngblip" not in position["text_only_rtf"]
+    assert "Tuerelement mit Seitenteil" in position["text_only_rtf"]
     assert position["image_long_text_rtf"].startswith("{\\rtf1")
     assert "\\pngblip" in position["image_long_text_rtf"]
     assert image_bytes.hex() in position["image_long_text_rtf"]
     assert "Tuerelement mit Seitenteil" in position["image_long_text_rtf"]
+    assert position["image_only_rtf"].startswith("{\\rtf1")
+    assert "\\pngblip" in position["image_only_rtf"]
+    assert image_bytes.hex() in position["image_only_rtf"]
+    assert "Tuerelement mit Seitenteil" not in position["image_only_rtf"]
     assert position["image_is_primary"] is True
     assert position["main_line_item_id"] == "57.05.21.A"
 
@@ -110,8 +117,153 @@ def test_vendoc_payload_reports_missing_primary_image_file(tmp_path: Path) -> No
 
     assert payload["errors"] == []
     assert payload["warnings"][0]["code"] == "primary_image_file_missing"
+    assert payload["positions"][0]["image_only_rtf"] is None
     assert "\\pngblip" not in payload["positions"][0]["image_long_text_rtf"]
+    assert "\\pngblip" not in payload["positions"][0]["text_only_rtf"]
     assert payload["positions"][0]["image_is_primary"] is False
+
+
+def test_vendoc_payload_exports_embedded_alternatives_nested(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["alternative_position_mode"] = "nested"
+    result["line_items"][0]["position_no"] = "1"
+    result["line_items"][0]["description_long"] = "\n".join(
+        [
+            "Fenster 2flg DLS DKR",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 119,90 GP: € 1.438,80",
+            "Alternativ: Holzart: Lärche 3-schicht verleimt",
+        ]
+    )
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["position_count"] == 3
+    assert payload["summary"]["alternative_position_mode"] == "nested"
+    assert payload["summary"]["alternative_position_count"] == 2
+    assert [position["position_no"] for position in payload["positions"]] == ["1", "1.1", "1.2"]
+    assert payload["positions"][0]["is_alternative"] is False
+    assert payload["positions"][0]["description_long"] == "Fenster 2flg DLS DKR"
+    assert "Alternativ:" not in payload["positions"][0]["description_long"]
+    assert payload["positions"][1]["is_alternative"] is True
+    assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert payload["positions"][1]["unit_price"] == 119.9
+    assert payload["positions"][1]["image_is_primary"] is False
+    assert payload["positions"][2]["description_short"] == "Holzart: Lärche 3-schicht verleimt"
+
+
+def test_vendoc_payload_renumbers_nested_alternatives_without_gaps(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["alternative_position_mode"] = "nested"
+    result["line_items"] = [
+        {
+            **result["line_items"][0],
+            "id": 77,
+            "position_no": "1",
+            "description_short": "Fixfenster",
+            "description_long": "Fixfenster",
+        },
+        {
+            **result["line_items"][0],
+            "id": 78,
+            "position_no": "2",
+            "is_alternative": True,
+            "description_short": "Alternative HS Schema A",
+            "description_long": "Alternative HS Schema A",
+        },
+        {
+            **result["line_items"][0],
+            "id": 79,
+            "position_no": "3",
+            "description_short": "Fenster KIPP",
+            "description_long": "Fenster KIPP",
+        },
+    ]
+
+    payload = build_vendoc_payload(result)
+
+    assert [position["position_no"] for position in payload["positions"]] == ["1", "1.1", "2"]
+    assert [position["is_alternative"] for position in payload["positions"]] == [False, True, False]
+
+
+def test_vendoc_payload_exports_alternatives_appended(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["alternative_position_mode"] = "append"
+    result["line_items"] = [
+        {
+            **result["line_items"][0],
+            "id": 77,
+            "position_no": "1",
+            "description_long": "Fenster\nAlternativ: Holzart: Douglas 3-schicht verleimt",
+        },
+        {
+            **result["line_items"][0],
+            "id": 78,
+            "position_no": "3",
+            "description_short": "Tuer",
+            "description_long": "Tuer",
+        },
+        {
+            **result["line_items"][0],
+            "id": 79,
+            "position_no": "2.1",
+            "is_alternative": True,
+            "description_short": "Alternative Griff",
+            "description_long": "Alternative Griff",
+        },
+    ]
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["position_count"] == 4
+    assert payload["summary"]["alternative_position_mode"] == "append"
+    assert payload["summary"]["alternative_position_count"] == 2
+    assert [position["position_no"] for position in payload["positions"]] == ["1", "2", "3", "4"]
+    assert [position["is_alternative"] for position in payload["positions"]] == [False, False, True, True]
+    assert payload["positions"][2]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert payload["positions"][3]["description_short"] == "Alternative Griff"
+
+
+def test_vendoc_payload_groups_appended_alternatives_by_description(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["alternative_position_mode"] = "append"
+    result["line_items"] = [
+        {
+            **result["line_items"][0],
+            "id": 77,
+            "position_no": "1",
+            "quantity": "4",
+            "description_long": "Fenster\nAlternativ: Holzart: Fichte 3-schicht verleimt EP: € 10,00",
+        },
+        {
+            **result["line_items"][0],
+            "id": 78,
+            "position_no": "2",
+            "quantity": "6",
+            "description_short": "Tuer",
+            "description_long": "Tuer\nAlternativ: Holzart: Fichte 3-schicht verleimt EP: € 20,00",
+        },
+    ]
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["alternative_position_mode"] == "append"
+    assert payload["summary"]["alternative_position_count"] == 2
+    assert payload["summary"]["position_count"] == 3
+    assert [position["position_no"] for position in payload["positions"]] == ["1", "2", "3"]
+    grouped = payload["positions"][2]
+    assert grouped["is_alternative"] is True
+    assert grouped["description_short"] == "Holzart: Fichte 3-schicht verleimt"
+    assert grouped["quantity"] == 10.0
+    assert grouped["unit_price"] == 16.0
+    assert grouped["image_is_primary"] is False
 
 
 def test_vendoc_payload_requires_positions() -> None:
@@ -166,9 +318,11 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
         "height_mm",
         "description_short",
         "description_long",
+        "text_only_rtf",
         "unit_price",
         "page_ref",
         "image_long_text_rtf",
+        "image_only_rtf",
         "image_is_primary",
         "created_at",
         "article_no",
