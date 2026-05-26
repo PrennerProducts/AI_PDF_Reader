@@ -3223,7 +3223,7 @@
 
     .admin-user-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -10594,10 +10594,6 @@
               Benutzer
               <input id="adminCreateUsername" autocomplete="off" required>
             </label>
-            <label class="auth-field" for="adminCreateDisplayName">
-              Anzeigename
-              <input id="adminCreateDisplayName" autocomplete="off">
-            </label>
             <label class="auth-field" for="adminCreatePassword">
               Passwort
               <input id="adminCreatePassword" type="password" autocomplete="new-password" required minlength="4">
@@ -10978,10 +10974,6 @@
         <div class="modal-title" id="authTitle">Anmelden</div>
       </div>
       <div class="auth-modal-body">
-        <label class="auth-field" id="loginDisplayNameWrap" for="loginDisplayName" hidden>
-          Anzeigename
-          <input id="loginDisplayName" name="display_name" autocomplete="name">
-        </label>
         <label class="auth-field" for="loginUsername">
           Benutzer
           <input id="loginUsername" name="username" autocomplete="username" required>
@@ -11107,8 +11099,6 @@
       authGate: document.getElementById("authGate"),
       loginForm: document.getElementById("loginForm"),
       authTitle: document.getElementById("authTitle"),
-      loginDisplayNameWrap: document.getElementById("loginDisplayNameWrap"),
-      loginDisplayName: document.getElementById("loginDisplayName"),
       loginUsername: document.getElementById("loginUsername"),
       loginPassword: document.getElementById("loginPassword"),
       loginError: document.getElementById("loginError"),
@@ -11116,7 +11106,6 @@
       setupBackBtn: document.getElementById("setupBackBtn"),
       adminCreateUserForm: document.getElementById("adminCreateUserForm"),
       adminCreateUsername: document.getElementById("adminCreateUsername"),
-      adminCreateDisplayName: document.getElementById("adminCreateDisplayName"),
       adminCreatePassword: document.getElementById("adminCreatePassword"),
       adminCreateUserMessage: document.getElementById("adminCreateUserMessage"),
       adminCreateUserBtn: document.getElementById("adminCreateUserBtn"),
@@ -12932,14 +12921,14 @@
     function syncAuthUser() {
       const user = state.currentUser || null;
       if (ui.currentUserLabel) {
-        ui.currentUserLabel.textContent = user ? (user.display_name || user.username || "Angemeldet") : "Nicht angemeldet";
+        ui.currentUserLabel.textContent = user ? (user.username || user.display_name || "Angemeldet") : "Nicht angemeldet";
       }
       if (ui.authUserChip) {
         if (user) ui.authUserChip.removeAttribute("hidden");
         else ui.authUserChip.setAttribute("hidden", "");
       }
       if (ui.documentReviewerInput && user && !ui.documentReviewerInput.value) {
-        ui.documentReviewerInput.value = user.display_name || user.username || "";
+        ui.documentReviewerInput.value = user.username || user.display_name || "";
       }
     }
 
@@ -12948,10 +12937,6 @@
       const isSetup = state.authMode === "setup";
       if (ui.authTitle) ui.authTitle.textContent = isSetup ? "Ersten Benutzer anlegen" : "Anmelden";
       if (ui.loginBtn) ui.loginBtn.textContent = isSetup ? "Benutzer anlegen" : "Anmelden";
-      if (ui.loginDisplayNameWrap) {
-        if (isSetup) ui.loginDisplayNameWrap.removeAttribute("hidden");
-        else ui.loginDisplayNameWrap.setAttribute("hidden", "");
-      }
       if (ui.setupBackBtn) {
         if (isSetup && !state.authSetupRequired) ui.setupBackBtn.removeAttribute("hidden");
         else ui.setupBackBtn.setAttribute("hidden", "");
@@ -12999,7 +12984,6 @@
       event.preventDefault();
       const username = ui.loginUsername ? String(ui.loginUsername.value || "").trim() : "";
       const password = ui.loginPassword ? String(ui.loginPassword.value || "") : "";
-      const displayName = ui.loginDisplayName ? String(ui.loginDisplayName.value || "").trim() : "";
       if (!username || !password) {
         if (ui.loginError) ui.loginError.textContent = "Benutzer und Passwort eingeben.";
         return;
@@ -13013,7 +12997,7 @@
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(isSetup ? { username, password, display_name: displayName || null } : { username, password }),
+            body: JSON.stringify({ username, password }),
           },
           { skipAuthRedirect: true }
         );
@@ -13021,7 +13005,6 @@
         state.authSetupRequired = false;
         setAuthMode("login");
         if (ui.loginPassword) ui.loginPassword.value = "";
-        if (ui.loginDisplayName) ui.loginDisplayName.value = "";
         syncAuthUser();
         hideAuthGate();
         await loadDocuments();
@@ -13046,7 +13029,6 @@
     async function submitAdminCreateUser(event) {
       event.preventDefault();
       const username = ui.adminCreateUsername ? String(ui.adminCreateUsername.value || "").trim() : "";
-      const displayName = ui.adminCreateDisplayName ? String(ui.adminCreateDisplayName.value || "").trim() : "";
       const password = ui.adminCreatePassword ? String(ui.adminCreatePassword.value || "") : "";
       if (!username || !password) {
         if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = "Benutzer und Passwort eingeben.";
@@ -13062,10 +13044,9 @@
         await apiJson("/auth/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password, display_name: displayName || null }),
+          body: JSON.stringify({ username, password }),
         });
         if (ui.adminCreateUsername) ui.adminCreateUsername.value = "";
-        if (ui.adminCreateDisplayName) ui.adminCreateDisplayName.value = "";
         if (ui.adminCreatePassword) ui.adminCreatePassword.value = "";
         if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = `Benutzer ${username} wurde angelegt.`;
       } catch (error) {
