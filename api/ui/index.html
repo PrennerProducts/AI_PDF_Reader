@@ -3092,7 +3092,7 @@
       align-items: center;
       gap: 8px;
       min-height: 30px;
-      padding: 4px 6px 4px 10px;
+      padding: 4px 6px 4px 12px;
       border-radius: 999px;
       color: #2d2828;
       background: rgba(255, 255, 255, 0.92);
@@ -3101,6 +3101,22 @@
       font-size: 12px;
       font-weight: 700;
       white-space: nowrap;
+    }
+
+    .auth-user-chip .auth-user-label {
+      color: rgba(45, 40, 40, 0.62);
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .auth-user-chip strong {
+      max-width: 170px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 12px;
+      font-weight: 800;
     }
 
     .auth-user-chip button {
@@ -10542,8 +10558,9 @@
           <span id="processLiveState" class="debug-state">idle</span>
         </div>
         <div class="auth-user-chip" id="authUserChip" hidden>
-          <span id="currentUserLabel">Nicht angemeldet</span>
-          <button id="logoutBtn" type="button">Logout</button>
+          <span class="auth-user-label">Angemeldet</span>
+          <strong id="currentUserLabel">Nicht angemeldet</strong>
+          <button id="logoutBtn" type="button">Abmelden</button>
         </div>
       </div>
       <details class="advanced-tools shell-advanced v3-admin-menu">
