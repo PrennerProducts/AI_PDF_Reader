@@ -3103,6 +3103,10 @@
       white-space: nowrap;
     }
 
+    .auth-user-chip[hidden] {
+      display: none !important;
+    }
+
     .auth-user-chip .auth-user-label {
       color: rgba(45, 40, 40, 0.62);
       font-size: 10px;
@@ -5938,8 +5942,8 @@
       top: 12px;
       z-index: 50;
       display: grid;
-      grid-template-columns: minmax(320px, 0.34fr) minmax(560px, 1fr) minmax(170px, 0.22fr) 40px;
-      grid-template-areas: "brand controls actions advanced";
+      grid-template-columns: minmax(320px, 0.34fr) minmax(560px, 1fr) minmax(170px, 0.22fr) minmax(164px, max-content) 40px;
+      grid-template-areas: "brand controls actions auth advanced";
       align-items: center;
       gap: 14px;
       min-height: 76px;
@@ -6373,6 +6377,13 @@
       background: #2c2c2e;
       border-color: #2c2c2e;
       transform: translateY(-1px);
+    }
+
+    .app-v3 .auth-user-chip {
+      grid-area: auth;
+      justify-self: end;
+      align-self: center;
+      max-width: 220px;
     }
 
     .app-v3 .shell-status {
@@ -10328,6 +10339,7 @@
         grid-template-columns: minmax(0, 1fr) 40px;
         grid-template-areas:
           "brand advanced"
+          "auth auth"
           "controls controls"
           "actions actions";
         min-height: 0;
@@ -10356,6 +10368,7 @@
         grid-template-columns: minmax(0, 1fr) 40px;
         grid-template-areas:
           "brand advanced"
+          "auth auth"
           "controls controls"
           "actions actions";
       }
@@ -10550,17 +10563,17 @@
           <button class="btn btn-secondary" id="uploadBtn" hidden>PDF hochladen</button>
         </div>
       </div>
+      <div class="auth-user-chip" id="authUserChip" hidden>
+        <span class="auth-user-label">Angemeldet</span>
+        <strong id="currentUserLabel">Nicht angemeldet</strong>
+        <button id="logoutBtn" type="button">Abmelden</button>
+      </div>
       <div class="status-strip shell-status">
         <div class="statusbar" id="statusBar">Lade Dokumentliste...</div>
         <div class="live-state-wrap">
           <span id="documentApprovalState" class="document-approval-pill pending">Freigabe offen</span>
           <span class="live-label">Run</span>
           <span id="processLiveState" class="debug-state">idle</span>
-        </div>
-        <div class="auth-user-chip" id="authUserChip" hidden>
-          <span class="auth-user-label">Angemeldet</span>
-          <strong id="currentUserLabel">Nicht angemeldet</strong>
-          <button id="logoutBtn" type="button">Abmelden</button>
         </div>
       </div>
       <details class="advanced-tools shell-advanced v3-admin-menu">
