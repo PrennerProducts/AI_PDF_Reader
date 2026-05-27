@@ -145,7 +145,7 @@ def test_sr_schauraum_regression() -> None:
     assert parsed["document_number"] == "AN-2025-113"
     assert parsed["document_date"] == "08.12.2025"
     assert parsed["project_ref"] == "KI-PDF-Reader Version ON-PREM (Physischer Server beim Kunden vor Ort)"
-    _assert_totals(parsed, ("4.600,00", "920,00", "5.520,00"))
+    _assert_totals(parsed, ("€ 4.600,00", "€ 920,00", "€ 5.520,00"))
     assert len(items) == 3
     assert items[0]["description_short"] == "MODUL 1 – ON-PREM KI-PDF-READER & SQL-EXPORT"
     assert items[2]["is_alternative"] is True
@@ -214,7 +214,7 @@ Gesamt EUR 5.520,00 €
     assert parsed["template"] == "sr_schauraum"
     assert parsed["document_type"] == "angebot"
     assert parsed["document_number"] == "AN-2025-113"
-    _assert_totals(parsed, ("4.600,00", "920,00", "5.520,00"))
+    _assert_totals(parsed, ("€ 4.600,00", "€ 920,00", "€ 5.520,00"))
     assert len(items) == 3
     assert items[0]["description_short"] == "MODUL 1 – ON-PREM KI-PDF-READER & SQL-EXPORT"
     assert items[1]["line_total_raw"] == "1.600,00"

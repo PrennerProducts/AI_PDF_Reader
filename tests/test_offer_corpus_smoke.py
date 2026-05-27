@@ -38,7 +38,7 @@ GREEN_OFFER_CASES = [
         "supplier_name": "alu-one Metallbaupartner GmbH",
         "document_number": "2400061DL-1",
         "document_date": "05.02.2024",
-        "position_count": 27,
+        "position_count": 30,
     },
     {
         "path": "samples/pdfs/candidates/offers/alu_one/Angebot A2506340MC-1.pdf",

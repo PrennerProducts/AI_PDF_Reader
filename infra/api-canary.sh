@@ -14,7 +14,9 @@ fi
 python - <<'PY'
 import json
 import mimetypes
+import os
 import urllib.request
+import urllib.error
 import uuid
 from pathlib import Path
 
@@ -96,10 +98,55 @@ CASES = [
 ]
 
 
+def _dotenv_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip("'\"")
+    return values
+
+
+DOTENV = _dotenv_values(ROOT / ".env")
+USERNAME = os.getenv("PDR_CANARY_USERNAME") or DOTENV.get("APP_BOOTSTRAP_USERNAME")
+PASSWORD = os.getenv("PDR_CANARY_PASSWORD") or DOTENV.get("APP_BOOTSTRAP_PASSWORD")
+OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+
+
 def _json_request(url: str, *, method: str = "GET", data: bytes | None = None, headers: dict[str, str] | None = None) -> dict:
     request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
-    with urllib.request.urlopen(request, timeout=180) as response:
+    with OPENER.open(request, timeout=180) as response:
         return json.load(response)
+
+
+def _ensure_authenticated() -> None:
+    try:
+        _json_request(f"{API_BASE}/auth/me")
+        return
+    except urllib.error.HTTPError as exc:
+        if exc.code != 401:
+            raise
+
+    if not USERNAME or not PASSWORD:
+        raise SystemExit(
+            "[error] API requires login. Set PDR_CANARY_USERNAME/PDR_CANARY_PASSWORD "
+            "or APP_BOOTSTRAP_USERNAME/APP_BOOTSTRAP_PASSWORD in .env."
+        )
+
+    payload = json.dumps({"username": USERNAME, "password": PASSWORD}).encode("utf-8")
+    try:
+        _json_request(
+            f"{API_BASE}/auth/login",
+            method="POST",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"[error] API login failed for {USERNAME!r}: HTTP {exc.code}") from exc
 
 
 def _upload_pdf(pdf_path: Path) -> int:
@@ -135,6 +182,8 @@ def _process_and_fetch(document_id: int) -> dict:
 
 rows: list[dict[str, object]] = []
 errors: list[str] = []
+
+_ensure_authenticated()
 
 for case in CASES:
     document_id = _upload_pdf(case["path"])

@@ -294,7 +294,13 @@ def build_document_validation(
         }
     component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
 
-    if provider_key == "koch" and document_type in {"angebot", "auftragsbestaetigung"} and line_items and not images:
+    if (
+        enforce_image_validation
+        and provider_key == "koch"
+        and document_type in {"angebot", "auftragsbestaetigung"}
+        and line_items
+        and not images
+    ):
         document_issues.append(
             _make_issue(
                 code="koch_detail_drawings_missing",
