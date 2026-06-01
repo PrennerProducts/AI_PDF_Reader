@@ -1,6 +1,6 @@
 # Projekt-Dokumentation
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 Diese Doku ist der zentrale Einstieg fuer Planung, Status, Architektur, API und VenDoc-Integration.
 
@@ -8,6 +8,7 @@ Diese Doku ist der zentrale Einstieg fuer Planung, Status, Architektur, API und 
 
 - `docs/PLAN.md`: priorisierter Umsetzungsplan bis zur produktionsreifen App.
 - `docs/STATUS.md`: aktueller technischer und fachlicher Stand.
+- `docs/RECENT_CHANGES.md`: Kurzueberblick ueber die groesseren Aenderungen seit Ende April 2026.
 - `docs/PRODUCTION_READINESS.md`: Release-Gates, Checklisten und Risiken fuer Produktivbetrieb.
 - `docs/TASKS.md`: konkrete Umsetzungstasks mit Prioritaet und Akzeptanz.
 - `docs/HOW_IT_WORKS.md`: technische Funktionsweise der aktuellen App.
@@ -62,6 +63,6 @@ python -m pytest tests/test_offer_corpus_smoke.py -q
 python -m pytest tests/test_offer_validation_smoke.py -q
 python -m pytest tests/test_non_offer_corpus_smoke.py -q
 python -m pytest tests/test_validation_provider_rules.py -q
-.venv/bin/python -m pytest tests -q
+env PYTHONPATH=api .venv/bin/python -m pytest tests -q
 ./infra/api-canary.sh
 ```

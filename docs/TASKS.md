@@ -1,6 +1,6 @@
 # Umsetzungstasks
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 Diese Liste ist der konkrete Backlog aus `docs/PLAN.md`.
 
@@ -19,7 +19,7 @@ Tasks:
 - `api/vendoc_exporter.py` erstellen.
 - Header-Mapping implementieren.
 - Positions-Mapping implementieren.
-- Primaeres Bild als Base64 anbinden.
+- Primaeres Bild als RTF/PNG-Hex anbinden.
 - Pflichtfelder validieren.
 - Unit-Tests mit Sample-Result schreiben.
 
@@ -28,7 +28,7 @@ Umgesetzt:
 - `api/vendoc_exporter.py`.
 - Deterministische externe UUIDs fuer Dokumente und Positionen.
 - Header-/Positionsmapping gemaess Screenshot-Schema.
-- Primaeres Positionsbild als Base64.
+- Primaeres Positionsbild als RTF mit PNG-Hex.
 - `warnings`/`errors`/`summary`.
 - `tests/test_vendoc_exporter.py`.
 
@@ -82,7 +82,7 @@ Akzeptanz:
 
 ### P0-004 MSSQL Live-Write
 
-Status: blockiert bis CIBEX-Zugang
+Status: im Code umgesetzt, Zielserver-Abnahme offen
 
 Ziel:
 
@@ -90,12 +90,13 @@ Ziel:
 
 Tasks:
 
-- MSSQL-Client/ODBC-Strategie festlegen.
-- Dockerfile um Treiber erweitern.
-- Env-Variablen einbauen.
-- Connection-Test implementieren.
-- Transaktionalen Insert fuer Header und Positionen bauen.
-- Fehler und Rollback testen.
+- MSSQL-Client/ODBC-Strategie festlegen. Status: erledigt mit ODBC Driver 18 + `pyodbc`.
+- Dockerfile um Treiber erweitern. Status: erledigt.
+- Env-Variablen einbauen. Status: erledigt.
+- Connection-Test implementieren. Status: erledigt via `GET /vendoc/health?check_connection=true`.
+- Transaktionalen Insert fuer Header und Positionen bauen. Status: erledigt.
+- Fehler und Rollback testen. Status: technisch umgesetzt, gegen Zielserver noch zu pruefen.
+- Zielserver-Live-Write mit VPN/MSSQL-Zugang gegen `SRTemp` ausfuehren. Status: offen.
 
 Akzeptanz:
 
@@ -105,7 +106,7 @@ Akzeptanz:
 
 ### P0-005 Freigabe-Gate fuer VenDoc
 
-Status: API erledigt am 2026-04-29, UI offen
+Status: erledigt
 
 Ziel:
 
@@ -116,6 +117,7 @@ Tasks:
 - Live-Export nur bei `document.status=processed`.
 - Live-Export nur bei `approval_status=approved`.
 - UI-Hinweis, warum Export gesperrt ist.
+- UI-Import-State und Warnung vor erneutem Live-Import.
 
 Akzeptanz:
 
@@ -124,7 +126,7 @@ Akzeptanz:
 
 ### P0-006 Canary wieder gruen
 
-Status: erledigt am 2026-04-27, erneut bestaetigt am 2026-04-29
+Status: erledigt, Stand 2026-05-28
 
 Ziel:
 
@@ -135,10 +137,12 @@ Umgesetzt:
 - Shared-Image-Fallback fuer Positionen ohne brauchbare Alternative.
 - Same-page Page-All-Fallback, wenn fokussierte Kandidaten nur schwache Folgeseitenbilder enthalten.
 - Provider-Validierung so geschaerft, dass fachliche Info-/Gruppenpositionen nicht als harte Betragsfehler zaehlen.
+- Canary um zwei Schuchter-Faelle erweitert.
+- Canary meldet sich bei aktivierter App-Auth automatisch an.
 
 Akzeptanz:
 
-- `./infra/api-canary.sh` laeuft gruen fuer `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp`.
+- `./infra/api-canary.sh` laeuft gruen fuer `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo`, `rekord_vomp`, `schuchter_composite` und `schuchter_accessory`.
 
 ## P1 - Produktion
 
@@ -169,14 +173,18 @@ Akzeptanz:
 
 ### P1-001 Auth und Rollen
 
-Status: offen
+Status: Basis-Auth erledigt, Rollen offen/bewusst nicht aktiviert
 
 Tasks:
 
-- Login oder Basic Auth.
-- Rollen `operator`, `reviewer`, `admin`.
-- Freigabe/Export nur fuer passende Rollen.
-- Auditfelder fuer User-Aktionen.
+- Login/Logout. Status: erledigt.
+- Bootstrap-Benutzer per ENV. Status: erledigt.
+- Setup-Registrierung fuer ersten Benutzer. Status: erledigt.
+- Benutzeranlage im Admin-Bereich. Status: erledigt.
+- Benutzeranzeige und Logout in der Kopfzeile. Status: erledigt.
+- Auditfelder fuer User-Aktionen. Status: erledigt.
+- Rollen `operator`, `reviewer`, `admin`. Status: offen; aktuell koennen alle angemeldeten Benutzer alles bedienen.
+- Freigabe/Export nur fuer passende Rollen. Status: offen, nur relevant falls Rollenmodell fachlich gewuenscht ist.
 
 ### P1-002 Background Jobs
 
@@ -265,7 +273,8 @@ Aktueller erledigter Stand:
 - 4 technische SR-Schauraum-Detailansichten als Nicht-Angebote aufgenommen.
 - Konkrete Dokumentenanforderung an Daniela steht in `docs/DANIELA_DOCUMENT_REQUEST.md`.
 - Betrags-/Summenvalidierung fuer alle Angebots-PDFs per `tests/test_offer_validation_smoke.py` abgesichert.
-- Finaler API-Corpuslauf am 2026-04-27: 41/41 Angebots-/Import-PDFs verarbeitet, 0 Pflichtfeldfehler, 0 leere Positionslisten, 3 offene Bildreviews.
+- Angebots-Smoke-Korpus am 2026-05-28: 39 Angebotsfaelle ueber 11 Anbieter, 0 Pflichtfeldfehler, 0 leere Positionslisten.
+- Voller Host-Testlauf am 2026-05-28: `209 passed, 2 warnings`.
 
 Naechster Dokumentenbedarf:
 
@@ -299,10 +308,6 @@ Umgesetzt:
 
 Offen:
 
-- Offene Bildreviews im Angebots-Corpus klaeren:
-  - Alu-One `A2506340MC-1`, Pos. `003`.
-  - Muigg `AN 251073`, Pos. `002` und `003`.
-  - Schuchter `A260344`, 0 extrahierte Bilder.
 - Line-Art-Ergaenzung an weiteren Schuchter-Angeboten und Detail-PDFs regressionstesten.
 - Bildkarten im UI kompakter machen und Kandidaten/Finalbild schneller vergleichbar machen.
 - Segmentierung fuer voll gerenderte Seiten als dritte Stufe pruefen, falls kuenftige PDFs weder Bildbloecke noch erkennbare Positions-Line-Art enthalten.
@@ -322,11 +327,16 @@ Umgesetzt:
 - Extraktions-Tabs in den Panel-Header verschoben und auf `Uebersicht`, `Freigabe`, `Positionen`, `Bilder` reduziert.
 - PDF-Auswahl startet Upload und Parser-Verarbeitung automatisch; der sichtbare `Verarbeiten`-Button bleibt als manueller Re-Run.
 - Schauraum-Logo in der kompakten Topbar sichtbar gemacht.
+- Benutzeranzeige und Logout in der sichtbaren Kopfzeile.
+- App-styled Login-Dialog.
+- Admin-Bereich mit vereinfachter Benutzeranlage per Benutzername und Passwort.
 - Freigabe-Assistent mit konkreten Vor-Freigabe-Schritten eingebaut.
 - Schritt-Aktionen springen direkt zu Aufgaben, Positionen, Bildern oder Freigabe.
+- Kundenauswahl im Startbereich.
+- Alternativpositionsmodus im Positionsbereich.
+- Duplicate-Import-Warnung als App-Modal.
 
 Offen:
 
 - Review-Queue als Startscreen.
-- VenDoc-Dry-Run/Exportstatus als eigener UI-Bereich.
 - Feldkorrekturen fuer Kopf und Positionen.

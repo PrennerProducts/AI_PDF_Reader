@@ -1,12 +1,53 @@
 # API Referenz
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 ## Basis
 
 - API: `http://localhost:8000`
 - UI: `GET /ui`
 - OpenAPI JSON: `GET /openapi.json`
+
+## Auth
+
+Auth ist per Default deaktiviert und wird mit `APP_AUTH_ENABLED=true` aktiviert.
+Bei deaktivierter Auth liefert die API einen Dev-User zurueck.
+
+### `GET /auth/me`
+
+Liefert Auth-Status und aktuellen Benutzer.
+
+### `POST /auth/login`
+
+Meldet einen Benutzer an und setzt eine Session-Cookie.
+
+Body:
+
+```json
+{"username": "admin", "password": "sicheres-passwort"}
+```
+
+### `POST /auth/logout`
+
+Beendet die aktuelle Session.
+
+### `GET /auth/setup-status`
+
+Liefert, ob bei aktivierter Auth noch kein Benutzer existiert und die Erstregistrierung erlaubt ist.
+
+### `POST /auth/register`
+
+Legt den ersten Benutzer an, solange noch kein Benutzer existiert.
+
+### `POST /auth/users`
+
+Legt einen weiteren Benutzer an. Aktuell gibt es kein Rollenmodell; jeder angemeldete Benutzer kann weitere Benutzer anlegen.
+
+Body:
+
+```json
+{"username": "max", "password": "sicheres-passwort"}
+```
 
 ## Dokumente
 
@@ -91,6 +132,10 @@ Body:
 
 Markiert bewusst, dass eine Position kein finales Bild hat.
 
+### `POST /documents/{document_id}/line-items/{line_item_id}/crop-image`
+
+Speichert einen manuellen PDF-Crop als finales Positionsbild.
+
 ### `POST /documents/{document_id}/line-items/{line_item_id}/review-check`
 
 Markiert offene Warnungen einer Position als manuell geprueft.
@@ -172,6 +217,53 @@ Liefert den letzten VenDoc-Exportjob eines Dokuments.
 
 Liefert Konfigurationsstatus fuer den MSSQL-Zielzugriff inklusive ODBC-Treiberstatus. Mit `check_connection=true` wird zusaetzlich eine echte SQL-Server-Verbindung getestet.
 
+### `GET /vendoc/customers`
+
+Liest Kunden aus `SRTemp`, wenn MSSQL aktiv ist. Die UI nutzt den Endpunkt fuer Kundensuche und Kundenzuordnung vor dem Export.
+
+### `PUT /documents/{document_id}/vendoc-customer`
+
+Speichert die gewaehlte SRTemp-Kundenzuordnung am Dokument.
+
+Body:
+
+```json
+{
+  "contact_oid": "203712",
+  "customer_number": "300774",
+  "uid_number": "ATU...",
+  "display_name": "SR Schauraum GmbH",
+  "inactive": false
+}
+```
+
+### `PUT /documents/{document_id}/alternative-position-mode`
+
+Setzt den Exportmodus fuer Alternativpositionen.
+
+Body:
+
+```json
+{"mode": "nested"}
+```
+
+Gueltige Werte:
+
+- `nested`: Alternativen direkt unter der Hauptposition, z.B. `1.1`.
+- `append`: Alternativen am Ende der Positionsliste.
+
+### `GET /vendoc/import-state/{document_id}`
+
+Liefert den aktuellen Importstatus fuer UI und Doppelimportwarnung.
+
+### `POST /document-packages/preview`
+
+Erzeugt eine Vorschau fuer gekoppelte Dokumentpakete, z.B. Angebot plus Auftragsbestaetigung.
+
+### `POST /vendoc/export-package`
+
+Exportiert ein Dokumentpaket nach VenDoc. Der gleiche Freigabe- und Live-Write-Schutz wie beim Einzeldokument gilt auch hier.
+
 ## Bilder
 
 ### `GET /document/{document_id}/image/{image_id}`
@@ -218,6 +310,9 @@ Parser-only gegen freien Text.
 - `reviewed_at`
 - `approval_note`
 - `status`
+- `vendoc_customer_id`
+- `vendoc_customer_name`
+- `alternative_position_mode`
 
 ### `line_items[*]`
 
@@ -278,6 +373,7 @@ Parser-only gegen freien Text.
 
 ```bash
 curl -sS http://localhost:8000/health
+curl -sS http://localhost:8000/auth/me
 curl -sS "http://localhost:8000/documents?limit=10"
 curl -sS -X POST "http://localhost:8000/process/1?process_mode=parser_only"
 curl -sS http://localhost:8000/progress/1
@@ -287,4 +383,5 @@ curl -sS "http://localhost:8000/preview/1?format=json"
 curl -sS "http://localhost:8000/export/1?format=csv"
 curl -sS -X POST "http://localhost:8000/vendoc/export/1?dry_run=true"
 curl -sS "http://localhost:8000/vendoc/export-jobs/1/latest"
+curl -sS "http://localhost:8000/vendoc/import-state/1"
 ```

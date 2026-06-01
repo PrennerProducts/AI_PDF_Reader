@@ -1,6 +1,6 @@
 # Production-Readiness-Plan
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 ## Definition von produktionsreif
 
@@ -27,28 +27,36 @@ python -m pytest tests/test_exporter_approval.py -q
 ./infra/api-canary.sh
 ```
 
-Hinweis: Der volle Host-Testlauf braucht eine korrekt installierte lokale Python-Umgebung inkl. FastAPI. Alternativ laufen API-nahe Tests im Container.
+Hinweis: Der volle Host-Testlauf wurde zuletzt so ausgefuehrt:
+
+```bash
+env PYTHONPATH=api .venv/bin/python -m pytest tests -q
+```
+
+Stand 2026-05-28: `209 passed, 2 warnings`. Die Warnings sind FastAPI-Deprecation-Hinweise.
 
 ## Checkliste P0
 
 - [x] VenDoc-Mapping als Dry-Run.
-- [ ] VenDoc-Live-Write in `SRTemp`.
+- [x] VenDoc-Live-Write in `SRTemp` im Code.
+- [ ] VenDoc-Live-Write gegen Zielserver produktionsnah verifiziert.
 - [x] Export-Journal `vendoc_export_jobs`.
 - [x] Stabile externe UUIDs fuer Dokument und Positionen.
-- [ ] Re-Export-Regel implementiert.
+- [x] Re-Export-Warnung in der UI.
+- [ ] Finale Re-Export-Regel mit Dragan/CIBEX entschieden.
 - [x] Freigabe-Gate fuer VenDoc-Export auf API-Ebene.
-- [ ] MSSQL-Fehler sauber in UI/API sichtbar.
+- [x] MSSQL-Fehler sauber in UI/API sichtbar.
 - [x] Live-Canary fachlich gruen.
 - [x] Doku fuer CIBEX-Zugang und Env-Variablen aktuell.
 
 ## Checkliste P1
 
-- [ ] Authentifizierung.
+- [x] Authentifizierung.
 - [ ] Rollen und Berechtigungen.
 - [ ] Background Processing.
 - [ ] Persistenter Processing-Fortschritt.
 - [ ] Feldkorrektur in der UI.
-- [ ] Audit fuer manuelle Korrekturen.
+- [x] Audit fuer User-Aktionen und manuelle Eingriffe.
 - [ ] Healthchecks und Readiness.
 - [ ] Backup-/Restore-Prozess.
 - [ ] Strukturierte Logs.
@@ -67,12 +75,13 @@ Hinweis: Der volle Host-Testlauf braucht eine korrekt installierte lokale Python
 
 ### MSSQL-Zugriff
 
-Der Datenbankzugang fehlt noch. Bis dahin kann nur Mapping/Dry-Run gebaut werden.
+Der MSSQL-Zugriff muss pro Zielserver/VPN aktiv verifiziert werden. Ohne gueltige `.env` bleibt der Writer deaktiviert.
 
 Massnahme:
 
 - VenDoc-Dry-Run ist implementiert und kann ohne MSSQL-Zugang genutzt werden.
-- Connection-Test-Endpunkt erst nach Zugang aktiv testen.
+- `GET /vendoc/health?check_connection=true` vor Live-Write ausfuehren.
+- Nach Live-Write per SQL-Select auf Header/Positionen gegen `external_document_id` pruefen.
 
 ### VenDoc-Feldregeln
 
@@ -120,7 +129,7 @@ Ergebnis:
 Ergebnis:
 
 - Exporte werden persistent geloggt.
-- Live-Write gegen MSSQL funktioniert.
+- Live-Write gegen MSSQL ist im Code umgesetzt und muss am Zielserver abgenommen werden.
 - Fehler und Retry sind sichtbar.
 
 ### Sprint 3 - Produktivhaertung

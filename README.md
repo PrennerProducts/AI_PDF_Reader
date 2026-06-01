@@ -1,6 +1,6 @@
 # PDF-Reader On-Prem
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 On-Prem-App fuer Angebots-PDFs: Upload, Parser, Bildextraktion, Validierung, Review/Freigabe und Export. Ziel fuer den Produktivbetrieb ist ein direkter VenDoc-Import in eine externe MSSQL-Datenbank `SRTemp`.
 
@@ -33,6 +33,19 @@ UI:
 ```text
 http://localhost:8000/ui
 ```
+
+Auth fuer Serverbetrieb:
+
+```dotenv
+APP_AUTH_ENABLED=true
+APP_BOOTSTRAP_USERNAME=admin
+APP_BOOTSTRAP_PASSWORD=<sicheres-passwort>
+APP_BOOTSTRAP_DISPLAY_NAME=Admin
+```
+
+Bei aktivierter Auth meldet sich der Canary mit `PDR_CANARY_USERNAME` /
+`PDR_CANARY_PASSWORD` an. Falls diese Variablen fehlen, nutzt er
+`APP_BOOTSTRAP_USERNAME` / `APP_BOOTSTRAP_PASSWORD` aus `.env`.
 
 ## Lokale `.env` fuer VPN / MSSQL
 
@@ -101,7 +114,8 @@ Aktueller Hinweis:
 
 - Die API laeuft.
 - Der Canary verarbeitet alle Dokumente.
-- Stand 2026-04-27: alle 6 Canary-Provider liefern `validation=auto_accept`.
+- Stand 2026-05-28: alle 8 Canary-Faelle liefern `validation=auto_accept`.
+- Der Canary kann sich bei aktivierter App-Auth automatisch anmelden.
 
 ## Aktueller Funktionsumfang
 
@@ -114,17 +128,21 @@ Aktueller Hinweis:
 - Angebot-zu-Auftragsbestaetigung-Verknuepfung ueber erkannte Angebotsreferenzen.
 - Validierung von Pflichtfeldern, Summen, Positionen und Bildern.
 - UI-Workbench mit Review, Freigabe und manueller Bildzuordnung.
+- Login, Logout, Bootstrap-Benutzer und Audit-Log.
 - JSON/CSV Export.
 - SQL Export fuer das interne App-Schema.
-- VenDoc-Dry-Run-Mapping mit Header-/Positionspayload und primaerem Bild als Base64.
-- VenDoc-Export-Journal in Postgres fuer Dry-Runs und geblockte Live-Exportversuche.
+- VenDoc-Dry-Run-Mapping mit Header-/Positionspayload und RTF-Bilddaten.
+- VenDoc-MSSQL-Live-Writer fuer `SRTemp`, per ENV schaltbar.
+- VenDoc-Export-Journal in Postgres fuer Dry-Runs, Live-Exports und Fehler.
+- Kundenauswahl fuer `SRTemp` und `customer_id` im VenDoc-Header.
+- Alternative Positionen mit Exportmodus `nested` oder `append`.
 
 Noch nicht umgesetzt:
 
-- Echter VenDoc-MSSQL-Writer.
-- Auth/Rollen.
+- Rollen und Berechtigungen.
 - Persistente Background Jobs.
 - Feldkorrekturen in der UI.
+- Produktiver SRTemp-Live-Write ist noch vor Ort gegen die Zieltabellen zu verifizieren.
 
 ## VenDoc-Ziel
 
@@ -135,12 +153,19 @@ Dragan hat in der MSSQL-Importdatenbank vorbereitet:
   - `dbo.vendoc_import_headers`
   - `dbo.vendoc_import_positions`
 
-Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin ist der VenDoc-Export als Dry-Run-Mapping verfuegbar; Live-Write bleibt gesperrt.
+Der SQL-Zugriff laeuft ueber CIBEX/VPN. Der Writer ist im Code vorhanden und wird
+mit `VENDOC_MSSQL_ENABLED=true` aktiviert. Dry-Run und SQL-Vorschau bleiben ohne
+echten Write nutzbar; ein produktiver Live-Write muss vor Ort gegen `SRTemp`
+fachlich kontrolliert werden.
 
 ## Wichtige API-Endpunkte
 
 - `GET /health`
 - `GET /ui`
+- `GET /auth/me`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `POST /auth/users`
 - `POST /upload`
 - `GET /documents?limit=20`
 - `POST /process/{document_id}?process_mode=parser_only`
@@ -156,9 +181,13 @@ Der SQL-Zugriff wird noch durch CIBEX eingerichtet. Bis dahin ist der VenDoc-Exp
 - `GET /preview/{document_id}?format=json|csv`
 - `GET /export/{document_id}?format=json|csv|sql&include_images_base64=true|false`
 - `POST /match-images/{document_id}?strategy=heuristic`
+- `GET /vendoc/customers`
+- `PUT /documents/{document_id}/vendoc-customer`
+- `PUT /documents/{document_id}/alternative-position-mode`
 - `POST /vendoc/export/{document_id}?dry_run=true|false`
 - `GET /vendoc/export-jobs/{document_id}`
 - `GET /vendoc/export-jobs/{document_id}/latest`
+- `GET /vendoc/import-state/{document_id}`
 - `GET /vendoc/health`
 - `POST /dev/parse-text`
 
@@ -191,14 +220,15 @@ python -m pytest tests/test_exporter_approval.py -q
 ./infra/api-canary.sh
 ```
 
-Aktueller Stand 2026-04-29:
+Aktueller Stand 2026-05-28:
 
-- `.venv/bin/python -m pytest tests -q`: `165 passed`.
-- `./infra/api-canary.sh`: 6/6 Provider `auto_accept`.
+- `env PYTHONPATH=api .venv/bin/python -m pytest tests -q`: `209 passed, 2 warnings`.
+- `./infra/api-canary.sh`: 8/8 Canary-Faelle `auto_accept`.
 
 ## Dokumentation
 
 - `docs/README.md`
+- `docs/RECENT_CHANGES.md`
 - `docs/PLAN.md`
 - `docs/STATUS.md`
 - `docs/PRODUCTION_READINESS.md`

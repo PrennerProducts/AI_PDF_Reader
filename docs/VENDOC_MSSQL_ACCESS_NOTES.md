@@ -1,6 +1,6 @@
 # VenDoc MSSQL Import: Zugriff, Mapping, Call-Notizen
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 ## Zielbild
 
@@ -116,6 +116,7 @@ Fachliche Klaerung:
 | `created_at` | `datetime` | null |
 | `subject` | `nvarchar(max)` | null |
 | `tax_type` | `nvarchar(max)` | null |
+| `customer_id` | `nvarchar(max)` | null |
 
 ### `dbo.vendoc_import_positions`
 
@@ -134,6 +135,7 @@ Fachliche Klaerung:
 | `description_short` | `nvarchar(max)` | null |
 | `description_long` | `nvarchar(max)` | null |
 | `image_long_text_rtf` | `nvarchar(max)` | null |
+| `text_only_rtf` | `nvarchar(max)` | null/optional |
 | `unit_price` | `float` | null |
 | `page_ref` | `nvarchar(max)` | null |
 | `image_is_primary` | `bit` | null |
@@ -144,6 +146,7 @@ Fachliche Klaerung:
 | `vat_type` | `nvarchar(max)` | null |
 | `unity` | `float` | null |
 | `main_line_item_id` | `nvarchar(max)` | null |
+| `image_only_rtf` | `nvarchar(max)` | null/optional |
 
 ## Auffaellige Schema-Punkte
 
@@ -176,10 +179,10 @@ Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange 
 
 | VenDoc-Spalte | Quelle in App | Status |
 | --- | --- | --- |
-| `external_document_id` | stabile von uns erzeugte UUID | zu implementieren |
+| `external_document_id` | stabile von uns erzeugte UUID | umgesetzt |
 | `source_document_id` | `documents.id` als String | klar |
 | `supplier_name` | `document.supplier_name` | klar |
-| `supplier_id` | noch nicht vorhanden | offen |
+| `supplier_id` | Provider-Alias aus App-Mapping | umgesetzt, fachlich pruefen |
 | `document_type` | `document.document_type` | klar |
 | `document_number` | `document.document_number` | klar |
 | `offer_reference` | `document.offer_reference` | klar |
@@ -193,12 +196,13 @@ Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange 
 | `created_at` | Exportzeitpunkt | klar |
 | `subject` | vermutlich Projekt/Betreff | offen |
 | `tax_type` | Steuerlogik | offen |
+| `customer_id` | `document.vendoc_customer_number` aus SRTemp-Kundenauswahl | umgesetzt |
 
 ### Positions-Mapping
 
 | VenDoc-Spalte | Quelle in App | Status |
 | --- | --- | --- |
-| `external_line_item_id` | stabile UUID je Position | zu implementieren |
+| `external_line_item_id` | stabile UUID je Position | umgesetzt |
 | `external_document_id` | Dokument-UUID | klar, Datentyp beachten |
 | `source_line_item_id` | `line_items.id` als String | klar |
 | `position_no` | `line_item.position_no` | klar |
@@ -211,6 +215,7 @@ Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange 
 | `description_short` | `line_item.description_short` | klar |
 | `description_long` | `line_item.description_long` | klar |
 | `image_long_text_rtf` | fertiger RTF-LongText inkl. eingebettetem PNG-Hex | bestaetigt |
+| `text_only_rtf` | RTF nur mit Positions-Langtext | optional umgesetzt |
 | `unit_price` | `line_item.unit_price` | klar |
 | `page_ref` | `line_item.page_ref` als String | klar |
 | `image_is_primary` | `true`, wenn Bild vorhanden | klar |
@@ -221,6 +226,7 @@ Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange 
 | `vat_type` | Steuerregel | offen |
 | `unity` | fachliche Bedeutung offen | offen |
 | `main_line_item_id` | Unterposition/Hauptposition | offen |
+| `image_only_rtf` | RTF nur mit Bild | optional umgesetzt |
 
 ## Technischer Implementierungsplan
 
@@ -270,19 +276,23 @@ Tasks:
 Ergebnis:
 
 - Freigegebene Dokumente koennen live in `SRTemp` geschrieben werden.
-- Bis CIBEX Zugangsdaten liefert, bleibt `VENDOC_MSSQL_ENABLED=false`.
+- Ohne Zielserver-Konfiguration bleibt `VENDOC_MSSQL_ENABLED=false`.
+- Je Deployment muss der Live-Write mit VPN/MSSQL-Zugang abgenommen werden.
 
 ### Phase 4 - UI
 
 Tasks:
 
-- Mapping-Preview anzeigen.
-- Button `VenDoc Dry-Run`.
-- Button `An VenDoc exportieren`.
-- Exportstatus im Dokument anzeigen.
-- Fehlerdetails anzeigen.
+- Mapping-Preview anzeigen. Status: umgesetzt im Admin-/Previewbereich.
+- Button `VenDoc Dry-Run`. Status: umgesetzt.
+- Button `An VenDoc exportieren`. Status: umgesetzt mit Freigabe-Gate.
+- Exportstatus im Dokument anzeigen. Status: umgesetzt via Import-State/latest Job.
+- Fehlerdetails anzeigen. Status: umgesetzt.
+- Kundenauswahl im Startbereich. Status: umgesetzt.
+- Warnung vor erneutem Live-Import. Status: umgesetzt.
+- Alternativpositionsmodus im Positionsbereich. Status: umgesetzt.
 
-## Geplante Env-Variablen
+## Env-Variablen
 
 ```env
 VENDOC_MSSQL_ENABLED=false
@@ -327,10 +337,11 @@ VENDOC_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
 
 ## Was noch fehlt
 
-- MSSQL-Zugangsdaten.
-- Docker-Image mit installiertem Microsoft ODBC Driver 18 neu bauen und gegen Zielserver testen.
-- UI fuer Exportstatus gegen Dry-Run, SQL-Vorschau und Live-Export ist vorbereitet.
+- Zielserverzugang/Firewall/VPN je Umgebung pruefen.
+- Docker-Image mit installiertem Microsoft ODBC Driver 18 auf dem Ubuntu-Zielserver neu bauen und gegen Zielserver testen.
+- Ersten produktionsnahen Live-Write mit anschliessendem SQL-Select gegen `external_document_id` abnehmen.
 - Finale fachliche Regeln fuer Sonderfelder, Alternativen, Nullpositionen und Bilder.
+- Finale Re-Import-/Dublettenregel mit Dragan/CIBEX.
 
 ## Call-Notiz fuer Dragan/CIBEX
 

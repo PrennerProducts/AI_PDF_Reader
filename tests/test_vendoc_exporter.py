@@ -16,6 +16,8 @@ from vendoc_exporter import (
 )
 from vendoc_mssql import POSITION_COLUMNS, build_srtemp_export_preview, build_srtemp_insert_script
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
+from parser import parse_document_text
+from structured_parser import extract_line_items
 
 
 def _write_png(path: Path) -> bytes:
@@ -264,6 +266,75 @@ def test_vendoc_payload_groups_appended_alternatives_by_description(tmp_path: Pa
     assert grouped["quantity"] == 10.0
     assert grouped["unit_price"] == 16.0
     assert grouped["image_is_primary"] is False
+
+
+def test_vendoc_payload_exports_rieder_alternative_under_parent() -> None:
+    text = (ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt").read_text(encoding="utf-8")
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 20252082,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": "2025-09-05",
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "alternative_position_mode": "nested",
+            },
+            "line_items": items,
+            "images": [],
+        }
+    )
+
+    assert payload["header"]["supplier_id"] == "300774"
+    assert payload["summary"]["alternative_position_count"] == 1
+    assert payload["summary"]["alternative_position_mode"] == "nested"
+    assert [(position["position_no"], position["is_alternative"]) for position in payload["positions"]] == [
+        ("1", False),
+        ("1.1", True),
+        ("2", False),
+        ("3", False),
+        ("4", False),
+    ]
+    assert payload["positions"][1]["description_short"] == "HS Schema A nach links"
+
+
+def test_vendoc_payload_exports_rieder_alternative_appended() -> None:
+    text = (ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt").read_text(encoding="utf-8")
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 20252082,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": "2025-09-05",
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "alternative_position_mode": "append",
+            },
+            "line_items": items,
+            "images": [],
+        }
+    )
+
+    assert payload["summary"]["alternative_position_count"] == 1
+    assert payload["summary"]["alternative_position_mode"] == "append"
+    assert [(position["position_no"], position["is_alternative"]) for position in payload["positions"]] == [
+        ("1", False),
+        ("2", False),
+        ("3", False),
+        ("4", False),
+        ("5", True),
+    ]
+    assert payload["positions"][-1]["description_short"] == "HS Schema A nach links"
 
 
 def test_vendoc_payload_requires_positions() -> None:

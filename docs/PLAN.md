@@ -1,6 +1,6 @@
 # Umsetzungsplan zur produktionsreifen App
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 ## Zielbild
 
@@ -30,11 +30,16 @@ Bereits umgesetzt:
 - UI-Workbench mit PDF-Vorschau, Cockpit, Review, Positionen, Bildern und manueller Bild-/Review-Freigabe.
 - Dokumentfreigabe (`approval_status`) als API- und UI-Funktion.
 - VenDoc-Dry-Run-Mapping mit Export-Journal und API-Endpunkten.
+- VenDoc-MSSQL-Live-Writer fuer `SRTemp`, per ENV aktivierbar.
+- Kundenauswahl fuer `SRTemp` und `customer_id` im Exportheader.
+- Alternative Positionen mit dokumentweitem Exportmodus.
+- Login, Logout, Bootstrap-Benutzer und Audit-Log.
+- Canary mit Auth-Unterstuetzung.
 
 Noch nicht produktionsreif:
 
-- Kein echter MSSQL-Live-Writer fuer VenDoc.
-- Keine Authentifizierung/Rollen.
+- Produktiver SRTemp-Live-Write ist noch am Zielsystem zu verifizieren.
+- Keine Rollen/Berechtigungen; aktuell koennen alle angemeldeten Benutzer alles bedienen.
 - Processing laeuft synchron im Request statt als robuster Job.
 - Doku und OpenAPI-Vertraege brauchen nach Codeaenderungen weiterhin Pflege.
 
@@ -47,13 +52,14 @@ Ziel: Freigegebene Dokumente in die externe Datenbank `SRTemp` schreiben.
 Status:
 
 - Dry-Run-Mapping ist umgesetzt.
-- Live-Write bleibt blockiert bis CIBEX-Zugang und finale Feldregeln vorliegen.
+- Live-Write ist im Code umgesetzt und bleibt bis zur Zielserver-Pruefung per ENV steuerbar.
+- Finale Feldregeln und Dublettenlogik bleiben mit Dragan/CIBEX abzustimmen.
 
 Tasks:
 
 - Neues Modul `api/vendoc_exporter.py` fuer Mapping und Dry-Run. Status: erledigt.
-- MSSQL-Client-Abhaengigkeit auswaehlen und einbauen.
-- SQL-Server-Treiber im API-Dockerfile installieren.
+- MSSQL-Client-Abhaengigkeit auswaehlen und einbauen. Status: erledigt mit `pyodbc`.
+- SQL-Server-Treiber im API-Dockerfile installieren. Status: erledigt mit Microsoft ODBC Driver 18.
 - Env-Konfiguration ergaenzen:
   - `VENDOC_MSSQL_HOST`
   - `VENDOC_MSSQL_PORT`
@@ -62,10 +68,10 @@ Tasks:
   - `VENDOC_MSSQL_PASSWORD`
   - `VENDOC_MSSQL_ENCRYPT`
   - `VENDOC_MSSQL_TRUST_SERVER_CERTIFICATE`
-- Mapping auf `dbo.vendoc_import_headers` und `dbo.vendoc_import_positions` implementieren. Status: Dry-Run erledigt, Live-Write offen.
+- Mapping auf `dbo.vendoc_import_headers` und `dbo.vendoc_import_positions` implementieren. Status: Dry-Run und Live-Write umgesetzt.
 - `dry_run=true` unterstuetzen, damit Mapping und Pflichtfelder ohne echten Write geprueft werden koennen. Status: erledigt.
-- Echtes Schreiben in einer Transaktion umsetzen: Header und Positionen entweder zusammen erfolgreich oder gar nicht.
-- Fehler sauber zur API/UI zurueckgeben.
+- Echtes Schreiben in einer Transaktion umsetzen: Header und Positionen entweder zusammen erfolgreich oder gar nicht. Status: umgesetzt.
+- Fehler sauber zur API/UI zurueckgeben. Status: umgesetzt, Zielserverfaelle noch abnehmen.
 
 ### 2. Export-Journal in Postgres
 
@@ -99,7 +105,7 @@ Tasks:
 - `POST /vendoc/export/{document_id}?dry_run=true|false`
 - `GET /vendoc/export-jobs/{document_id}`
 - `GET /vendoc/export-jobs/{document_id}/latest`
-- Optional: `GET /vendoc/health` fuer MSSQL-Verbindungstest.
+- `GET /vendoc/health` fuer MSSQL-Konfiguration und optionalen Verbindungstest.
 
 Regel:
 
@@ -118,7 +124,7 @@ Offen mit Dragan/CIBEX:
 - Darf dieselbe `external_document_id` erneut importiert werden?
 - Werden Alternativpositionen importiert?
 - Werden `0,00`-Positionen importiert?
-- Wie werden Bilder erwartet: Base64, Dateipfad oder separater Datensatz?
+- Bleibt `image_long_text_rtf` mit PNG-Hex im RTF das fuehrende Bildfeld oder sollen Text/Bild dauerhaft getrennt importiert werden?
 - Was bedeuten `tax_type`, `vat_type`, `unity`, `item_type`, `main_line_item_id` fachlich?
 - Soll `line_total` in VenDoc nachgezogen werden? Aktuell fehlt diese Spalte in der Screenshot-Struktur.
 
@@ -128,9 +134,10 @@ Ziel: Reproduzierbarer Release-Gate.
 
 Aktueller Befund:
 
-- `.venv/bin/python -m pytest tests -q`: `165 passed`.
-- Alle 39 Angebots-PDFs sind bei Betrags-/Summenvalidierung ohne Bildpflicht `auto_accept`.
-- `./infra/api-canary.sh` ist am 2026-04-29 gruen fuer `alu_one`, `entholzer`, `rieder`, `sr_schauraum`, `newo` und `rekord_vomp`.
+- `env PYTHONPATH=api .venv/bin/python -m pytest tests -q`: `209 passed, 2 warnings`.
+- Angebots-Smoke-Korpus: 39 Angebotsfaelle ueber 11 Anbieter.
+- `./infra/api-canary.sh` prueft 8 API-Faelle inkl. zwei Schuchter-Varianten.
+- Canary kann sich bei aktivierter App-Auth anmelden.
 
 Tasks:
 
@@ -144,10 +151,11 @@ Tasks:
 
 Tasks:
 
-- UI und API schuetzen.
-- Mindestens Rollen: `operator`, `reviewer`, `admin`.
-- Freigabe und VenDoc-Export nur fuer berechtigte Rollen.
-- Auditdaten speichern: wer hat verarbeitet, korrigiert, freigegeben, exportiert.
+- UI und API schuetzen. Status: erledigt per Session-Login, wenn `APP_AUTH_ENABLED=true`.
+- Bootstrap-Benutzer und Benutzeranlage. Status: erledigt.
+- Auditdaten speichern: wer hat verarbeitet, korrigiert, freigegeben, exportiert. Status: erledigt.
+- Mindestens Rollen: `operator`, `reviewer`, `admin`. Status: offen.
+- Freigabe und VenDoc-Export nur fuer berechtigte Rollen. Status: offen, nur relevant falls Rollen fachlich gewuenscht sind.
 
 ### 2. Processing als Job-System
 
@@ -256,10 +264,10 @@ Akzeptanz:
 
 Akzeptanz:
 
-- Live-Export schreibt in `SRTemp`.
-- Transaktion funktioniert.
-- Export-Journal dokumentiert Erfolg/Fehler.
-- Re-Export-Regel ist implementiert.
+- Live-Export schreibt in `SRTemp`. Status: im Code umgesetzt, Zielserver-Abnahme offen.
+- Transaktion funktioniert. Status: im Code umgesetzt, Zielserver-Abnahme offen.
+- Export-Journal dokumentiert Erfolg/Fehler. Status: umgesetzt.
+- Re-Export-Regel ist implementiert. Status: UI warnt, finale fachliche Regel offen.
 
 ### M4 - Produktivbetrieb
 
@@ -273,9 +281,11 @@ Akzeptanz:
 
 ## Naechste konkrete Schritte
 
-1. Zugriffsdaten von CIBEX abwarten und MSSQL-Verbindungsart klaeren.
-2. UI-Button, Mapping-Preview und Statusanzeige fuer VenDoc-Dry-Run einbauen.
-3. Re-Export-/Dublettenregel mit Dragan/CIBEX finalisieren.
-4. MSSQL-Client/Treiber und transaktionalen Live-Write bauen.
-5. Neue Angebots-PDFs in `candidates` aufnehmen und Parser-Korpus erweitern.
-6. Canary nach jeder Parser-, Validierungs- oder Bildworkflow-Aenderung als Release-Gate laufen lassen.
+1. Zielserver mit `git pull`, `docker compose --env-file .env ... --force-recreate api` aktualisieren.
+2. Auth im Container pruefen: `APP_AUTH_ENABLED=true` und Login/Logout in der UI.
+3. `GET /vendoc/health?check_connection=true` gegen den echten SQL Server pruefen.
+4. Einen freigegebenen Beleg per Dry-Run und danach per Live-Write nach `SRTemp` testen.
+5. SQL-Select auf `dbo.vendoc_import_headers` und `dbo.vendoc_import_positions` fuer die `external_document_id` machen.
+6. Re-Export-/Dublettenregel mit Dragan/CIBEX finalisieren.
+7. Neue Angebots-PDFs in `candidates` aufnehmen und Parser-Korpus erweitern.
+8. Canary nach jeder Parser-, Validierungs- oder Bildworkflow-Aenderung als Release-Gate laufen lassen.

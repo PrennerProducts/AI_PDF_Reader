@@ -1,10 +1,10 @@
 # Wie das System funktioniert
 
-Stand: 2026-04-29
+Stand: 2026-05-28
 
 ## Uebersicht
 
-Das System laeuft On-Prem und verarbeitet Angebots- und Auftragsbestaetigungs-PDFs in einer API-Pipeline. Die interne Persistenz liegt in Postgres. Fuer VenDoc ist ein zusaetzlicher MSSQL-Writer geplant, der freigegebene Dokumente in die externe Datenbank `SRTemp` schreibt.
+Das System laeuft On-Prem und verarbeitet Angebots- und Auftragsbestaetigungs-PDFs in einer API-Pipeline. Die interne Persistenz liegt in Postgres. Fuer VenDoc gibt es einen zusaetzlichen MSSQL-Writer, der freigegebene Dokumente in die externe Datenbank `SRTemp` schreiben kann.
 
 ## Komponenten
 
@@ -24,6 +24,8 @@ Aufgaben:
 - Review und Freigabe.
 - Bildzuordnung.
 - Dokumentverknuepfung Angebot/Auftragsbestaetigung.
+- Login, Session und Audit.
+- VenDoc Dry-Run, Live-Write, Kundenzuordnung und Export-Journal.
 - UI-Auslieferung.
 
 Hinweis:
@@ -177,18 +179,18 @@ Aktuell:
 - CSV.
 - SQL fuer das interne App-Schema.
 - VenDoc-Dry-Run-Mapping mit Export-Journal.
+- VenDoc-MSSQL-Live-Write nach `SRTemp`, per ENV schaltbar.
+- Kundenzuordnung und `customer_id` im Header.
+- Alternativpositionsmodus fuer den Export.
 
-Noch nicht umgesetzt:
-
-- Direkter VenDoc-MSSQL-Write.
-
-Geplanter VenDoc-Export:
+VenDoc-Export:
 
 1. Dokument muss verarbeitet sein.
 2. Dokument muss freigegeben sein.
 3. Mapping ist als Dry-Run pruefbar.
-4. Export-Journal speichert Dry-Runs, Sperrgruende und Fehler.
-5. Live-Write schreibt Header und Positionen spaeter in einer Transaktion, sobald MSSQL-Zugriff und Feldregeln final sind.
+4. Export-Journal speichert Dry-Runs, Live-Exports, Sperrgruende und Fehler.
+5. Live-Write schreibt Header und Positionen in einer MSSQL-Transaktion.
+6. Zielserver-Live-Write muss pro Deployment mit SQL-Select gegen `external_document_id` abgenommen werden.
 
 ## Bildextraktion und Bild-Mapping
 
@@ -231,12 +233,16 @@ Vorhanden:
 - Bilder.
 - Preview/Download.
 - Freigabe.
+- Login/Logout mit sichtbarem Benutzer in der Kopfzeile.
+- Admin-Bereich mit Benutzeranlage.
+- Kundenauswahl.
+- VenDoc-Importstatus und Doppelimportwarnung.
+- Alternativpositionsmodus.
 
 Fuer Production geplant:
 
 - Review-Queue als Hauptscreen.
 - Batch-Upload und Batch-Processing.
-- VenDoc-Exportstatus.
 - Feldkorrekturen.
 - Rollen und Berechtigungen.
 
@@ -262,8 +268,8 @@ Regel:
 
 ## Bekannte Grenzen
 
-1. VenDoc-MSSQL-Writer fehlt noch.
-2. Authentifizierung fehlt noch.
+1. Produktiver VenDoc-Live-Write muss je Zielserver verifiziert werden.
+2. Rollen/Berechtigungen fehlen noch; aktuell koennen alle angemeldeten Benutzer alles bedienen.
 3. Processing ist noch nicht als persistenter Job umgesetzt.
 4. Feldkorrekturen in der UI fehlen noch.
 5. Neue Angebotsdokumente muessen kontrolliert in Kandidaten und Regression einsortiert werden.

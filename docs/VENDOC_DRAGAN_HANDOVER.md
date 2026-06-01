@@ -1,6 +1,6 @@
 # VenDoc Handover fuer Dragan
 
-Stand: 2026-05-25
+Stand: 2026-05-28
 
 ## Zweck
 
@@ -134,6 +134,7 @@ Wichtige Environment-Variablen:
 
 - `APP_BOOTSTRAP_DISPLAY_NAME`
   - Anzeigename fuer den initialen Benutzer
+  - optional; wenn leer, wird der Benutzername angezeigt
 
 - `APP_SESSION_TTL_HOURS`
   - Gueltigkeit einer Login-Session
@@ -147,6 +148,7 @@ Benutzeranlage:
 - weitere Benutzer koennen angemeldete Benutzer im Admin-Bereich der UI anlegen
 - technisch ist dafuer weiter die API `POST /auth/users` vorhanden
 - Rollen sind bewusst nicht vorgesehen
+- die UI fragt fuer neue Benutzer nur Benutzername und Passwort ab; ein Anzeigename ist technisch optional, aber fuer die Bedienung nicht notwendig
 
 ### 7. Alternative Positionen
 
@@ -276,6 +278,11 @@ Umgesetzt:
 - lueckenlose Exportnummerierung fuer beide Alternativmodi
 - Hinweis und Exportpositionsanzeige im Reiter `Positionen`
 - Sammelpositionen fuer gleiche Alternativen im Modus `Am Ende anhaengen`
+- sichtbarer angemeldeter Benutzer und `Abmelden` in der Kopfzeile
+- vereinfachte Benutzeranlage nur mit Benutzername und Passwort
+- Canary kann bei aktivierter Auth automatisch mit `.env`- oder `PDR_CANARY_*`-Credentials laufen
+- Provider-/Validierungsregression aktuell gruen: `209 passed, 2 warnings`
+- Dry-Run fuer Muigg/SRTemp fachlich geprueft: `customer_id` im Header, bereinigte Kurztexte, Gewichte im Langtext und RTF-Bildeinbettung bleiben erhalten
 
 ## Was Dragan aktuell pruefen soll
 
