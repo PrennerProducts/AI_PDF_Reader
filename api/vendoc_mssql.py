@@ -79,7 +79,7 @@ COLUMN_ALIASES: dict[str, dict[str, list[str]]] = {
     },
     POSITION_TABLE: {
         "is_alternative": ["is_alternate"],
-        "text_only_rtf": ["text_rtf"],
+        "text_only_rtf": ["long_text_rtf", "text_rtf"],
         "image_only_rtf": ["image_rtf", "img_rtf"],
     },
 }

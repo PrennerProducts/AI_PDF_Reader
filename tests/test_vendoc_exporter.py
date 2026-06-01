@@ -14,7 +14,7 @@ from vendoc_exporter import (
     external_document_id,
     external_line_item_id,
 )
-from vendoc_mssql import POSITION_COLUMNS, build_srtemp_export_preview, build_srtemp_insert_script
+from vendoc_mssql import POSITION_COLUMNS, POSITION_TABLE, _resolve_column_bindings, build_srtemp_export_preview, build_srtemp_insert_script
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 from parser import parse_document_text
 from structured_parser import extract_line_items
@@ -436,6 +436,24 @@ def test_srtemp_preview_uses_runtime_resolved_column_names(monkeypatch, tmp_path
     ]
     assert "INSERT INTO dbo.vendoc_import_headers (external_document_id, source_document_id, is_alternative)" in preview["sql_script"]
     assert "is_alternate" not in preview["sql_script"]
+
+
+def test_srtemp_position_rtf_aliases_match_dragan_columns() -> None:
+    bindings = _resolve_column_bindings(
+        POSITION_TABLE,
+        POSITION_COLUMNS,
+        set(),
+        [
+            "external_line_item_id",
+            "external_document_id",
+            "source_line_item_id",
+            "long_text_rtf",
+            "image_rtf",
+        ],
+    )
+
+    assert ("long_text_rtf", "text_only_rtf") in bindings
+    assert ("image_rtf", "image_only_rtf") in bindings
 
 
 def test_strip_price_tokens_removes_trailing_short_text_price() -> None:

@@ -135,7 +135,7 @@ Fachliche Klaerung:
 | `description_short` | `nvarchar(max)` | null |
 | `description_long` | `nvarchar(max)` | null |
 | `image_long_text_rtf` | `nvarchar(max)` | null |
-| `text_only_rtf` | `nvarchar(max)` | null/optional |
+| `long_text_rtf` | `nvarchar(max)` | null/optional |
 | `unit_price` | `float` | null |
 | `page_ref` | `nvarchar(max)` | null |
 | `image_is_primary` | `bit` | null |
@@ -146,7 +146,7 @@ Fachliche Klaerung:
 | `vat_type` | `nvarchar(max)` | null |
 | `unity` | `float` | null |
 | `main_line_item_id` | `nvarchar(max)` | null |
-| `image_only_rtf` | `nvarchar(max)` | null/optional |
+| `image_rtf` | `nvarchar(max)` | null/optional |
 
 ## Auffaellige Schema-Punkte
 
@@ -215,7 +215,7 @@ Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange 
 | `description_short` | `line_item.description_short` | klar |
 | `description_long` | `line_item.description_long` | klar |
 | `image_long_text_rtf` | fertiger RTF-LongText inkl. eingebettetem PNG-Hex | bestaetigt |
-| `text_only_rtf` | RTF nur mit Positions-Langtext | optional umgesetzt |
+| `long_text_rtf` | App-Feld `text_only_rtf`, RTF nur mit Positions-Langtext | optional umgesetzt |
 | `unit_price` | `line_item.unit_price` | klar |
 | `page_ref` | `line_item.page_ref` als String | klar |
 | `image_is_primary` | `true`, wenn Bild vorhanden | klar |
@@ -226,7 +226,7 @@ Konsequenz: Unser SRTemp-Export bleibt passend. Wichtig ist nur, dass der lange 
 | `vat_type` | Steuerregel | offen |
 | `unity` | fachliche Bedeutung offen | offen |
 | `main_line_item_id` | Unterposition/Hauptposition | offen |
-| `image_only_rtf` | RTF nur mit Bild | optional umgesetzt |
+| `image_rtf` | App-Feld `image_only_rtf`, RTF nur mit Bild | optional umgesetzt |
 
 ## Technischer Implementierungsplan
 

@@ -196,10 +196,10 @@ UI-Verhalten:
 
 ### Empfohlen in `dbo.vendoc_import_positions`
 
-Bitte zwei neue Spalten anlegen:
+Dragan hat am 2026-06-01 diese zwei SRTemp-Spalten genannt:
 
-- `text_only_rtf`
-- `image_only_rtf`
+- `long_text_rtf`
+- `image_rtf`
 
 Empfohlener Typ:
 
@@ -207,10 +207,10 @@ Empfohlener Typ:
 
 ### Fachliche Bedeutung
 
-- `text_only_rtf`
+- `long_text_rtf`
   - enthaelt den bisherigen Positions-Langtext als RTF, aber ohne Bild
 
-- `image_only_rtf`
+- `image_rtf`
   - enthaelt nur das Bild als RTF
   - ohne den restlichen Text
 
@@ -238,10 +238,17 @@ Das heisst:
 
 ## Unterstuetzte Spaltennamen
 
-Falls Dragan andere Namen bevorzugt, sind aktuell zusaetzlich diese Aliasse unterstuetzt:
+Intern heissen die App-Felder weiterhin `text_only_rtf` und `image_only_rtf`.
+Beim Schreiben nach SRTemp werden Dragans Spalten automatisch verwendet:
+
+- App `text_only_rtf` -> SRTemp `long_text_rtf`
+- App `image_only_rtf` -> SRTemp `image_rtf`
+
+Weitere unterstuetzte Aliasse:
 
 - fuer Text-RTF:
   - `text_only_rtf`
+  - alternativ `long_text_rtf`
   - alternativ `text_rtf`
 
 - fuer Bild-RTF:
@@ -249,11 +256,10 @@ Falls Dragan andere Namen bevorzugt, sind aktuell zusaetzlich diese Aliasse unte
   - alternativ `image_rtf`
   - alternativ `img_rtf`
 
-Empfehlung trotzdem:
+Finale Namen laut Dragan:
 
-- im SQL-Schema direkt die finalen Namen verwenden:
-  - `text_only_rtf`
-  - `image_only_rtf`
+- `long_text_rtf`
+- `image_rtf`
 
 ## Was wir in der App bereits gemacht haben
 
@@ -286,24 +292,18 @@ Umgesetzt:
 
 ## Was Dragan aktuell pruefen soll
 
-1. Ob `dbo.vendoc_import_positions` die zwei neuen Spalten bekommen soll:
-   - `text_only_rtf`
-   - `image_only_rtf`
-
-2. Ob VenDoc intern:
+1. Ob VenDoc intern:
    - das kombinierte Feld braucht
    - oder Text und Bild getrennt weiterverarbeitet werden sollen
 
-3. Ob die empfohlenen Spaltennamen fuer ihn passen
-
-4. Ob die Audit-Informationen fuer ihn ausreichend sind:
+2. Ob die Audit-Informationen fuer ihn ausreichend sind:
    - Benutzer
    - IP
    - Aktion
    - Dokument / Position
    - Details als JSON
 
-5. Ob die Positionsnummerierung und Gruppierung fuer Alternativen in VenDoc so passt:
+3. Ob die Positionsnummerierung und Gruppierung fuer Alternativen in VenDoc so passt:
    - `1.1`, `1.2` direkt unter der Hauptposition
    - oder gesammelt am Ende, z.B. alle gleichen `Holzart: Fichte ...` als eine gemeinsame Alternativposition
 
@@ -313,9 +313,9 @@ Folgender Text kann an Dragan geschickt werden:
 
 > Wir lassen das bestehende kombinierte Feld `image_long_text_rtf` unveraendert bestehen.
 > Zusaetzlich erzeugen wir jetzt pro Position zwei weitere RTF-Felder:
-> `text_only_rtf` fuer den reinen Text und `image_only_rtf` fuer das Bild separat.
-> Wenn du diese Werte direkt in `SRTemp` haben willst, brauchen wir in `dbo.vendoc_import_positions` zwei neue Spalten vom Typ `nvarchar(max)` mit genau diesen Namen.
-> Alternativ koennen wir auch `text_rtf` sowie `image_rtf` / `img_rtf` bedienen, falls du andere Feldnamen bevorzugst.
+> `long_text_rtf` fuer den reinen Text und `image_rtf` fuer das Bild separat.
+> Die App mappt intern `text_only_rtf` auf `long_text_rtf` und `image_only_rtf` auf `image_rtf`.
+> Beide Spalten sollten in `dbo.vendoc_import_positions` als `nvarchar(max)` vorhanden sein.
 
 Zum Mehrbenutzerbetrieb:
 

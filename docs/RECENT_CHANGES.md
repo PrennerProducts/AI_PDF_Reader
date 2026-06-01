@@ -27,8 +27,8 @@ Diese Datei fasst die groesseren Aenderungen seit Ende April 2026 zusammen. Deta
 - Gewichts- und Umfangsangaben bleiben im Langtext erhalten.
 - `image_long_text_rtf` bleibt das kombinierte RTF-Feld mit Text und Bild.
 - Zusaetzlich werden optional erzeugt:
-  - `text_only_rtf`
-  - `image_only_rtf`
+  - intern `text_only_rtf`, in SRTemp laut Dragan `long_text_rtf`
+  - intern `image_only_rtf`, in SRTemp laut Dragan `image_rtf`
 - Bilder werden als PNG-Hex in RTF eingebettet.
 - Der Export toleriert fehlende optionale RTF-Spalten im Zielsystem.
 
