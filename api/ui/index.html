@@ -8255,18 +8255,33 @@
     }
 
     .app-v3 .vendoc-customer-controls {
+      position: relative;
+      z-index: 2;
       display: grid;
       gap: 8px;
       padding: 12px 14px;
       border-radius: 18px;
       border: 1px solid rgba(60, 60, 67, 0.10);
       background: #fbfbfd;
+      overflow: visible;
+    }
+
+    .app-v3 .vendoc-start-customer-card {
+      position: relative;
+      z-index: 120;
+      overflow: visible !important;
+    }
+
+    .app-v3 .vendoc-start-customer-card:has(.vendoc-customer-panel:not([hidden])) {
+      z-index: 4000;
     }
 
     .app-v3 .vendoc-customer-picker {
       position: relative;
+      z-index: 3;
       display: grid;
       gap: 8px;
+      overflow: visible;
     }
 
     .app-v3 .vendoc-customer-trigger {
@@ -8311,7 +8326,7 @@
       top: calc(100% + 8px);
       left: 0;
       right: 0;
-      z-index: 20;
+      z-index: 5000;
       display: grid;
       gap: 10px;
       padding: 12px;
