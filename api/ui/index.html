@@ -12219,12 +12219,18 @@
 
     function lineTotalOverrideControlHtml(item, lineItemId) {
       if (!lineItemPriceEditable(item) || !Number.isFinite(lineItemId)) return "";
+      const metadata = parseLineItemMetadata(item);
       const value = uiNumberValue(item && item.line_total);
+      const printedValue = uiNumberValue(metadata.delivery_charge_printed_total);
+      const printedNote = printedValue === null
+        ? ""
+        : `<small>lt. Dokument: ${escapeHtml(printedValue.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))} €</small>`;
       return `
         <label class="line-total-override-control">
           <span>
             <strong>Pauschalbetrag</strong>
             <small>Ändert diese Zusatzposition und die Nettoprüfung.</small>
+            ${printedNote}
           </span>
           <input
             type="number"
