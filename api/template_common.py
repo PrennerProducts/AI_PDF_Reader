@@ -109,8 +109,8 @@ def extract_first_description(lines: list[str], skip_prefixes: tuple[str, ...], 
             continue
         if TWO_AMOUNTS_RE.search(clean):
             continue
-        clean = re.sub(r"^(?:EUR|\u20ac)?\s*[0-9][0-9 .]*,[0-9]{2}\s*", "", clean, flags=re.IGNORECASE).strip()
-        clean = re.sub(r"\s+(?:EUR|\u20ac)?\s*[0-9][0-9 .]*,[0-9]{2}$", "", clean, flags=re.IGNORECASE).strip()
+        clean = re.sub(r"^(?:EUR|\u20ac)?\s*[0-9][0-9 .]*,[0-9]{2}\s*(?:EUR|\u20ac)?\s*", "", clean, flags=re.IGNORECASE).strip()
+        clean = re.sub(r"\s+(?:EUR|\u20ac)?\s*[0-9][0-9 .]*,[0-9]{2}\s*(?:EUR|\u20ac)?$", "", clean, flags=re.IGNORECASE).strip()
         if clean and re.search(r"[A-Za-z\u00c4\u00d6\u00dc\u00e4\u00f6\u00fc]", clean):
             candidates.append(clean)
 

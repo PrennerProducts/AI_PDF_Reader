@@ -226,6 +226,7 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         source_positions = [_to_str(item.get("position_no")) for item in group_items if _to_str(item.get("position_no"))]
         metadata = dict(_metadata(first))
         metadata["alternative_source"] = "aggregated_append"
+        metadata["alternative_append_at_end"] = True
         metadata["alternative_group_source_count"] = len(group_items)
         metadata["alternative_group_source_ids"] = source_ids
         metadata["alternative_group_source_positions"] = source_positions
@@ -250,6 +251,7 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         aggregate = dict(first)
         aggregate["id"] = f"aggregate:alt:{group_index}:{_normalize_lookup_key(label)[:48]}"
         aggregate["is_alternative"] = True
+        aggregate["alternative_append_at_end"] = True
         aggregate["quantity"] = quantity_sum if quantity_sum else None
         aggregate["description_short"] = label
         aggregate["description_long"] = "\n".join(line for line in detail_lines if line)
@@ -262,6 +264,13 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
 
     aggregated.extend(passthrough)
     return aggregated
+
+
+def _alternative_append_at_end(item: dict[str, Any], mode: str) -> bool:
+    if mode == "append":
+        return True
+    metadata = _metadata(item)
+    return _to_bool(item.get("alternative_append_at_end")) or _to_bool(metadata.get("alternative_append_at_end"))
 
 
 def _prepare_line_items_for_export(line_items: list[Any], mode: str) -> tuple[list[dict[str, Any]], int]:
@@ -293,26 +302,26 @@ def _prepare_line_items_for_export(line_items: list[Any], mode: str) -> tuple[li
                 alt_item = _embedded_alternative_item(item, alt_text, alt_number)
                 embedded_alternative_count += 1
                 parent_key = parent_position_no or str(parent_index)
-                parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
-                if normalized_mode == "nested":
+                if _alternative_append_at_end(alt_item, normalized_mode):
+                    append_alternatives.append(alt_item)
+                else:
+                    parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
                     alt_item["position_no"] = _nested_position(parent_position_no, parent_index, parent_alt_counts[parent_key])
                     prepared.append(alt_item)
-                else:
-                    append_alternatives.append(alt_item)
             continue
 
         existing_alternative_count += 1
         parent_key = parent_position_no or _to_str(item.get("position_no")) or str(max(1, parent_index))
-        parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
-        if normalized_mode == "nested":
+        if _alternative_append_at_end(item, normalized_mode):
+            append_alternatives.append(item)
+        else:
+            parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
             item["position_no"] = _nested_position(parent_position_no, parent_index, parent_alt_counts[parent_key])
             prepared.append(item)
-        else:
-            append_alternatives.append(item)
 
-    if normalized_mode == "append" and append_alternatives:
+    if append_alternatives:
         append_alternatives = _aggregate_append_alternatives(append_alternatives)
-        next_position = len(prepared) + 1
+        next_position = parent_index + 1
         for alt_item in append_alternatives:
             alt_item["position_no"] = str(next_position)
             next_position += 1

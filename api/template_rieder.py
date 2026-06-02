@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from template_common import extract_amount_tokens, extract_dimensions, extract_first_description, normalize_line, normalize_text, page_ref_from_offset, trim_block_lines
@@ -79,6 +80,110 @@ def _is_alternative_position(block_lines: list[str]) -> bool:
     if any("ku.pos.: variante" in line for line in leading_lines):
         return True
     return False
+
+
+def _parse_eu_decimal(value: str | None) -> Decimal | None:
+    if value is None:
+        return None
+    cleaned = str(value).strip().replace("EUR", "").replace("\u20ac", "").replace(" ", "")
+    if not cleaned:
+        return None
+    cleaned = cleaned.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(cleaned)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _format_eu_decimal(value: Decimal) -> str:
+    normalized = value.quantize(Decimal("0.01"))
+    raw = f"{normalized:.2f}"
+    whole, cents = raw.split(".")
+    chunks: list[str] = []
+    while whole:
+        chunks.append(whole[-3:])
+        whole = whole[:-3]
+    return f"{'.'.join(reversed(chunks))},{cents}"
+
+
+def _is_delivery_charge_line(line: str) -> bool:
+    normalized = normalize_line(line).lower()
+    return (
+        "baustellenanlieferung" in normalized
+        or "frachtkostenbeitrag" in normalized
+        or "frachkostenbeitrag" in normalized
+        or "frachtkost" in normalized
+    )
+
+
+def _next_numeric_position_no(items: list[dict[str, Any]]) -> str:
+    max_position = 0
+    for item in items:
+        raw = str(item.get("position_no") or "").strip()
+        if raw.isdigit():
+            max_position = max(max_position, int(raw))
+    return str(max_position + 1 if max_position else len(items) + 1)
+
+
+def extract_delivery_charge_item(text: str, items: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+    normalized_text = normalize_text(text)
+    lines = [normalize_line(line) for line in normalized_text.splitlines()]
+    delivery_lines = [line for line in lines if _is_delivery_charge_line(line)]
+    if not delivery_lines:
+        return None
+
+    first_amount_sum = Decimal("0.00")
+    amount_values: list[Decimal] = []
+    amount_raw_by_value: dict[Decimal, str] = {}
+    for line in delivery_lines:
+        tokens = extract_amount_tokens(line)
+        parsed_tokens = [(token, _parse_eu_decimal(token)) for token in tokens]
+        parsed_values = [(token, value) for token, value in parsed_tokens if value is not None]
+        if not parsed_values:
+            continue
+        first_amount_sum += parsed_values[0][1]
+        for token, value in parsed_values:
+            amount_values.append(value)
+            amount_raw_by_value[value] = token
+
+    detected_amount = None
+    if first_amount_sum > 0:
+        for candidate in amount_values:
+            if abs(candidate - first_amount_sum) <= Decimal("0.02"):
+                detected_amount = candidate
+                break
+        if detected_amount is None:
+            detected_amount = first_amount_sum
+
+    amount = Decimal("200.00")
+    amount_raw = _format_eu_decimal(amount)
+    first_delivery_line = delivery_lines[0]
+    offset = normalized_text.find(first_delivery_line)
+    page_ref = page_ref_from_offset(normalized_text, offset if offset >= 0 else len(normalized_text))
+    position_no = _next_numeric_position_no(items or [])
+
+    return {
+        "position_no": position_no,
+        "lv_pos": None,
+        "is_alternative": False,
+        "quantity_raw": "1",
+        "unit": "Pauschale",
+        "width_raw": None,
+        "height_raw": None,
+        "description_short": "Baustellenanlieferung / Frachtkosten",
+        "description_long": "\n".join(delivery_lines),
+        "unit_price_raw": amount_raw,
+        "line_total_raw": amount_raw,
+        "page_ref": page_ref,
+        "pricing_source": "rieder_delivery_block",
+        "manual_price_editable": True,
+        "image_required": False,
+        "delivery_charge_detected": True,
+        "delivery_charge_default_amount": str(amount),
+        "delivery_charge_printed_total": str(detected_amount) if detected_amount is not None else None,
+        "delivery_charge_fallback": detected_amount is None,
+        "delivery_charge_lines": delivery_lines,
+    }
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:

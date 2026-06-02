@@ -191,6 +191,58 @@ def test_vendoc_payload_renumbers_nested_alternatives_without_gaps(tmp_path: Pat
     assert [position["is_alternative"] for position in payload["positions"]] == [False, True, False]
 
 
+def test_vendoc_payload_appends_single_nested_alternative_by_override(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["alternative_position_mode"] = "nested"
+    result["line_items"] = [
+        {
+            **result["line_items"][0],
+            "id": 77,
+            "position_no": "1",
+            "description_short": "Fixfenster",
+            "description_long": "Fixfenster",
+        },
+        {
+            **result["line_items"][0],
+            "id": 78,
+            "position_no": "1.1",
+            "is_alternative": True,
+            "description_short": "Alternative am Ende",
+            "description_long": "Alternative am Ende",
+            "metadata_json": {"alternative_append_at_end": True},
+        },
+        {
+            **result["line_items"][0],
+            "id": 79,
+            "position_no": "1.2",
+            "is_alternative": True,
+            "description_short": "Alternative unter Hauptposition",
+            "description_long": "Alternative unter Hauptposition",
+        },
+        {
+            **result["line_items"][0],
+            "id": 80,
+            "position_no": "2",
+            "description_short": "Fenster KIPP",
+            "description_long": "Fenster KIPP",
+        },
+    ]
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["alternative_position_mode"] == "nested"
+    assert payload["summary"]["alternative_position_count"] == 2
+    assert [(position["position_no"], position["description_short"]) for position in payload["positions"]] == [
+        ("1", "Fixfenster"),
+        ("1.1", "Alternative unter Hauptposition"),
+        ("2", "Fenster KIPP"),
+        ("3", "Alternative am Ende"),
+    ]
+    assert [position["is_alternative"] for position in payload["positions"]] == [False, True, False, True]
+
+
 def test_vendoc_payload_exports_alternatives_appended(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)

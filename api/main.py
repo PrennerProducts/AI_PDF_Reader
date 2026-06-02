@@ -2,7 +2,7 @@ import re
 import hmac
 import secrets
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from hashlib import pbkdf2_hmac, sha256
 import json
 import os
@@ -39,7 +39,9 @@ from db import (
     get_document_relations,
     refresh_document_links,
     reset_document_results,
+    update_line_item_alternative_append_mode,
     update_line_item_image_assignments,
+    update_line_item_line_total_override,
     update_line_item_review_state,
     replace_document_images,
     replace_document_amount_lines,
@@ -68,6 +70,7 @@ from image_preview import browser_preview_for_image
 from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
 from template_alu_one import extract_line_item_layout_hints as extract_alu_one_line_item_layout_hints
+from template_rieder import extract_delivery_charge_item as extract_rieder_delivery_charge_item
 from template_koch_detail import parse_page_details as parse_koch_detail_page_details
 from vendoc_exporter import build_vendoc_payload
 from vendoc_mssql import (
@@ -147,6 +150,14 @@ class DocumentVendocCustomerRequest(BaseModel):
 
 class DocumentAlternativePositionModeRequest(BaseModel):
     mode: Literal["nested", "append"] = "nested"
+
+
+class LineItemAlternativeAppendRequest(BaseModel):
+    append_at_end: bool = False
+
+
+class LineItemLineTotalOverrideRequest(BaseModel):
+    line_total: Decimal = Field(ge=0, le=Decimal("99999999.99"))
 
 
 class LoginRequest(BaseModel):
@@ -1072,9 +1083,152 @@ def _build_amount_line_rows(extracted_text: str, totals: dict[str, str | None]) 
     return rows
 
 
-def _build_line_item_rows(extracted_text: str, template: str, source_path: Path | None = None) -> list[dict]:
+def _money(value: Decimal) -> Decimal:
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _line_item_metadata_dict(row: dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("metadata_json")
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _set_line_item_metadata(row: dict[str, Any], metadata: dict[str, Any]) -> None:
+    row["metadata_json"] = json.dumps(metadata, ensure_ascii=True)
+
+
+def _rieder_pricing_operations(amount_line_rows: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    operations: list[dict[str, Any]] = []
+    for row in sorted(amount_line_rows or [], key=lambda item: int(item.get("sort_order") or 0)):
+        line_type = str(row.get("line_type") or "").strip().lower()
+        percent = row.get("percent")
+        if line_type not in {"discount", "surcharge"} or percent is None:
+            continue
+        try:
+            percent_decimal = Decimal(percent)
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if percent_decimal == 0:
+            continue
+        operations.append(
+            {
+                "line_type": line_type,
+                "percent": percent_decimal,
+                "label_raw": row.get("label_raw") or "",
+                "sort_order": row.get("sort_order", 0),
+            }
+        )
+    return operations
+
+
+def _rieder_last_discount_subtotal(amount_line_rows: list[dict[str, Any]] | None) -> Decimal | None:
+    last_subtotal: Decimal | None = None
+    for row in sorted(amount_line_rows or [], key=lambda item: int(item.get("sort_order") or 0)):
+        line_type = str(row.get("line_type") or "").strip().lower()
+        if line_type == "net_total":
+            break
+        if line_type == "subtotal":
+            amount = row.get("amount")
+            if isinstance(amount, Decimal):
+                last_subtotal = amount
+    return last_subtotal
+
+
+def _apply_rieder_operations(value: Decimal, operations: list[dict[str, Any]]) -> Decimal:
+    current = value
+    for operation in operations:
+        percent = operation["percent"] / Decimal("100")
+        factor = Decimal("1") + percent if operation["line_type"] == "surcharge" else Decimal("1") - percent
+        current = _money(current * factor)
+    return current
+
+
+def _update_row_unit_price_from_total(row: dict[str, Any]) -> None:
+    line_total = row.get("line_total")
+    if not isinstance(line_total, Decimal):
+        return
+    quantity = row.get("quantity")
+    if isinstance(quantity, Decimal) and quantity != 0:
+        row["unit_price"] = _money(line_total / quantity)
+    else:
+        row["unit_price"] = line_total
+
+
+def _apply_rieder_pricing_to_line_item_rows(rows: list[dict[str, Any]], amount_line_rows: list[dict[str, Any]] | None) -> None:
+    operations = _rieder_pricing_operations(amount_line_rows)
+    if not operations:
+        return
+
+    normal_row_indexes: list[int] = []
+    for index, row in enumerate(rows):
+        line_total = row.get("line_total")
+        if not isinstance(line_total, Decimal):
+            continue
+        metadata = _line_item_metadata_dict(row)
+        if metadata.get("pricing_source") == "rieder_delivery_block":
+            continue
+
+        original_line_total = line_total
+        original_unit_price = row.get("unit_price")
+        adjusted_line_total = _apply_rieder_operations(original_line_total, operations)
+        row["line_total"] = adjusted_line_total
+        _update_row_unit_price_from_total(row)
+
+        metadata["rieder_pricing_applied"] = True
+        metadata["rieder_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata["rieder_original_unit_price"] = str(original_unit_price)
+        metadata["rieder_pricing_operations"] = [
+            {
+                "line_type": operation["line_type"],
+                "percent": str(operation["percent"]),
+                "label_raw": operation["label_raw"],
+            }
+            for operation in operations
+        ]
+        _set_line_item_metadata(row, metadata)
+
+        if not bool(row.get("is_alternative")):
+            normal_row_indexes.append(index)
+
+    target_subtotal = _rieder_last_discount_subtotal(amount_line_rows)
+    if target_subtotal is None or not normal_row_indexes:
+        return
+    current_subtotal = sum((rows[index].get("line_total") for index in normal_row_indexes), Decimal("0.00"))
+    delta = _money(target_subtotal - current_subtotal)
+    if abs(delta) > Decimal("0.10") or delta == 0:
+        return
+
+    target_index = normal_row_indexes[-1]
+    target_row = rows[target_index]
+    if not isinstance(target_row.get("line_total"), Decimal):
+        return
+    target_row["line_total"] = _money(target_row["line_total"] + delta)
+    _update_row_unit_price_from_total(target_row)
+    metadata = _line_item_metadata_dict(target_row)
+    metadata["rieder_rounding_delta"] = str(delta)
+    _set_line_item_metadata(target_row, metadata)
+
+
+def _build_line_item_rows(
+    extracted_text: str,
+    template: str,
+    source_path: Path | None = None,
+    amount_line_rows: list[dict[str, Any]] | None = None,
+) -> list[dict]:
     rows: list[dict] = []
     items = extract_line_items(extracted_text, template)
+    if template == "rieder":
+        delivery_item = extract_rieder_delivery_charge_item(extracted_text, items)
+        if delivery_item:
+            items.append(delivery_item)
     if template == "alu_one" and source_path is not None and source_path.exists():
         try:
             hints = extract_alu_one_line_item_layout_hints(source_path)
@@ -1151,6 +1305,17 @@ def _build_line_item_rows(extracted_text: str, template: str, source_path: Path 
             metadata["next_position_top_ratio"] = float(item.get("next_position_top_ratio"))
         if "image_required" in item:
             metadata["image_required"] = bool(item.get("image_required"))
+        for key in (
+            "pricing_source",
+            "manual_price_editable",
+            "delivery_charge_detected",
+            "delivery_charge_default_amount",
+            "delivery_charge_printed_total",
+            "delivery_charge_fallback",
+            "delivery_charge_lines",
+        ):
+            if key in item:
+                metadata[key] = item.get(key)
         referenced_lv_pos = _clean_optional_str(item.get("referenced_lv_pos"))
         if referenced_lv_pos:
             metadata["referenced_lv_pos"] = referenced_lv_pos
@@ -1173,6 +1338,8 @@ def _build_line_item_rows(extracted_text: str, template: str, source_path: Path 
                 "metadata_json": json.dumps(metadata, ensure_ascii=True),
             }
         )
+    if template == "rieder":
+        _apply_rieder_pricing_to_line_item_rows(rows, amount_line_rows)
     return rows
 
 
@@ -1626,6 +1793,101 @@ def clear_line_item_review(document_id: int, line_item_id: int, request: Request
         "line_item_id": line_item_id,
         "review_checked": False,
         "review_checked_reason": "ui_review_reset",
+    }
+
+
+@app.put("/documents/{document_id}/line-items/{line_item_id}/alternative-append-at-end")
+def set_line_item_alternative_append_at_end(
+    document_id: int,
+    line_item_id: int,
+    payload: LineItemAlternativeAppendRequest,
+    request: Request,
+):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+    if not bool(line_item.get("is_alternative")):
+        raise HTTPException(status_code=400, detail="Only alternative line items can be appended at the end.")
+
+    updated = update_line_item_alternative_append_mode(
+        document_id,
+        line_item_id,
+        append_at_end=payload.append_at_end,
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Alternative append override could not be persisted.")
+
+    _audit(
+        request,
+        "line_item_alternative_append_changed",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={"append_at_end": bool(payload.append_at_end)},
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "alternative_append_at_end": bool(payload.append_at_end),
+    }
+
+
+@app.put("/documents/{document_id}/line-items/{line_item_id}/line-total-override")
+def set_line_item_line_total_override(
+    document_id: int,
+    line_item_id: int,
+    payload: LineItemLineTotalOverrideRequest,
+    request: Request,
+):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    metadata_raw = line_item.get("metadata_json")
+    metadata: dict[str, Any] = {}
+    if isinstance(metadata_raw, dict):
+        metadata = metadata_raw
+    elif isinstance(metadata_raw, str) and metadata_raw.strip():
+        try:
+            parsed = json.loads(metadata_raw)
+            metadata = parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            metadata = {}
+
+    editable = bool(metadata.get("manual_price_editable")) or metadata.get("pricing_source") == "rieder_delivery_block"
+    if not editable:
+        raise HTTPException(status_code=400, detail="Line item price is not manually editable.")
+
+    line_total = payload.line_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    updated = update_line_item_line_total_override(document_id, line_item_id, line_total=line_total)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Line item price override could not be persisted.")
+
+    _audit(
+        request,
+        "line_item_price_override_changed",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={"line_total": str(line_total)},
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "unit_price": str(updated.get("unit_price")) if updated.get("unit_price") is not None else None,
+        "line_total": str(updated.get("line_total")) if updated.get("line_total") is not None else None,
     }
 
 
@@ -2726,7 +2988,12 @@ def process_document(
             extracted_text,
             parsed.get("totals") if isinstance(parsed.get("totals"), dict) else {},
         )
-        line_item_rows = _build_line_item_rows(extracted_text, template, source_path=source_path)
+        line_item_rows = _build_line_item_rows(
+            extracted_text,
+            template,
+            source_path=source_path,
+            amount_line_rows=amount_line_rows,
+        )
 
         _set_process_progress(
             document_id,

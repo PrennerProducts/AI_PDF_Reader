@@ -1134,6 +1134,73 @@ def update_line_item_review_state(
     return int(updated)
 
 
+def update_line_item_alternative_append_mode(
+    document_id: int,
+    line_item_id: int,
+    *,
+    append_at_end: bool,
+) -> int:
+    patch = json.dumps(
+        {
+            "alternative_append_at_end": bool(append_at_end),
+            "alternative_append_at_end_source": "ui_manual",
+            "alternative_append_at_end_updated_at": (
+                datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            ),
+        },
+        ensure_ascii=True,
+    )
+    with get_db() as conn:
+        updated = conn.execute(
+            """
+            UPDATE line_items
+            SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || %s::jsonb
+            WHERE document_id = %s AND id = %s;
+            """,
+            (patch, document_id, line_item_id),
+        ).rowcount or 0
+        if updated:
+            _clear_document_approval_state(conn, document_id)
+    return int(updated)
+
+
+def update_line_item_line_total_override(
+    document_id: int,
+    line_item_id: int,
+    *,
+    line_total: Decimal,
+) -> dict[str, Any] | None:
+    patch = json.dumps(
+        {
+            "manual_line_total_override": str(line_total.quantize(Decimal("0.01"))),
+            "manual_line_total_override_source": "ui_manual",
+            "manual_line_total_override_updated_at": (
+                datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            ),
+        },
+        ensure_ascii=True,
+    )
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE line_items
+            SET
+                line_total = %s,
+                unit_price = CASE
+                    WHEN quantity IS NOT NULL AND quantity <> 0 THEN ROUND((%s / quantity)::numeric, 2)
+                    ELSE %s
+                END,
+                metadata_json = COALESCE(metadata_json, '{}'::jsonb) || %s::jsonb
+            WHERE document_id = %s AND id = %s
+            RETURNING id, unit_price, line_total, metadata_json;
+            """,
+            (line_total, line_total, line_total, patch, document_id, line_item_id),
+        ).fetchone()
+        if row:
+            _clear_document_approval_state(conn, document_id)
+    return dict(row) if row else None
+
+
 def update_document_approval_state(
     document_id: int,
     *,
@@ -1609,6 +1676,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
         item["review_checked"] = bool(review_meta.get("checked"))
         item["review_checked_at"] = review_meta.get("checked_at")
         item["review_checked_reason"] = review_meta.get("reason")
+        item["alternative_append_at_end"] = bool(metadata_dict(item).get("alternative_append_at_end"))
         page_ref = _to_int(item.get("page_ref"))
         page_end_ref = _to_int((metadata_dict(item) or {}).get("page_end_ref"))
         if page_ref is not None and (page_end_ref is None or page_end_ref < page_ref):

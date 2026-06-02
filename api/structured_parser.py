@@ -8,6 +8,15 @@ from template_registry import extract_line_items_for_template
 PERCENT_RE = re.compile(r"([0-9]+(?:[.,][0-9]+)?)\s*%")
 
 
+def _has_vat_term(lower: str) -> bool:
+    return bool(
+        "mehrwertsteuer" in lower
+        or "mwst" in lower
+        or "umsatzsteuer" in lower
+        or re.search(r"\bust\.?\b", lower)
+    )
+
+
 def _is_amount_header_line(line: str) -> bool:
     lower = line.lower()
     return ("einzelpreis" in lower and "gesamtpreis" in lower) or ("preis/me" in lower and "nettobetrag" in lower)
@@ -25,13 +34,13 @@ def _classify_amount_line(label: str) -> str:
         return "total"
     if "zwischensumme" in lower or "summe ohne montagekosten" in lower or "summe der positionen" in lower or lower.startswith("summe"):
         return "subtotal"
-    if lower.startswith("zuzüglich") and ("mehrwertsteuer" in lower or "ust." in lower or "ust" in lower or "mwst" in lower):
+    if lower.startswith("zuzüglich") and _has_vat_term(lower):
         return "vat"
-    if "mehrwertsteuer" in lower or "ust." in lower or "ust" in lower or "mwst" in lower:
+    if _has_vat_term(lower):
         return "vat"
     if "rabatt" in lower or "abzug" in lower:
         return "discount"
-    if "zuschlag" in lower or "frachtkosten" in lower or "zustellung" in lower:
+    if "zuschlag" in lower or "frachtkosten" in lower or "zustellung" in lower or "baustellenanlieferung" in lower:
         return "surcharge"
     return "other"
 
@@ -60,15 +69,16 @@ def _has_amount_trigger(line: str) -> bool:
             "bruttobetrag",
             "summe brutto",
             "mehrwertsteuer",
-            "ust",
             "ust.",
             "mwst",
+            "umsatzsteuer",
             "rabatt",
             "zuschlag",
             "frachtkosten",
+            "baustellenanlieferung",
             "zustellung",
         )
-    )
+    ) or bool(re.search(r"\bust\.?\b", lower))
 
 
 def _candidate_amount_for_trigger(lines: list[str], idx: int, line: str) -> tuple[str | None, str | None]:

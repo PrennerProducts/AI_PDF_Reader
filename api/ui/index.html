@@ -8554,6 +8554,140 @@
       margin-top: -2px;
     }
 
+    .app-v3 .alternative-append-toggle,
+    .app-v3 .alternative-append-state {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      min-height: 58px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: rgba(255, 255, 255, 0.82);
+      color: rgba(29, 29, 31, 0.72);
+      cursor: pointer;
+    }
+
+    .app-v3 .alternative-append-state {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      cursor: default;
+      background: #f1fbf5;
+      border-color: rgba(52, 199, 89, 0.22);
+    }
+
+    .app-v3 .alternative-append-toggle.is-selected {
+      border-color: rgba(213, 26, 15, 0.24);
+      background: #fff2ed;
+      color: rgba(29, 29, 31, 0.88);
+    }
+
+    .app-v3 .alternative-append-toggle input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: #d51a0f;
+    }
+
+    .app-v3 .alternative-append-toggle span,
+    .app-v3 .alternative-append-state {
+      min-width: 0;
+    }
+
+    .app-v3 .alternative-append-toggle strong,
+    .app-v3 .alternative-append-state strong {
+      display: block;
+      margin-bottom: 3px;
+      color: rgba(29, 29, 31, 0.86);
+      font-size: 13px;
+      font-weight: 780;
+      line-height: 1.2;
+    }
+
+    .app-v3 .alternative-append-toggle small,
+    .app-v3 .alternative-append-state span {
+      display: block;
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .app-v3 .position-export-note {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      min-height: 40px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: rgba(245, 245, 247, 0.82);
+      color: rgba(29, 29, 31, 0.62);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .app-v3 .position-export-note.append {
+      border-color: rgba(213, 26, 15, 0.18);
+      background: #fff2ed;
+      color: #8f1d14;
+    }
+
+    .app-v3 .position-export-note strong {
+      color: rgba(29, 29, 31, 0.82);
+      font-size: 11px;
+      font-weight: 820;
+      text-transform: uppercase;
+    }
+
+    .app-v3 .line-total-override-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 132px;
+      gap: 10px;
+      align-items: center;
+      min-height: 58px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .app-v3 .line-total-override-control span {
+      min-width: 0;
+    }
+
+    .app-v3 .line-total-override-control strong {
+      display: block;
+      margin-bottom: 3px;
+      color: rgba(29, 29, 31, 0.86);
+      font-size: 13px;
+      font-weight: 780;
+      line-height: 1.2;
+    }
+
+    .app-v3 .line-total-override-control small {
+      display: block;
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .app-v3 .line-total-override-control input {
+      width: 100%;
+      min-height: 38px;
+      border-radius: 12px;
+      border: 1px solid rgba(60, 60, 67, 0.14);
+      background: #ffffff;
+      color: rgba(29, 29, 31, 0.88);
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 720;
+      text-align: right;
+    }
+
     .app-v3 .vendoc-export-actions {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -10094,6 +10228,123 @@
       box-shadow: inset 3px 0 0 rgba(11, 122, 72, 0.18) !important;
     }
 
+    .app-v3 #totalsAudit .sum-audit-details {
+      min-width: 0;
+      border: 1px solid var(--sr-polish-line);
+      border-radius: 12px;
+      background: var(--sr-polish-surface);
+      overflow: hidden;
+      box-shadow: none;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details.kind-ok {
+      box-shadow: inset 3px 0 0 rgba(11, 122, 72, 0.18);
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details.kind-review,
+    .app-v3 #totalsAudit .sum-audit-details.kind-err {
+      background: linear-gradient(180deg, #ffffff 0%, #fff8f5 100%);
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details.kind-err {
+      border-color: rgba(213, 26, 15, 0.24);
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details summary {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 7px;
+      min-height: 72px;
+      padding: 9px 34px 9px 10px;
+      align-content: space-between;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details summary::after {
+      content: "+";
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      color: rgba(29, 29, 31, 0.48);
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 760;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details[open] summary::after {
+      content: "-";
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details summary:focus-visible {
+      outline: 2px solid rgba(213, 26, 15, 0.34);
+      outline-offset: -2px;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-details .review-row-sub {
+      display: block;
+      overflow: visible;
+      -webkit-line-clamp: unset;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-breakdown {
+      display: grid;
+      gap: 6px;
+      padding: 8px 10px 10px;
+      border-top: 1px solid rgba(17, 17, 17, 0.075);
+      background: rgba(247, 247, 248, 0.72);
+    }
+
+    .app-v3 #totalsAudit .sum-audit-line,
+    .app-v3 #totalsAudit .sum-audit-step {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 3px 12px;
+      align-items: baseline;
+      min-width: 0;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(17, 17, 17, 0.055);
+      color: var(--sr-gray-760);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-line:last-child,
+    .app-v3 #totalsAudit .sum-audit-step:last-child {
+      border-bottom: 0;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-line span,
+    .app-v3 #totalsAudit .sum-audit-step span {
+      min-width: 0;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-line strong,
+    .app-v3 #totalsAudit .sum-audit-step strong {
+      color: var(--sr-gray-900);
+      font-size: 11px;
+      font-weight: 820;
+      white-space: nowrap;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-line small,
+    .app-v3 #totalsAudit .sum-audit-step small {
+      grid-column: 1 / -1;
+      min-width: 0;
+      color: var(--sr-gray-560);
+      font-size: 10px;
+      line-height: 1.25;
+    }
+
+    .app-v3 #totalsAudit .sum-audit-step.is-problem strong {
+      color: #9d2d1a;
+    }
+
     .app-v3 #tabPaneOverview .review-flag.ok,
     .app-v3 .flow-badge.badge-ok,
     .app-v3 .item-stat-pill:not(.warn),
@@ -10454,6 +10705,16 @@
         grid-template-columns: 1fr;
       }
 
+      .app-v3 #totalsAudit .sum-audit-line,
+      .app-v3 #totalsAudit .sum-audit-step {
+        grid-template-columns: 1fr;
+      }
+
+      .app-v3 #totalsAudit .sum-audit-line strong,
+      .app-v3 #totalsAudit .sum-audit-step strong {
+        white-space: normal;
+      }
+
       .app-v3 #tabPaneOverview .review-grid > .review-card:first-child {
         grid-template-columns: 1fr;
       }
@@ -10752,7 +11013,7 @@
                   </div>
                 </div>
                 <div class="approval-guide" id="approvalGuide"></div>
-                <details class="overview-details">
+                <details class="overview-details" open>
                   <summary>Dokumentdetails</summary>
                   <div class="summary" id="summary"></div>
                 </details>
@@ -11872,6 +12133,20 @@
       }
     }
 
+    function boolish(value) {
+      if (value === true) return true;
+      if (value === false || value === null || value === undefined) return false;
+      return ["1", "true", "yes", "ja", "y"].includes(String(value).trim().toLowerCase());
+    }
+
+    function lineItemAlternativeAppendAtEnd(item) {
+      if (!item || typeof item !== "object") return false;
+      if (Object.prototype.hasOwnProperty.call(item, "alternative_append_at_end")) {
+        return boolish(item.alternative_append_at_end);
+      }
+      return boolish(parseLineItemMetadata(item).alternative_append_at_end);
+    }
+
     function detailValue(value) {
       if (value === true) return "ja";
       if (value === false) return "nein";
@@ -11894,6 +12169,73 @@
           <div class="position-text-label">${escapeHtml(label)}</div>
           <pre>${escapeHtml(text || emptyLabel || "-")}</pre>
         </div>
+      `;
+    }
+
+    function alternativeExportNoteHtml(item, exportMeta, mode) {
+      if (!item || !item.is_alternative) return "";
+      const appendAtEnd = !!(exportMeta && exportMeta.append_at_end);
+      const exportPosition = fmt(exportMeta && exportMeta.position_no, fmt(item.position_no));
+      const label = appendAtEnd ? "Am Ende angehängt" : "Unter Hauptposition";
+      const detail = appendAtEnd
+        ? `Exportposition ${exportPosition}; diese Unterposition steht als eigene Position am Ende.`
+        : `Exportposition ${exportPosition}; diese Unterposition bleibt direkt unter der Hauptposition.`;
+      return `
+        <div class="position-export-note${appendAtEnd ? " append" : ""}">
+          <strong>Export</strong>
+          <span>${escapeHtml(label)} · ${escapeHtml(detail)}</span>
+        </div>
+      `;
+    }
+
+    function alternativeAppendControlHtml(item, lineItemId, mode) {
+      if (!item || !item.is_alternative) return "";
+      const normalizedMode = mode === "append" ? "append" : "nested";
+      if (normalizedMode === "append") {
+        return `
+          <div class="alternative-append-state">
+            <strong>Am Ende angehängt</strong>
+            <span>Der Dokumentmodus hängt aktuell alle Alternativen am Ende an.</span>
+          </div>
+        `;
+      }
+      if (!Number.isFinite(lineItemId) || item.__embedded_alternative || item.__aggregated_alternative) return "";
+      const checked = lineItemAlternativeAppendAtEnd(item);
+      return `
+        <label class="alternative-append-toggle${checked ? " is-selected" : ""}">
+          <input type="checkbox" data-alternative-append-toggle data-line-item-id="${escapeHtml(String(lineItemId))}" ${checked ? "checked" : ""}>
+          <span>
+            <strong>Am Ende anhängen</strong>
+            <small>Nur diese Unterposition wird als eigene Position am Ende exportiert.</small>
+          </span>
+        </label>
+      `;
+    }
+
+    function lineItemPriceEditable(item) {
+      const metadata = parseLineItemMetadata(item);
+      return !!(metadata.manual_price_editable || metadata.pricing_source === "rieder_delivery_block");
+    }
+
+    function lineTotalOverrideControlHtml(item, lineItemId) {
+      if (!lineItemPriceEditable(item) || !Number.isFinite(lineItemId)) return "";
+      const value = uiNumberValue(item && item.line_total);
+      return `
+        <label class="line-total-override-control">
+          <span>
+            <strong>Pauschalbetrag</strong>
+            <small>Ändert diese Zusatzposition und die Nettoprüfung.</small>
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value="${escapeHtml(value === null ? "" : value.toFixed(2))}"
+            data-line-total-override-input
+            data-line-item-id="${escapeHtml(String(lineItemId))}"
+            aria-label="Pauschalbetrag bearbeiten"
+          >
+        </label>
       `;
     }
 
@@ -12203,6 +12545,129 @@
       `;
     }
 
+    function auditMoney(value, fallback = "-") {
+      const number = uiNumberValue(value);
+      if (number === null) return fallback;
+      return number.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function auditSignedMoney(value, fallback = "-") {
+      const number = uiNumberValue(value);
+      if (number === null) return fallback;
+      const prefix = number > 0 ? "+" : number < 0 ? "-" : "";
+      return `${prefix}${Math.abs(number).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function auditPercent(value, fallback = "-") {
+      const number = uiNumberValue(value);
+      if (number === null) return fallback;
+      return number.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function sumAuditLineHtml(label, value, note = "") {
+      return `
+        <div class="sum-audit-line">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+        </div>
+      `;
+    }
+
+    function sumAuditStepHtml(step, index) {
+      const lineType = String(step && step.line_type || "").trim().toLowerCase();
+      const operationLabel = lineType === "surcharge" ? "Zuschlag" : "Rabatt";
+      const amountNumber = uiNumberValue(step && step.expected_amount);
+      const amountSign = amountNumber !== null && amountNumber < 0 ? "-" : "+";
+      const amountValue = amountNumber === null ? "-" : auditMoney(Math.abs(amountNumber));
+      const formula = `${auditMoney(step && step.base)} ${amountSign} ${amountValue} = ${auditMoney(step && step.expected_subtotal)}`;
+      const printed = `gedruckt: ${auditSignedMoney(step && step.printed_amount)} -> ${auditMoney(step && step.printed_subtotal)}`;
+      const matches = step && step.amount_matches !== false && step.subtotal_matches !== false;
+      const rawLabel = String(step && step.label_raw || "").trim();
+      return `
+        <div class="sum-audit-step${matches ? "" : " is-problem"}">
+          <span>${escapeHtml(`${index + 1}. ${operationLabel} ${auditPercent(step && step.percent)}%`)}</span>
+          <strong>${escapeHtml(formula)}</strong>
+          <small>${escapeHtml(rawLabel ? `${printed} · ${rawLabel}` : printed)}</small>
+        </div>
+      `;
+    }
+
+    function sumAuditDetailsHtml(title, sub, metaHtml, bodyHtml, kind = "neutral") {
+      const safeKind = ["ok", "review", "err", "neutral"].includes(kind) ? kind : "neutral";
+      return `
+        <details class="sum-audit-details kind-${escapeHtml(safeKind)}">
+          <summary>
+            <div class="review-row-main">
+              <div class="review-row-title">${escapeHtml(title)}</div>
+              <div class="review-row-sub">${escapeHtml(sub)}</div>
+            </div>
+            <div class="review-row-meta">${metaHtml}</div>
+          </summary>
+          <div class="sum-audit-breakdown">${bodyHtml}</div>
+        </details>
+      `;
+    }
+
+    function grossAuditBreakdownHtml(document, totals) {
+      return [
+        sumAuditLineHtml("Netto", auditMoney(totals.net_total ?? document.net_total)),
+        sumAuditLineHtml("MwSt", auditMoney(totals.vat_total ?? document.vat_total)),
+        sumAuditLineHtml("Berechnet", auditMoney(totals.computed_gross_from_net_vat), "Netto + MwSt"),
+        sumAuditLineHtml("Brutto im Dokument", auditMoney(totals.gross_total ?? document.gross_total)),
+        sumAuditLineHtml("Delta", auditSignedMoney(totals.gross_delta)),
+      ].join("");
+    }
+
+    function componentAuditBreakdownHtml(totals) {
+      const sequence = totals && totals.rieder_pricing_sequence && typeof totals.rieder_pricing_sequence === "object"
+        ? totals.rieder_pricing_sequence
+        : null;
+      if (sequence) {
+        const steps = Array.isArray(sequence.steps) ? sequence.steps : [];
+        return [
+          sumAuditLineHtml("Startsumme", auditMoney(sequence.initial_subtotal)),
+          steps.length
+            ? steps.map((step, index) => sumAuditStepHtml(step, index)).join("")
+            : sumAuditLineHtml("Zu-/Abschläge", "-", "Keine Sequenzschritte vorhanden"),
+          sumAuditLineHtml("Letzte Zwischensumme", auditMoney(sequence.last_discount_subtotal)),
+          sumAuditLineHtml("Rieder-Frachtblock", auditMoney(sequence.printed_delivery_total ?? sequence.delivery_total), "gedruckter Prüfwert"),
+          sumAuditLineHtml("Angelegte Pauschalposition", auditMoney(sequence.delivery_position_total), "editierbare Position"),
+          sumAuditLineHtml("Berechnetes Netto", auditMoney(sequence.computed_net), "Zwischensumme + Frachtblock"),
+          sumAuditLineHtml("Nettosumme im Dokument", auditMoney(sequence.net_total)),
+          sumAuditLineHtml("Delta", auditSignedMoney(totals.net_delta_from_components)),
+        ].join("");
+      }
+
+      return [
+        sumAuditLineHtml("Positionsbasis", auditMoney(totals.component_included_line_item_sum)),
+        sumAuditLineHtml("Rabatte", auditSignedMoney(totals.discount_sum)),
+        sumAuditLineHtml("Zuschläge", auditSignedMoney(totals.surcharge_sum)),
+        sumAuditLineHtml("Berechnetes Netto", auditMoney(totals.computed_net_from_components), "Positionen + Zu-/Abschläge"),
+        sumAuditLineHtml("Nettosumme im Dokument", auditMoney(totals.net_total)),
+        sumAuditLineHtml("Delta", auditSignedMoney(totals.net_delta_from_components)),
+      ].join("");
+    }
+
+    function amountBasisAuditBreakdownHtml(totals, lineTotal, lineWithIssues, validation) {
+      return [
+        sumAuditLineHtml("Alle Positionen", fmt(lineTotal, "0")),
+        sumAuditLineHtml("Positionen mit Auffälligkeiten", fmt(lineWithIssues, "0")),
+        sumAuditLineHtml("Positionssumme", auditMoney(totals.component_included_line_item_sum), "für Nettoprüfung berücksichtigt"),
+        sumAuditLineHtml("Nicht-alternative Positionen", auditMoney(totals.non_alternative_line_item_sum)),
+        sumAuditLineHtml("Prüfmodus", fmt(totals.component_check_mode)),
+        sumAuditLineHtml("Gesamthinweise", fmt(validation.issue_count || 0)),
+      ].join("");
+    }
+
+    function pageAuditBreakdownHtml(totals, imageTotal) {
+      return [
+        sumAuditLineHtml("Erkannte Seiten", totals.page_count ? fmt(totals.page_count) : "-"),
+        sumAuditLineHtml("Bilder im Dokument", fmt(imageTotal || 0)),
+        sumAuditLineHtml("Rundungstoleranz", auditMoney(totals.tolerance)),
+      ].join("");
+    }
+
     function reviewTaskSeverityMeta(severity) {
       if (severity === "error") return { label: "Fehler", css: "error" };
       if (severity === "warning") return { label: "Warnung", css: "warning" };
@@ -12251,7 +12716,7 @@
         const issues = itemOpenIssues(item);
         const positionLabel = fmt(item.position_no, `#${fmt(item.id)}`);
         const pageLabel = item.page_ref ? `Seite ${fmt(item.page_ref)}` : "Seite -";
-        const descriptionLabel = fmt(item.description_short, "-");
+        const descriptionLabel = fmt(lineItemShortText(item), "-");
         const canBeChecked = itemCanBeManuallyChecked(item);
 
         issues.forEach((issue, issueIndex) => {
@@ -12879,25 +13344,33 @@
         ? "heuristik · nicht blockierend"
         : (totals.component_check_mode || "-");
       ui.totalsAudit.innerHTML = [
-        reviewRowHtml(
+        sumAuditDetailsHtml(
           "Netto + MwSt = Brutto",
           `${euro(totals.computed_gross_from_net_vat)} erwartet · Delta ${euro(totals.gross_delta)}`,
-          reviewFlagHtml(grossFlag.label, grossFlag.kind)
+          reviewFlagHtml(grossFlag.label, grossFlag.kind),
+          grossAuditBreakdownHtml(document, totals),
+          grossFlag.kind
         ),
-        reviewRowHtml(
+        sumAuditDetailsHtml(
           componentTitle,
           componentDescription,
-          `${reviewFlagHtml(componentFlag.label, componentFlag.kind)}${reviewFlagHtml(componentModeLabel, "neutral")}`
+          `${reviewFlagHtml(componentFlag.label, componentFlag.kind)}${reviewFlagHtml(componentModeLabel, "neutral")}`,
+          componentAuditBreakdownHtml(totals),
+          componentFlag.kind
         ),
-        reviewRowHtml(
+        sumAuditDetailsHtml(
           "Betragsbasis",
           `${lineTotal} Positionen · ${lineWithIssues} mit Auffälligkeiten`,
-          reviewFlagHtml(`${validation.issue_count || 0} Gesamt`, validation.issue_count ? "review" : "ok")
+          reviewFlagHtml(`${validation.issue_count || 0} Gesamt`, validation.issue_count ? "review" : "ok"),
+          amountBasisAuditBreakdownHtml(totals, lineTotal, lineWithIssues, validation),
+          validation.issue_count ? "review" : "ok"
         ),
-        reviewRowHtml(
+        sumAuditDetailsHtml(
           "Dokumentseiten",
           totals.page_count ? `${totals.page_count} Seiten erkannt` : "Keine Seitenzahl aus Rohtext abgeleitet",
-          reviewFlagHtml(imageTotal ? `${imageTotal} Bilder` : "ohne Bilder", imageTotal ? "ok" : "neutral")
+          reviewFlagHtml(imageTotal ? `${imageTotal} Bilder` : "ohne Bilder", imageTotal ? "ok" : "neutral"),
+          pageAuditBreakdownHtml(totals, imageTotal),
+          imageTotal ? "ok" : "neutral"
         ),
       ].join("");
 
@@ -13954,7 +14427,7 @@
 
     function lineItemNeedsImageForUi(item) {
       const reason = normalizedUiText(item && item.image_assignment_reason);
-      const description = normalizedUiText(item && item.description_short);
+      const description = normalizedUiText(lineItemShortText(item));
       const lvPos = normalizedUiText(item && item.lv_pos);
       const positionNo = normalizedUiText(item && item.position_no);
       if (reason === "non_visual_line_item") return false;
@@ -14009,6 +14482,9 @@
       const embeddedAlternativeTotal = items.reduce((sum, item) => sum + embeddedAlternativeCount(item), 0);
       const alternativeTotal = existingAlternativeCount + embeddedAlternativeTotal;
       const groupedAlternativeCount = displayItems.filter((item) => item && item.__aggregated_alternative).length;
+      const appendOverrideCount = alternativeMode === "nested"
+        ? items.filter((item) => item && item.is_alternative && lineItemAlternativeAppendAtEnd(item)).length
+        : alternativeTotal;
       const itemsWithIssues = displayItems.filter((item) => Number(item.validation_issue_count || 0) > 0);
       const filteredItems = displayItems
         .filter((item) => {
@@ -14035,12 +14511,16 @@
         const groupedHint = groupedAlternativeCount
           ? `<span class="item-stat-pill warn">${escapeHtml(fmt(groupedAlternativeCount))} Sammelposition(en)</span>`
           : "";
+        const appendHint = appendOverrideCount
+          ? `<span class="item-stat-pill warn">${escapeHtml(fmt(appendOverrideCount))} am Ende</span>`
+          : "";
         ui.itemFilterInfo.innerHTML = `
           <span class="item-stat-pill">${escapeHtml(fmt(filteredItems.length))}/${escapeHtml(fmt(displayItems.length))} in Exportansicht</span>
           <span class="item-stat-pill${itemsWithIssues.length ? " warn" : ""}">${escapeHtml(fmt(itemsWithIssues.length))} auffällig</span>
           ${alternativeHint}
           ${embeddedHint}
           ${groupedHint}
+          ${appendHint}
         `;
       }
 
@@ -14059,6 +14539,8 @@
         const exportDiffers = String(exportPositionNo || "") !== String(fmt(item.position_no));
         const exportMetaChips = [];
         if (item.is_alternative) exportMetaChips.push({ label: "Alternative", css: "" });
+        if (item.is_alternative && exportMeta.append_at_end) exportMetaChips.push({ label: "Am Ende", css: "warn" });
+        if (item.is_alternative && !exportMeta.append_at_end) exportMetaChips.push({ label: "Unterposition", css: "" });
         if (exportDiffers) exportMetaChips.push({ label: `Original ${fmt(item.position_no)}`, css: "" });
         if (exportDiffers) exportMetaChips.push({ label: "neu nummeriert", css: "warn" });
         const exportMetaHtml = exportMetaChips.length
@@ -14121,6 +14603,9 @@
           "page_end_ref",
           "spans_page_break",
           "image_required",
+          "alternative_append_at_end",
+          "alternative_append_at_end_source",
+          "alternative_append_at_end_updated_at",
           "referenced_lv_pos",
           "source",
           "extraction_source",
@@ -14133,6 +14618,9 @@
         const imageRequiredLabel = itemMetadata.image_required === undefined
           ? (lineItemNeedsImageForUi(item) ? "ja" : "nein")
           : detailValue(itemMetadata.image_required);
+        const alternativeAppendControl = alternativeAppendControlHtml(item, lineItemId, alternativeMode);
+        const lineTotalOverrideControl = lineTotalOverrideControlHtml(item, lineItemId);
+        const alternativeExportNote = alternativeExportNoteHtml(item, exportMeta, alternativeMode);
         const extractedFieldHtml = detailMetaCellsHtml([
           ["Datensatz-ID", item.id],
           ["Position", item.position_no],
@@ -14140,6 +14628,7 @@
           ["LV / Arch.-Pos.", item.lv_pos],
           ["Referenz-LV", itemMetadata.referenced_lv_pos],
           ["Alternativ", item.is_alternative],
+          ["Am Ende anhängen", item.is_alternative ? !!exportMeta.append_at_end : null],
           ["Seite(n)", pageRange],
           ["Seitenumbruch", itemMetadata.spans_page_break],
           ["Quelle", sourceLabel],
@@ -14175,7 +14664,7 @@
           </td>
           <td>${escapeHtml(formatQuantity(item.quantity))} ${escapeHtml(fmt(item.unit, ""))}</td>
           <td>
-            <div class="position-description">${escapeHtml(fmt(item.description_short))}</div>
+          <div class="position-description">${escapeHtml(fmt(lineItemShortText(item)))}</div>
             <div class="position-description-meta">Details öffnen für Langtext, Bildkandidaten und Prüfhinweise.</div>
           </td>
           <td>
@@ -14221,6 +14710,18 @@
                     ${detailMetaCellHtml("Bildquelle", imageAssignmentSourceLabel(item.image_assignment_source))}
                   </div>
                 </div>
+                ${alternativeAppendControl ? `
+                  <div class="position-detail-block">
+                    <h3>Export</h3>
+                    ${alternativeAppendControl}
+                  </div>
+                ` : ""}
+                ${lineTotalOverrideControl ? `
+                  <div class="position-detail-block">
+                    <h3>Preis</h3>
+                    ${lineTotalOverrideControl}
+                  </div>
+                ` : ""}
                 <div class="position-detail-block">
                   <h3>Extraktionskontext</h3>
                   <div class="detail-meta-grid">
@@ -14232,7 +14733,8 @@
                 <div class="position-detail-block wide">
                   <h3>Extrahierter Positionstext</h3>
                   <div class="position-image-section">
-                    ${positionTextPanelHtml("Kurztext", item.description_short, "Kein Kurztext extrahiert.")}
+                    ${alternativeExportNote}
+                    ${positionTextPanelHtml("Kurztext", lineItemShortText(item), "Kein Kurztext extrahiert.")}
                     ${positionTextPanelHtml("Langtext / Rohblock", item.description_long, "Kein Langtext zur Position gespeichert.")}
                   </div>
                 </div>
@@ -14843,18 +15345,46 @@
       return count;
     }
 
+    function countAlternativeAppendOverrides(result) {
+      const items = Array.isArray(result && result.line_items) ? result.line_items : [];
+      return items.filter((item) => item && item.is_alternative && lineItemAlternativeAppendAtEnd(item)).length;
+    }
+
     function embeddedAlternativeCount(item) {
       const longText = String(item && item.description_long || "");
       return longText.split(/\r?\n/).filter((line) => /^\s*Alternativ(?:e|position)?\s*:/i.test(line)).length;
     }
 
-    function uiNumberValue(value) {
-      if (value === null || value === undefined || value === "") return null;
-      if (typeof value === "number") return Number.isFinite(value) ? value : null;
-      const normalized = String(value).trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-      const number = Number(normalized);
-      return Number.isFinite(number) ? number : null;
-    }
+      function uiNumberValue(value) {
+        if (value === null || value === undefined || value === "") return null;
+        if (typeof value === "number") return Number.isFinite(value) ? value : null;
+        let normalized = String(value)
+          .trim()
+          .replace(/\s/g, "")
+          .replace(/€/g, "")
+          .replace(/EUR/gi, "");
+        if (!normalized) return null;
+        const commaIndex = normalized.lastIndexOf(",");
+        const dotIndex = normalized.lastIndexOf(".");
+        if (commaIndex >= 0 && dotIndex >= 0) {
+          if (commaIndex > dotIndex) {
+            normalized = normalized.replace(/\./g, "").replace(",", ".");
+          } else {
+            normalized = normalized.replace(/,/g, "");
+          }
+        } else if (commaIndex >= 0) {
+          normalized = normalized.replace(/\./g, "").replace(",", ".");
+        } else if (dotIndex >= 0) {
+          const dotGroups = normalized.split(".");
+          const usesThousandsDots =
+            dotGroups.length > 2 || (dotGroups.length === 2 && /^\d{3}$/.test(dotGroups[1]));
+          if (usesThousandsDots) {
+            normalized = normalized.replace(/\./g, "");
+          }
+        }
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+      }
 
     function stripAlternativePriceTokens(value) {
       const raw = String(value || "").trim();
@@ -14862,10 +15392,15 @@
       return raw
         .replace(/\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?/gi, "")
         .replace(/(?:€\s*\d{1,3}(?:[ .]\d{3})*,\d{2}|\d{1,3}(?:[ .]\d{3})*,\d{2}\s*€)/g, "")
+        .replace(/\s*€\s*/g, " ")
         .replace(/\s{2,}/g, " ")
         .replace(/\s+([,:;])/g, "$1")
         .trim()
         .replace(/^[-,\s]+|[-,\s]+$/g, "");
+    }
+
+    function lineItemShortText(item) {
+      return stripAlternativePriceTokens(item && item.description_short) || fmt(item && item.description_short);
     }
 
     function embeddedAlternativeLines(item) {
@@ -14992,6 +15527,7 @@
           ...first,
           id: `aggregate:alt:${groupIndex + 1}:${normalizedUiText(label).slice(0, 48)}`,
           is_alternative: true,
+          alternative_append_at_end: true,
           quantity: quantitySum || null,
           description_short: label,
           description_long: [
@@ -15014,7 +15550,16 @@
     }
 
     function buildAlternativeDisplayItems(items, mode) {
-      if (mode !== "append") return Array.isArray(items) ? items : [];
+      if (mode !== "append") {
+        const visible = [];
+        const appendAlternatives = [];
+        (Array.isArray(items) ? items : []).forEach((item) => {
+          if (!item || typeof item !== "object") return;
+          if (item.is_alternative && lineItemAlternativeAppendAtEnd(item)) appendAlternatives.push(item);
+          else visible.push(item);
+        });
+        return visible.concat(aggregateAppendAlternativesForDisplay(appendAlternatives));
+      }
       const mains = [];
       const alternatives = [];
       (Array.isArray(items) ? items : []).forEach((item) => {
@@ -15040,26 +15585,26 @@
           parentIndex += 1;
           orderIndex += 1;
           parentExportNo = String(parentIndex);
-          preview.set(item, { position_no: parentExportNo, is_alternative: false, order_index: orderIndex });
+          preview.set(item, { position_no: parentExportNo, is_alternative: false, append_at_end: false, order_index: orderIndex });
           continue;
         }
 
         const parentKey = parentExportNo || String(Math.max(1, parentIndex));
-        const nextAltNo = Number(parentAltCounts.get(parentKey) || 0) + 1;
-        parentAltCounts.set(parentKey, nextAltNo);
-        if (normalizedMode === "nested") {
+        if (normalizedMode === "nested" && !lineItemAlternativeAppendAtEnd(item)) {
+          const nextAltNo = Number(parentAltCounts.get(parentKey) || 0) + 1;
+          parentAltCounts.set(parentKey, nextAltNo);
           orderIndex += 1;
-          preview.set(item, { position_no: `${parentKey}.${nextAltNo}`, is_alternative: true, order_index: orderIndex });
+          preview.set(item, { position_no: `${parentKey}.${nextAltNo}`, is_alternative: true, append_at_end: false, order_index: orderIndex });
         } else {
           appendItems.push(item);
         }
       }
 
-      if (normalizedMode === "append") {
+      if (appendItems.length) {
         let nextPosition = parentIndex + 1;
         for (const item of appendItems) {
           orderIndex += 1;
-          preview.set(item, { position_no: String(nextPosition), is_alternative: true, order_index: orderIndex });
+          preview.set(item, { position_no: String(nextPosition), is_alternative: true, append_at_end: true, order_index: orderIndex });
           nextPosition += 1;
         }
       }
@@ -15083,6 +15628,7 @@
       const documentPayload = result && result.document ? result.document : null;
       const mode = documentPayload && documentPayload.alternative_position_mode === "append" ? "append" : "nested";
       const altCount = countAlternativePositions(result);
+      const appendOverrideCount = mode === "nested" ? countAlternativeAppendOverrides(result) : altCount;
       const buttons = alternativeModeSegments()
         .flatMap((segment) => Array.from(segment.querySelectorAll("[data-alternative-mode]")));
       for (const button of buttons) {
@@ -15094,7 +15640,10 @@
         if (!documentPayload) {
           meta.textContent = "Noch kein Dokument geladen.";
         } else if (altCount > 0) {
-          meta.textContent = `${altCount} Alternative(n) erkannt · Export aktuell ${alternativePositionModeLabel(mode)}.`;
+          const appendNote = appendOverrideCount > 0
+            ? ` · ${appendOverrideCount} am Ende`
+            : "";
+          meta.textContent = `${altCount} Alternative(n) erkannt · Export aktuell ${alternativePositionModeLabel(mode)}${appendNote}.`;
         } else {
           meta.textContent = `Keine Alternativen erkannt · Exportmodus ist trotzdem gespeichert: ${alternativePositionModeLabel(mode)}.`;
         }
@@ -15125,6 +15674,93 @@
       } catch (error) {
         setStatus(`Einstellung für Alternativpositionen konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
         renderAlternativePositionMode(state.result);
+      }
+    }
+
+    function setLocalLineItemAlternativeAppendAtEnd(lineItemId, appendAtEnd) {
+      if (!state.result || !Array.isArray(state.result.line_items)) return null;
+      const item = state.result.line_items.find((candidate) => Number(candidate && candidate.id) === Number(lineItemId));
+      if (!item) return null;
+      const previous = lineItemAlternativeAppendAtEnd(item);
+      const metadata = parseLineItemMetadata(item);
+      metadata.alternative_append_at_end = !!appendAtEnd;
+      item.metadata_json = metadata;
+      item.alternative_append_at_end = !!appendAtEnd;
+      return previous;
+    }
+
+    async function saveLineItemAlternativeAppendAtEnd(lineItemId, appendAtEnd) {
+      if (!state.documentId || !Number.isFinite(lineItemId)) return;
+      const previous = setLocalLineItemAlternativeAppendAtEnd(lineItemId, appendAtEnd);
+      if (previous === null) return;
+      renderAlternativePositionMode(state.result);
+      renderLineItems(state.result.line_items || []);
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/alternative-append-at-end`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ append_at_end: !!appendAtEnd }),
+        });
+        setLocalLineItemAlternativeAppendAtEnd(lineItemId, !!response.alternative_append_at_end);
+        renderAlternativePositionMode(state.result);
+        renderLineItems(state.result.line_items || []);
+        setStatus(
+          `Unterposition wird ${appendAtEnd ? "am Ende angehängt" : "unter der Hauptposition exportiert"}.`,
+          "ok"
+        );
+      } catch (error) {
+        setLocalLineItemAlternativeAppendAtEnd(lineItemId, previous);
+        renderAlternativePositionMode(state.result);
+        renderLineItems(state.result.line_items || []);
+        setStatus(`Einstellung konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    function setLocalLineItemLineTotal(lineItemId, lineTotal, unitPrice = null) {
+      if (!state.result || !Array.isArray(state.result.line_items)) return null;
+      const item = state.result.line_items.find((candidate) => Number(candidate && candidate.id) === Number(lineItemId));
+      if (!item) return null;
+      const previous = {
+        line_total: item.line_total,
+        unit_price: item.unit_price,
+      };
+      const numericLineTotal = uiNumberValue(lineTotal);
+      item.line_total = numericLineTotal === null ? lineTotal : numericLineTotal;
+      const quantity = uiNumberValue(item.quantity);
+      if (unitPrice !== null && unitPrice !== undefined) {
+        item.unit_price = unitPrice;
+      } else if (numericLineTotal !== null && quantity !== null && quantity !== 0) {
+        item.unit_price = Number((numericLineTotal / quantity).toFixed(2));
+      } else {
+        item.unit_price = item.line_total;
+      }
+      return previous;
+    }
+
+    async function saveLineItemLineTotalOverride(lineItemId, lineTotal) {
+      if (!state.documentId || !Number.isFinite(lineItemId) || !Number.isFinite(lineTotal)) return;
+      const previous = setLocalLineItemLineTotal(lineItemId, lineTotal);
+      if (previous === null) return;
+      if (state.result) renderLineItems(state.result.line_items || []);
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/line-total-override`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ line_total: lineTotal }),
+        });
+        const savedLineTotal = uiNumberValue(response.line_total);
+        const savedUnitPrice = uiNumberValue(response.unit_price);
+        setLocalLineItemLineTotal(
+          lineItemId,
+          savedLineTotal === null ? lineTotal : savedLineTotal,
+          savedUnitPrice
+        );
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(`Pauschalbetrag gespeichert: ${euro(savedLineTotal === null ? lineTotal : savedLineTotal)}.`, "ok");
+      } catch (error) {
+        setLocalLineItemLineTotal(lineItemId, previous.line_total, previous.unit_price);
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(`Pauschalbetrag konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
       }
     }
 
@@ -15724,6 +16360,27 @@
         state.expandedItemKeys.add(itemKey);
       }
       if (state.result) renderLineItems(state.result.line_items || []);
+    });
+
+    ui.itemRows.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const lineTotalInput = target.closest("[data-line-total-override-input]");
+      if (lineTotalInput) {
+        const lineItemId = Number(lineTotalInput.getAttribute("data-line-item-id"));
+        const lineTotal = uiNumberValue(lineTotalInput.value);
+        if (!Number.isFinite(lineItemId) || lineTotal === null) {
+          setStatus("Pauschalbetrag ist ungültig.", "err");
+          return;
+        }
+        void saveLineItemLineTotalOverride(lineItemId, lineTotal);
+        return;
+      }
+      const toggle = target.closest("[data-alternative-append-toggle]");
+      if (!toggle) return;
+      const lineItemId = Number(toggle.getAttribute("data-line-item-id"));
+      if (!Number.isFinite(lineItemId)) return;
+      void saveLineItemAlternativeAppendAtEnd(lineItemId, !!toggle.checked);
     });
 
     ui.itemRows.addEventListener("mouseover", (event) => {

@@ -68,6 +68,21 @@ def _normalized_text(value: Any) -> str:
     return " ".join(str(value).strip().lower().split())
 
 
+def _metadata_dict(item: dict[str, Any]) -> dict[str, Any]:
+    raw = item.get("metadata_json")
+    if isinstance(raw, dict):
+        return raw
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+    try:
+        import json
+
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
 def _make_issue(
     *,
     code: str,
@@ -200,6 +215,131 @@ def _component_check_mode(provider_key: str, amount_lines: list[dict[str, Any]])
     if discount_count > 0 or surcharge_count > 0 or subtotal_count > 1 or embedded_complexity:
         return "heuristic", "complex_pricing_breakdown"
     return "strict", None
+
+
+def _money(value: Decimal) -> Decimal:
+    return value.quantize(SUM_TOLERANCE)
+
+
+def _rieder_delivery_total(line_items: list[dict[str, Any]]) -> Decimal:
+    total = Decimal("0.00")
+    for item in line_items:
+        metadata = _metadata_dict(item)
+        if metadata.get("pricing_source") != "rieder_delivery_block":
+            continue
+        line_total = _to_decimal(item.get("line_total"))
+        if line_total is not None:
+            total += line_total
+    return total.quantize(SUM_TOLERANCE)
+
+
+def _is_rieder_delivery_amount_line(row: dict[str, Any]) -> bool:
+    label = _normalized_text(row.get("label_raw"))
+    return (
+        "baustellenanlieferung" in label
+        or "frachtkostenbeitrag" in label
+        or "frachkostenbeitrag" in label
+        or "frachtkost" in label
+    )
+
+
+def _rieder_printed_delivery_total(amount_lines: list[dict[str, Any]]) -> Decimal | None:
+    delivery_rows = [
+        row
+        for row in amount_lines
+        if _normalized_text(row.get("line_type")) == "surcharge" and _is_rieder_delivery_amount_line(row)
+    ]
+    if not delivery_rows:
+        return None
+
+    aggregate_candidates: list[Decimal] = []
+    item_sum = Decimal("0.00")
+    for row in delivery_rows:
+        amount = _to_decimal(row.get("amount"))
+        if amount is None:
+            continue
+        item_sum += amount
+        base_amount = _to_decimal(row.get("base_amount"))
+        if base_amount is not None and amount > base_amount:
+            aggregate_candidates.append(amount)
+
+    if aggregate_candidates:
+        return max(aggregate_candidates).quantize(SUM_TOLERANCE)
+    if item_sum > 0:
+        return item_sum.quantize(SUM_TOLERANCE)
+    return None
+
+
+def _rieder_sequence_summary(
+    amount_lines: list[dict[str, Any]],
+    line_items: list[dict[str, Any]],
+    net_total: Decimal | None,
+) -> dict[str, Any] | None:
+    ordered = sorted(amount_lines, key=lambda row: int(row.get("sort_order") or 0))
+    subtotals = [row for row in ordered if _normalized_text(row.get("line_type")) == "subtotal"]
+    if not subtotals:
+        return None
+
+    current = _to_decimal(subtotals[0].get("amount"))
+    if current is None:
+        return None
+
+    steps: list[dict[str, Any]] = []
+    subtotal_index = 1
+    for row in ordered:
+        line_type = _normalized_text(row.get("line_type"))
+        if line_type == "net_total":
+            break
+        percent = _to_decimal(row.get("percent"))
+        if line_type not in {"discount", "surcharge"} or percent is None:
+            continue
+
+        sign = Decimal("1") if line_type == "surcharge" else Decimal("-1")
+        expected_amount = _money(current * percent / Decimal("100")) * sign
+        expected_subtotal = _money(current + expected_amount)
+        printed_amount = _to_decimal(row.get("amount"))
+        printed_subtotal = None
+        while subtotal_index < len(subtotals):
+            candidate = subtotals[subtotal_index]
+            if int(candidate.get("sort_order") or 0) > int(row.get("sort_order") or 0):
+                printed_subtotal = _to_decimal(candidate.get("amount"))
+                subtotal_index += 1
+                break
+            subtotal_index += 1
+
+        steps.append(
+            {
+                "line_type": line_type,
+                "label_raw": row.get("label_raw"),
+                "percent": percent,
+                "base": current,
+                "expected_amount": expected_amount,
+                "printed_amount": printed_amount,
+                "expected_subtotal": expected_subtotal,
+                "printed_subtotal": printed_subtotal,
+                "amount_matches": printed_amount is not None and abs(printed_amount - expected_amount) <= SUM_TOLERANCE,
+                "subtotal_matches": printed_subtotal is not None and abs(printed_subtotal - expected_subtotal) <= SUM_TOLERANCE,
+            }
+        )
+        current = printed_subtotal if printed_subtotal is not None else expected_subtotal
+
+    delivery_position_total = _rieder_delivery_total(line_items)
+    printed_delivery_total = _rieder_printed_delivery_total(amount_lines)
+    delivery_total = printed_delivery_total if printed_delivery_total is not None else delivery_position_total
+    computed_net = _money(current + delivery_total)
+    return {
+        "initial_subtotal": _to_decimal(subtotals[0].get("amount")),
+        "last_discount_subtotal": current,
+        "delivery_total": delivery_total,
+        "delivery_position_total": delivery_position_total,
+        "printed_delivery_total": printed_delivery_total,
+        "computed_net": computed_net,
+        "net_total": net_total,
+        "steps": steps,
+        "sequence_matches": all(step["amount_matches"] and step["subtotal_matches"] for step in steps),
+        "delivery_position_present": delivery_position_total > 0,
+        "net_matches": net_total is not None and abs(net_total - computed_net) <= SUM_TOLERANCE,
+    }
 
 
 def _confidence_policy(parse_confidence: Any) -> dict[str, Any]:
@@ -697,7 +837,15 @@ def build_document_validation(
         elif line_type == "surcharge":
             surcharge_sum += amount
 
-    computed_net_from_components = (component_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
+    rieder_sequence_summary = (
+        _rieder_sequence_summary(amount_lines, line_items, net_total) if provider_key == "rieder" else None
+    )
+    if rieder_sequence_summary is not None:
+        computed_net_from_components = rieder_sequence_summary["computed_net"]
+        component_check_mode = "rieder_sequence"
+        component_check_reason = "rieder_discount_sequence_applied_to_positions"
+    else:
+        computed_net_from_components = (component_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
     totals_summary["non_alternative_line_item_sum"] = non_alternative_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["component_included_line_item_sum"] = component_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["discount_sum"] = discount_sum.quantize(SUM_TOLERANCE)
@@ -706,6 +854,8 @@ def build_document_validation(
     totals_summary["component_check_mode"] = component_check_mode
     if component_check_reason is not None:
         totals_summary["component_check_reason"] = component_check_reason
+    if rieder_sequence_summary is not None:
+        totals_summary["rieder_pricing_sequence"] = rieder_sequence_summary
 
     if net_total is not None:
         totals_summary["net_delta_from_components"] = net_total - computed_net_from_components
@@ -718,6 +868,25 @@ def build_document_validation(
                     field="net_total",
                     message="Positionen plus Zu-/Abschlaege stimmen nicht mit Nettosumme ueberein.",
                     expected=computed_net_from_components,
+                    actual=net_total,
+                )
+            )
+        if (
+            provider_key == "rieder"
+            and rieder_sequence_summary is not None
+            and (
+                not rieder_sequence_summary["sequence_matches"]
+                or not rieder_sequence_summary["delivery_position_present"]
+                or not rieder_sequence_summary["net_matches"]
+            )
+        ):
+            document_issues.append(
+                _make_issue(
+                    code="rieder_pricing_sequence_mismatch",
+                    severity="warning",
+                    field="net_total",
+                    message="Rieder-Zuschlaege, Rabatte und Frachtposition stimmen nicht mit der Nettosumme ueberein.",
+                    expected=rieder_sequence_summary.get("computed_net"),
                     actual=net_total,
                 )
             )

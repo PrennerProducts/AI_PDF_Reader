@@ -1,5 +1,6 @@
 import sys
 import subprocess
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -7,6 +8,9 @@ sys.path.insert(0, str(ROOT / "api"))
 
 from parser import parse_document_text
 from structured_parser import extract_amount_lines, extract_line_items
+from template_common import extract_first_description
+from main import _build_amount_line_rows, _build_line_item_rows
+from validation import build_document_validation
 
 
 def _read_text_fixture(path: Path) -> str:
@@ -28,6 +32,17 @@ def _assert_totals(parsed: dict, expected: tuple[str, str, str]) -> None:
     assert totals.get("gross_total") == expected[2]
 
 
+def test_first_description_strips_trailing_currency_price() -> None:
+    assert (
+        extract_first_description(
+            ["Fixfenster 1flg € 5.404,00 €"],
+            skip_prefixes=(),
+            preferred_words=("fixfenster",),
+        )
+        == "Fixfenster 1flg"
+    )
+
+
 def test_rieder_regression() -> None:
     text = _read_text_fixture(ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt")
     parsed = parse_document_text(text)
@@ -47,6 +62,56 @@ def test_rieder_regression() -> None:
     assert item_by_pos["3"]["is_alternative"] is False
     assert item_by_pos["4"]["is_alternative"] is False
     assert item_by_pos["5"]["is_alternative"] is False
+
+
+def test_rieder_processing_adds_delivery_position_and_applies_sequential_discounts() -> None:
+    text = _read_text_fixture(ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"])
+    rows = _build_line_item_rows(text, parsed["template"], amount_line_rows=amount_rows)
+
+    delivery_rows = [row for row in rows if row["description_short"] == "Baustellenanlieferung / Frachtkosten"]
+    assert len(rows) == 6
+    assert len(delivery_rows) == 1
+    assert delivery_rows[0]["position_no"] == "6"
+    assert delivery_rows[0]["line_total"] == Decimal("200.00")
+    assert delivery_rows[0]["unit_price"] == Decimal("200.00")
+    assert rows[1]["is_alternative"] is True
+    assert rows[1]["line_total"] == Decimal("1761.01")
+
+    normal_without_delivery = [
+        row
+        for row in rows
+        if not row["is_alternative"] and row["description_short"] != "Baustellenanlieferung / Frachtkosten"
+    ]
+    assert sum(row["line_total"] for row in normal_without_delivery) == Decimal("6111.71")
+    assert sum(row["line_total"] for row in rows if not row["is_alternative"]) == Decimal("6311.71")
+
+    baustellen_amount_rows = [row for row in amount_rows if "Baustellenanlieferung" in row["label_raw"]]
+    assert baustellen_amount_rows[0]["line_type"] == "surcharge"
+
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Rieder",
+            "document_type": "angebot",
+            "document_number": parsed["document_number"],
+            "document_date": "2025-09-05",
+            "project_ref": parsed["project_ref"],
+            "currency": "EUR",
+            "net_total": "6315.71",
+            "vat_total": "1263.14",
+            "gross_total": "7578.85",
+        },
+        amount_lines=amount_rows,
+        line_items=rows,
+        images=[],
+    )
+    assert validation["totals"]["component_check_mode"] == "rieder_sequence"
+    assert validation["totals"]["component_sum_matches_net"] is True
+    assert validation["totals"]["rieder_pricing_sequence"]["delivery_total"] == Decimal("204.00")
+    assert validation["totals"]["rieder_pricing_sequence"]["printed_delivery_total"] == Decimal("204.00")
+    assert validation["totals"]["rieder_pricing_sequence"]["delivery_position_total"] == Decimal("200.00")
+    assert validation["totals"]["rieder_pricing_sequence"]["net_matches"] is True
 
 
 def test_entholzer_regression() -> None:
