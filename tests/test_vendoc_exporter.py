@@ -183,6 +183,60 @@ def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_pat
     assert payload["positions"][1]["unit_price"] == 31.33
 
 
+def test_vendoc_payload_can_skip_rieder_sequence_for_embedded_alternatives(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["alternative_position_mode"] = "nested"
+    result["document"]["apply_pricing_adjustments"] = False
+    result["line_items"][0]["description_long"] = "\n".join(
+        [
+            "Fenster 1flg DKL",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 57,97 GP: € 57,97",
+        ]
+    )
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is False
+    assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert payload["positions"][1]["unit_price"] == 57.97
+
+
+def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["apply_pricing_adjustments"] = False
+    result["line_items"][0]["unit_price"] = "31.33"
+    result["line_items"][0]["line_total"] = "31.33"
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_original_unit_price": "57.97",
+        "rieder_original_line_total": "57.97",
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is False
+    assert payload["positions"][0]["unit_price"] == 57.97
+
+
 def test_vendoc_payload_renumbers_nested_alternatives_without_gaps(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)

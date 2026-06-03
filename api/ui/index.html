@@ -2175,6 +2175,93 @@
       word-break: break-word;
     }
 
+    .position-edit-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .position-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .position-edit-field {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 12px;
+      color: #655d59;
+    }
+
+    .position-edit-field.wide {
+      grid-column: span 2;
+    }
+
+    .position-edit-field.full {
+      grid-column: 1 / -1;
+    }
+
+    .position-edit-field span,
+    .position-edit-checkbox span {
+      font-size: 11px;
+      font-weight: 700;
+      color: #655d59;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .position-edit-field input,
+    .position-edit-field textarea {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid rgba(35, 32, 32, 0.12);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #2f2a2a;
+      font: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .position-edit-field textarea {
+      min-height: 96px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .position-edit-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      align-self: end;
+      color: #2f2a2a;
+    }
+
+    .position-edit-checkbox input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--brand);
+    }
+
+    .position-edit-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .position-edit-note {
+      color: #8a817c;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
     .position-detail-head {
       display: flex;
       align-items: center;
@@ -3391,6 +3478,10 @@
         grid-template-columns: 1fr;
       }
 
+      .position-edit-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .position-image-section {
         grid-template-columns: 1fr;
       }
@@ -3640,6 +3731,15 @@
     @media (max-width: 560px) {
       .review-metrics {
         grid-template-columns: 1fr;
+      }
+
+      .position-edit-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .position-edit-field.wide,
+      .position-edit-field.full {
+        grid-column: 1 / -1;
       }
 
       .action-group {
@@ -8562,6 +8662,43 @@
       line-height: 1.45;
     }
 
+    .app-v3 .pricing-adjustment-toggle {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: #ffffff;
+      color: rgba(29, 29, 31, 0.72);
+      cursor: pointer;
+    }
+
+    .app-v3 .pricing-adjustment-toggle input {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      accent-color: var(--brand);
+    }
+
+    .app-v3 .pricing-adjustment-toggle span {
+      display: grid;
+      gap: 2px;
+    }
+
+    .app-v3 .pricing-adjustment-toggle strong {
+      color: rgba(29, 29, 31, 0.86);
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .app-v3 .pricing-adjustment-toggle small,
+    .app-v3 .pricing-adjustment-meta {
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
     .app-v3 .position-alternative-mode-control {
       margin-top: -2px;
     }
@@ -11195,6 +11332,14 @@
                   </button>
                 </div>
                 <div class="alternative-mode-meta" id="alternativeModeMetaItems">Noch kein Dokument geladen.</div>
+                <label class="pricing-adjustment-toggle">
+                  <input id="pricingAdjustmentToggle" type="checkbox" checked disabled>
+                  <span>
+                    <strong>Zuschläge und Rabatte anwenden</strong>
+                    <small>Steuert die Rieder-Preisfolge für Positionen, Alternativen, Prüfung und VenDoc-Export.</small>
+                  </span>
+                </label>
+                <div class="pricing-adjustment-meta" id="pricingAdjustmentMeta">Noch kein Dokument geladen.</div>
               </div>
               <div class="items-table-wrap">
                 <table class="items-table">
@@ -11324,6 +11469,7 @@
       reviewFilter: "all",
       activeExtractTab: "overview",
       expandedItemKeys: new Set(),
+      editingItemKeys: new Set(),
       pdf: {
         page: 1,
         pageCount: null,
@@ -11372,6 +11518,8 @@
       alternativeModeSegmentItems: document.getElementById("alternativeModeSegmentItems"),
       alternativeModeMeta: document.getElementById("alternativeModeMeta"),
       alternativeModeMetaItems: document.getElementById("alternativeModeMetaItems"),
+      pricingAdjustmentToggle: document.getElementById("pricingAdjustmentToggle"),
+      pricingAdjustmentMeta: document.getElementById("pricingAdjustmentMeta"),
       vendocDryRunBtn: document.getElementById("vendocDryRunBtn"),
       vendocSqlPreviewBtn: document.getElementById("vendocSqlPreviewBtn"),
       vendocLiveExportBtn: document.getElementById("vendocLiveExportBtn"),
@@ -11489,6 +11637,20 @@
       net_total: "Netto",
       vat_total: "MwSt",
     };
+    const LINE_ITEM_EDIT_FIELD_LABELS = {
+      position_no: "Position",
+      lv_pos: "LV / Arch.-Pos.",
+      is_alternative: "Alternative",
+      quantity: "Menge",
+      unit: "Einheit",
+      width_mm: "Breite",
+      height_mm: "Höhe",
+      description_short: "Kurztext",
+      description_long: "Langtext",
+      unit_price: "Einzelpreis",
+      line_total: "Gesamtpreis",
+      page_ref: "Seite",
+    };
     const REVIEW_SCOPE_LABELS = {
       document: "Dokument",
       item: "Position",
@@ -11586,6 +11748,10 @@
 
     function euro(value) {
       if (value === null || value === undefined || value === "") return "-";
+      const number = uiNumberValue(value);
+      if (number !== null) {
+        return number.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
       return String(value).replace(".", ",");
     }
 
@@ -12257,6 +12423,98 @@
       `;
     }
 
+    function lineItemCanEdit(item, lineItemId) {
+      if (!item || typeof item !== "object") return false;
+      if (!Number.isFinite(lineItemId)) return false;
+      if (item.__embedded_alternative || item.__aggregated_alternative) return false;
+      const itemDocumentId = Number(item.document_id);
+      if (Number.isFinite(itemDocumentId) && itemDocumentId > 0 && Number(state.documentId) !== itemDocumentId) {
+        return false;
+      }
+      return true;
+    }
+
+    function lineItemNumberEditValue(value, decimals = null) {
+      const number = uiNumberValue(value);
+      if (number === null) return "";
+      const text = decimals === null ? String(number) : number.toFixed(decimals);
+      return text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    }
+
+    function lineItemEditFieldHtml(label, name, value, options = {}) {
+      const type = options.type || "text";
+      const className = `position-edit-field${options.wide ? " wide" : ""}${options.full ? " full" : ""}`;
+      const valueText = options.number ? lineItemNumberEditValue(value, options.decimals) : fmt(value, "");
+      const attrs = [
+        `name="${escapeHtml(name)}"`,
+        options.min !== undefined ? `min="${escapeHtml(options.min)}"` : "",
+        options.step !== undefined ? `step="${escapeHtml(options.step)}"` : "",
+      ].filter(Boolean).join(" ");
+      if (options.textarea) {
+        return `
+          <label class="${className}">
+            <span>${escapeHtml(label)}</span>
+            <textarea ${attrs}>${escapeHtml(valueText)}</textarea>
+          </label>
+        `;
+      }
+      return `
+        <label class="${className}">
+          <span>${escapeHtml(label)}</span>
+          <input type="${escapeHtml(type)}" value="${escapeHtml(valueText)}" ${attrs}>
+        </label>
+      `;
+    }
+
+    function lineItemManualEditLabel(metadata) {
+      if (!metadata || !metadata.manual_edit) return "";
+      const actor = fmt(metadata.manual_edit_actor, "");
+      const updatedAt = metadata.manual_edit_updated_at ? formatDateTime(metadata.manual_edit_updated_at, "") : "";
+      const fields = Array.isArray(metadata.manual_edit_fields)
+        ? metadata.manual_edit_fields
+            .map((field) => LINE_ITEM_EDIT_FIELD_LABELS[field] || field)
+            .filter(Boolean)
+            .join(", ")
+        : "";
+      const parts = [
+        actor ? `von ${actor}` : "",
+        updatedAt ? `am ${updatedAt}` : "",
+        fields ? `Felder: ${fields}` : "",
+      ].filter(Boolean);
+      return parts.length ? parts.join(" · ") : "Manuell geändert";
+    }
+
+    function lineItemEditFormHtml(item, lineItemId, itemKey) {
+      const metadata = parseLineItemMetadata(item);
+      const manualEditLabel = lineItemManualEditLabel(metadata);
+      return `
+        <form class="position-edit-form" data-line-item-edit-form data-line-item-id="${escapeHtml(String(lineItemId))}" data-item-key="${escapeHtml(itemKey)}">
+          <div class="position-edit-grid">
+            ${lineItemEditFieldHtml("Position", "position_no", item.position_no)}
+            ${lineItemEditFieldHtml("LV / Arch.-Pos.", "lv_pos", item.lv_pos)}
+            ${lineItemEditFieldHtml("Menge", "quantity", item.quantity, { type: "number", min: "0", step: "0.0001", number: true })}
+            ${lineItemEditFieldHtml("Einheit", "unit", item.unit)}
+            ${lineItemEditFieldHtml("Breite mm", "width_mm", item.width_mm, { type: "number", min: "0", step: "0.01", number: true })}
+            ${lineItemEditFieldHtml("Höhe mm", "height_mm", item.height_mm, { type: "number", min: "0", step: "0.01", number: true })}
+            ${lineItemEditFieldHtml("Einzelpreis", "unit_price", item.unit_price, { type: "number", min: "0", step: "0.01", number: true, decimals: 2 })}
+            ${lineItemEditFieldHtml("Gesamtpreis", "line_total", item.line_total, { type: "number", min: "0", step: "0.01", number: true, decimals: 2 })}
+            ${lineItemEditFieldHtml("Seite", "page_ref", item.page_ref, { type: "number", min: "1", step: "1", number: true })}
+            <label class="position-edit-checkbox">
+              <input type="checkbox" name="is_alternative" ${item.is_alternative ? "checked" : ""}>
+              <span>Alternative</span>
+            </label>
+            ${lineItemEditFieldHtml("Kurztext", "description_short", item.description_short, { wide: true, textarea: true })}
+            ${lineItemEditFieldHtml("Langtext / Rohblock", "description_long", item.description_long, { full: true, textarea: true })}
+          </div>
+          <div class="position-edit-actions">
+            ${manualEditLabel ? `<span class="position-edit-note">${escapeHtml(manualEditLabel)}</span>` : ""}
+            <button type="button" class="review-task-action subtle" data-line-item-edit-cancel data-item-key="${escapeHtml(itemKey)}">Abbrechen</button>
+            <button type="submit" class="review-task-action primary">Speichern</button>
+          </div>
+        </form>
+      `;
+    }
+
     function extraMetadataCellsHtml(metadata, usedKeys) {
       const entries = Object.entries(metadata || {})
         .filter(([key, value]) => !usedKeys.has(key) && value !== null && value !== undefined && String(value).trim() !== "")
@@ -12657,11 +12915,17 @@
         ].join("");
       }
 
+      const appliesAdjustments = totals && totals.apply_pricing_adjustments !== false;
       return [
+        sumAuditLineHtml("Preislogik", appliesAdjustments ? "Zuschläge/Rabatte aktiv" : "Basispreise aktiv"),
         sumAuditLineHtml("Positionsbasis", auditMoney(totals.component_included_line_item_sum)),
         sumAuditLineHtml("Rabatte", auditSignedMoney(totals.discount_sum)),
         sumAuditLineHtml("Zuschläge", auditSignedMoney(totals.surcharge_sum)),
-        sumAuditLineHtml("Berechnetes Netto", auditMoney(totals.computed_net_from_components), "Positionen + Zu-/Abschläge"),
+        sumAuditLineHtml(
+          "Berechnetes Netto",
+          auditMoney(totals.computed_net_from_components),
+          appliesAdjustments ? "Positionen + Zu-/Abschläge" : "Basispositionen; Zu-/Abschläge deaktiviert"
+        ),
         sumAuditLineHtml("Nettosumme im Dokument", auditMoney(totals.net_total)),
         sumAuditLineHtml("Delta", auditSignedMoney(totals.net_delta_from_components)),
       ].join("");
@@ -12674,6 +12938,7 @@
         sumAuditLineHtml("Positionssumme", auditMoney(totals.component_included_line_item_sum), "für Nettoprüfung berücksichtigt"),
         sumAuditLineHtml("Nicht-alternative Positionen", auditMoney(totals.non_alternative_line_item_sum)),
         sumAuditLineHtml("Prüfmodus", fmt(totals.component_check_mode)),
+        sumAuditLineHtml("Preislogik", totals.apply_pricing_adjustments === false ? "Basispreise" : "Zuschläge/Rabatte aktiv"),
         sumAuditLineHtml("Gesamthinweise", fmt(validation.issue_count || 0)),
       ].join("");
     }
@@ -14022,6 +14287,12 @@
       return lineItems.find((item) => Number(item && item.id) === Number(lineItemId)) || null;
     }
 
+    function lineItemKeyById(lineItemId) {
+      const lineItems = Array.isArray(state.result && state.result.line_items) ? state.result.line_items : [];
+      const index = lineItems.findIndex((item) => Number(item && item.id) === Number(lineItemId));
+      return index >= 0 ? positionItemKey(lineItems[index], index) : "";
+    }
+
     function imageUrl(documentId, imageId) {
       const image = imageRecordById(imageId);
       const metadata = image && image.metadata_json && typeof image.metadata_json === "object" ? image.metadata_json : {};
@@ -14577,6 +14848,10 @@
           .filter((text) => text && text !== "-");
         const canBeChecked = itemCanBeManuallyChecked(item);
         const isNonVisual = String(item.image_assignment_reason || "") === "non_visual_line_item";
+        const itemMetadata = parseLineItemMetadata(item);
+        const canEditLineItem = lineItemCanEdit(item, lineItemId);
+        const isEditingLineItem = canEditLineItem && state.editingItemKeys.has(itemKey);
+        const manualEditLabel = lineItemManualEditLabel(itemMetadata);
         const toggleLabel = isExpanded ? "−" : "+";
         const reviewStateHtml = item.review_checked
           ? `<div class="position-review-state">Manuell geprüft${item.review_checked_at ? ` · ${escapeHtml(fmt(item.review_checked_at))}` : ""}</div>`
@@ -14602,6 +14877,14 @@
           item.review_checked && Number.isFinite(lineItemId)
             ? reviewTaskActionHtml("Prüfung zurücksetzen", "clear-reviewed", { line_item_id: lineItemId, subtle: true })
             : "",
+          canEditLineItem
+            ? reviewTaskActionHtml(isEditingLineItem ? "Bearbeitung schließen" : "Bearbeiten", "toggle-edit", {
+                line_item_id: lineItemId,
+                item_key: itemKey,
+                primary: isEditingLineItem,
+                subtle: !isEditingLineItem,
+              })
+            : "",
         ].filter(Boolean).join("");
         const imageActionButtons = [
           !isNonVisual && Number.isFinite(lineItemId)
@@ -14611,7 +14894,6 @@
             ? reviewTaskActionHtml("Kein Bild setzen", "clear-image", { line_item_id: lineItemId, warning: true })
             : "",
         ].filter(Boolean).join("");
-        const itemMetadata = parseLineItemMetadata(item);
         const usedMetadataKeys = new Set([
           "quantity_raw",
           "width_raw",
@@ -14630,6 +14912,11 @@
           "rieder_original_embedded_unit_price",
           "source",
           "extraction_source",
+          "manual_edit",
+          "manual_edit_source",
+          "manual_edit_actor",
+          "manual_edit_updated_at",
+          "manual_edit_fields",
         ]);
         const pageEndRef = itemMetadata.page_end_ref;
         const pageRange = pageEndRef && String(pageEndRef) !== String(item.page_ref)
@@ -14669,6 +14956,7 @@
           ["Bildpflicht", imageRequiredLabel],
           ["Bildgrund", imageAssignmentSourceLabel(item.image_assignment_reason)],
           ["Bild-Match-Quelle", imageAssignmentSourceLabel(item.image_assignment_source)],
+          ["Manuelle Änderung", manualEditLabel || null],
         ]) + extraMetadataCellsHtml(itemMetadata, usedMetadataKeys);
 
         const row = document.createElement("tr");
@@ -14752,8 +15040,15 @@
                     ${detailMetaCellHtml("Status", validationMeta.label)}
                     ${detailMetaCellHtml("Review", item.review_checked ? "manuell geprüft" : "offen / automatisch")}
                     ${detailMetaCellHtml("Quelle", sourceLabel)}
+                    ${manualEditLabel ? detailMetaCellHtml("Manuell geändert", manualEditLabel) : ""}
                   </div>
                 </div>
+                ${isEditingLineItem ? `
+                  <div class="position-detail-block wide">
+                    <h3>Position bearbeiten</h3>
+                    ${lineItemEditFormHtml(item, lineItemId, itemKey)}
+                  </div>
+                ` : ""}
                 <div class="position-detail-block wide">
                   <h3>Extrahierter Positionstext</h3>
                   <div class="position-image-section">
@@ -14945,6 +15240,7 @@
         setDocumentApprovalPills(result);
         state.fieldSources = deriveFieldSources();
         state.expandedItemKeys = new Set();
+        state.editingItemKeys = new Set();
         renderReview(result);
         renderDocumentIssues(result);
         renderSummary(result);
@@ -14983,6 +15279,7 @@
         state.result = null;
         state.fieldSources = {};
         state.expandedItemKeys = new Set();
+        state.editingItemKeys = new Set();
         state.pdf.pageCount = null;
         syncPdfControls();
         setDocumentApprovalPills(null);
@@ -15478,6 +15775,7 @@
 
     function expandEmbeddedAlternativesForDisplay(items) {
       const expanded = [];
+      const applyPricingAdjustments = pricingAdjustmentsEnabled(state.result);
       (Array.isArray(items) ? items : []).forEach((item, itemIndex) => {
         if (!item || typeof item !== "object") return;
         expanded.push(item);
@@ -15486,11 +15784,17 @@
           const parentId = fmt(item.id || item.position_no || itemIndex, "position");
           const metadata = metadataObject(item);
           const originalUnitPrice = epPriceFromText(altText);
-          const unitPrice = applyRiederPricingOperationsForUi(originalUnitPrice, metadata);
+          const unitPrice = applyPricingAdjustments
+            ? applyRiederPricingOperationsForUi(originalUnitPrice, metadata)
+            : originalUnitPrice;
           metadata.alternative_source = "embedded_long_text";
           metadata.main_line_item_id = parentId;
           if (originalUnitPrice !== null && unitPrice !== originalUnitPrice) {
             metadata.rieder_original_embedded_unit_price = String(originalUnitPrice);
+          }
+          if (!applyPricingAdjustments) {
+            metadata.rieder_pricing_effective_applied = false;
+            metadata.rieder_pricing_disabled_by_document = true;
           }
           expanded.push({
             ...item,
@@ -15696,6 +16000,20 @@
       return mode === "append" ? "am Ende angehängt" : "unter der Hauptposition";
     }
 
+    function pricingAdjustmentsEnabled(result) {
+      const documentPayload = result && result.document ? result.document : null;
+      if (!documentPayload || documentPayload.apply_pricing_adjustments === undefined || documentPayload.apply_pricing_adjustments === null) {
+        return true;
+      }
+      return boolish(documentPayload.apply_pricing_adjustments);
+    }
+
+    function pricingAdjustmentModeLabel(enabled) {
+      return enabled
+        ? "Preise inkl. Zuschlag-/Rabatt-Sequenz"
+        : "Basispreise ohne Zuschläge/Rabatte";
+    }
+
     function alternativeModeSegments() {
       return [ui.alternativeModeSegment, ui.alternativeModeSegmentItems].filter(Boolean);
     }
@@ -15707,6 +16025,7 @@
     function renderAlternativePositionMode(result) {
       const documentPayload = result && result.document ? result.document : null;
       const mode = documentPayload && documentPayload.alternative_position_mode === "append" ? "append" : "nested";
+      const applyPricingAdjustments = pricingAdjustmentsEnabled(result);
       const altCount = countAlternativePositions(result);
       const appendOverrideCount = mode === "nested" ? countAlternativeAppendOverrides(result) : altCount;
       const buttons = alternativeModeSegments()
@@ -15727,6 +16046,15 @@
         } else {
           meta.textContent = `Keine Alternativen erkannt · Exportmodus ist trotzdem gespeichert: ${alternativePositionModeLabel(mode)}.`;
         }
+      }
+      if (ui.pricingAdjustmentToggle) {
+        ui.pricingAdjustmentToggle.checked = applyPricingAdjustments;
+        ui.pricingAdjustmentToggle.disabled = !state.documentId || !documentPayload;
+      }
+      if (ui.pricingAdjustmentMeta) {
+        ui.pricingAdjustmentMeta.textContent = documentPayload
+          ? pricingAdjustmentModeLabel(applyPricingAdjustments)
+          : "Noch kein Dokument geladen.";
       }
     }
 
@@ -15753,6 +16081,40 @@
         setStatus(`Alternativpositionen werden ${alternativePositionModeLabel(normalizedMode)} exportiert.`, "ok");
       } catch (error) {
         setStatus(`Einstellung für Alternativpositionen konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+        renderAlternativePositionMode(state.result);
+      }
+    }
+
+    async function savePricingAdjustmentsMode(enabled) {
+      if (!state.documentId) return;
+      const previous = pricingAdjustmentsEnabled(state.result);
+      if (ui.pricingAdjustmentToggle) ui.pricingAdjustmentToggle.disabled = true;
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/pricing-adjustments`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apply_pricing_adjustments: !!enabled }),
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        state.editingItemKeys = new Set();
+        if (state.result && state.result.document) {
+          state.result.document.apply_pricing_adjustments = !!response.apply_pricing_adjustments;
+          syncCurrentDocumentIntoList(state.result.document);
+        }
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setStatus(
+          `Zuschläge und Rabatte werden ${enabled ? "angewendet" : "nicht angewendet"}.`,
+          "ok"
+        );
+      } catch (error) {
+        if (state.result && state.result.document) {
+          state.result.document.apply_pricing_adjustments = previous;
+        }
+        renderAlternativePositionMode(state.result);
+        setStatus(`Preislogik konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
         renderAlternativePositionMode(state.result);
       }
     }
@@ -15841,6 +16203,93 @@
         setLocalLineItemLineTotal(lineItemId, previous.line_total, previous.unit_price);
         if (state.result) renderLineItems(state.result.line_items || []);
         setStatus(`Pauschalbetrag konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    function renderResultSnapshot(result, { expandedSnapshot = null } = {}) {
+      if (!result || typeof result !== "object") return;
+      state.result = result;
+      setPdfPageCountFromResult(result);
+      syncCurrentDocumentIntoList(result.document || {});
+      setDocumentApprovalPills(result);
+      state.fieldSources = deriveFieldSources();
+      if (expandedSnapshot) state.expandedItemKeys = expandedSnapshot;
+      renderReview(result);
+      renderDocumentIssues(result);
+      renderSummary(result);
+      renderAmountLines(result.amount_lines || []);
+      renderLineItems(result.line_items || []);
+      renderImages(result.images || []);
+      updateWorkflowNavigation();
+      renderVendocCustomerSelect();
+    }
+
+    function lineItemEditTextValue(form, name) {
+      const element = form.elements[name];
+      const value = element ? String(element.value || "").trim() : "";
+      return value || null;
+    }
+
+    function lineItemEditNumberValue(form, name) {
+      const element = form.elements[name];
+      const value = element ? uiNumberValue(element.value) : null;
+      return value === null ? null : value;
+    }
+
+    function lineItemEditPayload(form) {
+      const pageRef = lineItemEditNumberValue(form, "page_ref");
+      return {
+        position_no: lineItemEditTextValue(form, "position_no"),
+        lv_pos: lineItemEditTextValue(form, "lv_pos"),
+        is_alternative: !!(form.elements.is_alternative && form.elements.is_alternative.checked),
+        quantity: lineItemEditNumberValue(form, "quantity"),
+        unit: lineItemEditTextValue(form, "unit"),
+        width_mm: lineItemEditNumberValue(form, "width_mm"),
+        height_mm: lineItemEditNumberValue(form, "height_mm"),
+        description_short: lineItemEditTextValue(form, "description_short"),
+        description_long: lineItemEditTextValue(form, "description_long"),
+        unit_price: lineItemEditNumberValue(form, "unit_price"),
+        line_total: lineItemEditNumberValue(form, "line_total"),
+        page_ref: pageRef === null ? null : Math.max(1, Math.round(pageRef)),
+      };
+    }
+
+    async function saveLineItemEdit(form) {
+      if (!state.documentId || !(form instanceof HTMLFormElement)) return;
+      const lineItemId = Number(form.getAttribute("data-line-item-id"));
+      if (!Number.isFinite(lineItemId)) return;
+      const itemKey = String(form.getAttribute("data-item-key") || "");
+      const submitButtons = Array.from(form.querySelectorAll("button"));
+      submitButtons.forEach((button) => { button.disabled = true; });
+      setStatus(`Position ${lineItemId} wird gespeichert ...`);
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(lineItemEditPayload(form)),
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        if (itemKey) expandedSnapshot.delete(itemKey);
+        if (response && response.result) {
+          renderResultSnapshot(response.result, { expandedSnapshot });
+          const refreshedKey = lineItemKeyById(lineItemId);
+          if (refreshedKey) state.expandedItemKeys.add(refreshedKey);
+          state.editingItemKeys = new Set();
+          if (state.result) renderLineItems(state.result.line_items || []);
+          await loadVendocExportStatus(state.documentId);
+        } else {
+          await loadResult(state.documentId);
+        }
+        setStatus(
+          response && response.changed === false
+            ? `Position ${lineItemId}: keine Änderung erkannt.`
+            : `Position ${lineItemId} wurde manuell aktualisiert. Freigabe wurde zurückgesetzt.`,
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Position konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        submitButtons.forEach((button) => { button.disabled = false; });
       }
     }
 
@@ -16424,6 +16873,29 @@
           void setLineItemReviewChecked(lineItemId, false, reviewAction);
           return;
         }
+        if (action === "toggle-edit") {
+          const itemKey = String(reviewAction.getAttribute("data-item_key") || "");
+          if (!itemKey) return;
+          if (state.editingItemKeys.has(itemKey)) {
+            state.editingItemKeys.delete(itemKey);
+          } else {
+            state.editingItemKeys.add(itemKey);
+            state.expandedItemKeys.add(itemKey);
+          }
+          if (state.result) renderLineItems(state.result.line_items || []);
+          return;
+        }
+      }
+
+      const cancelEditButton = target.closest("[data-line-item-edit-cancel]");
+      if (cancelEditButton) {
+        event.preventDefault();
+        const itemKey = String(cancelEditButton.getAttribute("data-item-key") || "");
+        if (itemKey) {
+          state.editingItemKeys.delete(itemKey);
+          if (state.result) renderLineItems(state.result.line_items || []);
+        }
+        return;
       }
 
       const toggle = target.closest("[data-item-toggle]");
@@ -16440,6 +16912,15 @@
         state.expandedItemKeys.add(itemKey);
       }
       if (state.result) renderLineItems(state.result.line_items || []);
+    });
+
+    ui.itemRows.addEventListener("submit", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const form = target.closest("[data-line-item-edit-form]");
+      if (!(form instanceof HTMLFormElement)) return;
+      event.preventDefault();
+      void saveLineItemEdit(form);
     });
 
     ui.itemRows.addEventListener("change", (event) => {
@@ -16608,6 +17089,11 @@
         await saveAlternativePositionMode(button.getAttribute("data-alternative-mode"));
       });
     });
+    if (ui.pricingAdjustmentToggle) {
+      ui.pricingAdjustmentToggle.addEventListener("change", () => {
+        void savePricingAdjustmentsMode(ui.pricingAdjustmentToggle.checked);
+      });
+    }
     document.addEventListener("click", (event) => {
       if (!state.vendocCustomerPickerOpen) return;
       if (ui.vendocCustomerPicker && ui.vendocCustomerPicker.contains(event.target)) return;

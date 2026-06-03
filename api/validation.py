@@ -83,6 +83,17 @@ def _metadata_dict(item: dict[str, Any]) -> dict[str, Any]:
         return {}
 
 
+def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
+    if not document:
+        return True
+    value = document.get("apply_pricing_adjustments")
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "ja", "y", "on"}
+
+
 def _make_issue(
     *,
     code: str,
@@ -433,6 +444,10 @@ def build_document_validation(
             "reason": "koch_offer_net_only",
         }
     component_check_mode, component_check_reason = _component_check_mode(provider_key, amount_lines)
+    apply_pricing_adjustments = _pricing_adjustments_enabled(document)
+    if provider_key == "rieder" and not apply_pricing_adjustments:
+        component_check_mode = "rieder_adjustments_disabled"
+        component_check_reason = "rieder_pricing_adjustments_disabled_by_document"
 
     if (
         enforce_image_validation
@@ -488,6 +503,7 @@ def build_document_validation(
         "net_total": net_total,
         "vat_total": vat_total,
         "gross_total": gross_total,
+        "apply_pricing_adjustments": apply_pricing_adjustments,
     }
     if net_total is not None and vat_total is not None and gross_total is not None:
         expected_gross = (net_total + vat_total).quantize(SUM_TOLERANCE)
@@ -838,12 +854,16 @@ def build_document_validation(
             surcharge_sum += amount
 
     rieder_sequence_summary = (
-        _rieder_sequence_summary(amount_lines, line_items, net_total) if provider_key == "rieder" else None
+        _rieder_sequence_summary(amount_lines, line_items, net_total)
+        if provider_key == "rieder" and apply_pricing_adjustments
+        else None
     )
     if rieder_sequence_summary is not None:
         computed_net_from_components = rieder_sequence_summary["computed_net"]
         component_check_mode = "rieder_sequence"
         component_check_reason = "rieder_discount_sequence_applied_to_positions"
+    elif provider_key == "rieder" and not apply_pricing_adjustments:
+        computed_net_from_components = component_item_sum.quantize(SUM_TOLERANCE)
     else:
         computed_net_from_components = (component_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
     totals_summary["non_alternative_line_item_sum"] = non_alternative_item_sum.quantize(SUM_TOLERANCE)

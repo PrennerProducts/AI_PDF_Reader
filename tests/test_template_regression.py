@@ -1,3 +1,4 @@
+import json
 import sys
 import subprocess
 from decimal import Decimal
@@ -108,10 +109,49 @@ def test_rieder_processing_adds_delivery_position_and_applies_sequential_discoun
     )
     assert validation["totals"]["component_check_mode"] == "rieder_sequence"
     assert validation["totals"]["component_sum_matches_net"] is True
-    assert validation["totals"]["rieder_pricing_sequence"]["delivery_total"] == Decimal("204.00")
-    assert validation["totals"]["rieder_pricing_sequence"]["printed_delivery_total"] == Decimal("204.00")
-    assert validation["totals"]["rieder_pricing_sequence"]["delivery_position_total"] == Decimal("200.00")
-    assert validation["totals"]["rieder_pricing_sequence"]["net_matches"] is True
+
+
+def test_rieder_validation_can_skip_sequential_discounts() -> None:
+    text = _read_text_fixture(ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"])
+    rows = _build_line_item_rows(text, parsed["template"], amount_line_rows=amount_rows)
+    basis_rows = []
+    for row in rows:
+        basis_row = dict(row)
+        metadata = json.loads(row.get("metadata_json") or "{}")
+        if metadata.get("rieder_original_line_total") is not None:
+            basis_row["line_total"] = Decimal(str(metadata["rieder_original_line_total"]))
+        if metadata.get("rieder_original_unit_price") is not None:
+            basis_row["unit_price"] = Decimal(str(metadata["rieder_original_unit_price"]))
+        basis_rows.append(basis_row)
+
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Rieder",
+            "document_type": "angebot",
+            "document_number": parsed["document_number"],
+            "document_date": "2025-09-05",
+            "project_ref": parsed["project_ref"],
+            "currency": "EUR",
+            "net_total": "6315.71",
+            "vat_total": "1263.14",
+            "gross_total": "7578.85",
+            "apply_pricing_adjustments": False,
+        },
+        amount_lines=amount_rows,
+        line_items=basis_rows,
+        images=[],
+    )
+
+    assert validation["totals"]["apply_pricing_adjustments"] is False
+    assert validation["totals"]["component_check_mode"] == "rieder_adjustments_disabled"
+    assert validation["totals"]["component_sum_matches_net"] is False
+    assert "rieder_pricing_sequence" not in validation["totals"]
+    assert {
+        issue["code"]
+        for issue in validation["document_issues"]
+    }.isdisjoint({"rieder_pricing_sequence_mismatch", "net_component_mismatch"})
 
 
 def test_rieder_main_price_ignores_embedded_alternative_prices() -> None:

@@ -40,6 +40,7 @@ from db import (
     refresh_document_links,
     reset_document_results,
     update_line_item_alternative_append_mode,
+    update_line_item_fields,
     update_line_item_image_assignments,
     update_line_item_line_total_override,
     update_line_item_review_state,
@@ -50,6 +51,7 @@ from db import (
     update_document_approval_state,
     update_document_alternative_position_mode,
     update_document_parse_result,
+    update_document_pricing_adjustments,
     update_document_status,
     update_document_vendoc_customer,
 )
@@ -152,12 +154,31 @@ class DocumentAlternativePositionModeRequest(BaseModel):
     mode: Literal["nested", "append"] = "nested"
 
 
+class DocumentPricingAdjustmentsRequest(BaseModel):
+    apply_pricing_adjustments: bool = True
+
+
 class LineItemAlternativeAppendRequest(BaseModel):
     append_at_end: bool = False
 
 
 class LineItemLineTotalOverrideRequest(BaseModel):
     line_total: Decimal = Field(ge=0, le=Decimal("99999999.99"))
+
+
+class LineItemUpdateRequest(BaseModel):
+    position_no: str | None = Field(default=None, max_length=80)
+    lv_pos: str | None = Field(default=None, max_length=120)
+    is_alternative: bool | None = None
+    quantity: Decimal | None = Field(default=None, ge=0, le=Decimal("99999999.9999"))
+    unit: str | None = Field(default=None, max_length=80)
+    width_mm: Decimal | None = Field(default=None, ge=0, le=Decimal("99999999.99"))
+    height_mm: Decimal | None = Field(default=None, ge=0, le=Decimal("99999999.99"))
+    description_short: str | None = Field(default=None, max_length=1000)
+    description_long: str | None = Field(default=None, max_length=20000)
+    unit_price: Decimal | None = Field(default=None, ge=0, le=Decimal("99999999.99"))
+    line_total: Decimal | None = Field(default=None, ge=0, le=Decimal("99999999.99"))
+    page_ref: int | None = Field(default=None, ge=1, le=9999)
 
 
 class LoginRequest(BaseModel):
@@ -645,6 +666,79 @@ def _to_float_safe(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+LINE_ITEM_DECIMAL_EDIT_FIELDS = {
+    "quantity": Decimal("0.0001"),
+    "width_mm": Decimal("0.01"),
+    "height_mm": Decimal("0.01"),
+    "unit_price": Decimal("0.01"),
+    "line_total": Decimal("0.01"),
+}
+LINE_ITEM_TEXT_EDIT_FIELDS = {
+    "position_no",
+    "lv_pos",
+    "unit",
+    "description_short",
+    "description_long",
+}
+
+
+def _line_item_update_payload(payload: LineItemUpdateRequest) -> dict[str, Any]:
+    if hasattr(payload, "model_dump"):
+        raw_updates = payload.model_dump(exclude_unset=True)
+    else:
+        raw_updates = payload.dict(exclude_unset=True)
+    updates: dict[str, Any] = {}
+    for field, value in raw_updates.items():
+        if field in LINE_ITEM_TEXT_EDIT_FIELDS:
+            updates[field] = _clean_optional_str(value)
+            continue
+        if field in LINE_ITEM_DECIMAL_EDIT_FIELDS:
+            if value is None:
+                updates[field] = None
+                continue
+            try:
+                updates[field] = Decimal(str(value)).quantize(
+                    LINE_ITEM_DECIMAL_EDIT_FIELDS[field],
+                    rounding=ROUND_HALF_UP,
+                )
+            except (InvalidOperation, ValueError):
+                raise HTTPException(status_code=422, detail=f"{field} is not a valid decimal value.")
+            continue
+        if field == "page_ref":
+            updates[field] = int(value) if value is not None else None
+            continue
+        if field == "is_alternative":
+            updates[field] = bool(value) if value is not None else False
+    return updates
+
+
+def _line_item_edit_compare_value(field: str, value: Any) -> Any:
+    if field in LINE_ITEM_TEXT_EDIT_FIELDS:
+        return _clean_optional_str(value)
+    if field in LINE_ITEM_DECIMAL_EDIT_FIELDS:
+        if value is None or value == "":
+            return None
+        try:
+            return Decimal(str(value)).quantize(LINE_ITEM_DECIMAL_EDIT_FIELDS[field], rounding=ROUND_HALF_UP)
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+    if field == "page_ref":
+        return _to_int_safe(value)
+    if field == "is_alternative":
+        return bool(value)
+    return value
+
+
+def _changed_line_item_updates(current: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+    changed: dict[str, Any] = {}
+    for field, value in updates.items():
+        old_value = _line_item_edit_compare_value(field, current.get(field))
+        new_value = _line_item_edit_compare_value(field, value)
+        if old_value != new_value:
+            changed[field] = value
+    return changed
 
 
 def _clamp_ratio(value: float) -> float:
@@ -1796,6 +1890,71 @@ def clear_line_item_review(document_id: int, line_item_id: int, request: Request
     }
 
 
+@app.patch("/documents/{document_id}/line-items/{line_item_id}")
+def update_line_item(
+    document_id: int,
+    line_item_id: int,
+    payload: LineItemUpdateRequest,
+    request: Request,
+):
+    user = _require_user(request)
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    updates = _line_item_update_payload(payload)
+    changed = _changed_line_item_updates(line_item, updates)
+    if not changed:
+        return {
+            "ok": True,
+            "changed": False,
+            "document_id": document_id,
+            "line_item_id": line_item_id,
+            "result": result_data,
+        }
+
+    actor_username = str(user.get("username") or "").strip() or None
+    updated = update_line_item_fields(
+        document_id,
+        line_item_id,
+        changed,
+        actor_username=actor_username,
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Line item could not be updated.")
+
+    old_values = {field: _json_safe(line_item.get(field)) for field in changed}
+    new_values = {field: _json_safe(value) for field, value in changed.items()}
+    _audit(
+        request,
+        "line_item_fields_changed",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={
+            "changed_fields": sorted(changed.keys()),
+            "old_values": old_values,
+            "new_values": new_values,
+            "approval_reset": True,
+        },
+    )
+
+    refreshed_result = get_document_result(document_id) or result_data
+    return {
+        "ok": True,
+        "changed": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "line_item": _json_safe(updated),
+        "result": refreshed_result,
+    }
+
+
 @app.put("/documents/{document_id}/line-items/{line_item_id}/alternative-append-at-end")
 def set_line_item_alternative_append_at_end(
     document_id: int,
@@ -2390,6 +2549,39 @@ def set_document_alternative_position_mode(
         "ok": True,
         "document_id": document_id,
         "alternative_position_mode": updated.get("alternative_position_mode"),
+        "updated_at": updated.get("updated_at"),
+    }
+
+
+@app.put("/documents/{document_id}/pricing-adjustments")
+def set_document_pricing_adjustments(
+    document_id: int,
+    payload: DocumentPricingAdjustmentsRequest,
+    request: Request,
+):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    previous = bool(document.get("apply_pricing_adjustments", True))
+    updated = update_document_pricing_adjustments(
+        document_id,
+        apply_pricing_adjustments=payload.apply_pricing_adjustments,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    _audit(
+        request,
+        "pricing_adjustments_changed",
+        document_id=document_id,
+        details={
+            "previous_apply_pricing_adjustments": previous,
+            "apply_pricing_adjustments": bool(updated.get("apply_pricing_adjustments")),
+        },
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "apply_pricing_adjustments": bool(updated.get("apply_pricing_adjustments")),
         "updated_at": updated.get("updated_at"),
     }
 

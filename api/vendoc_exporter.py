@@ -142,6 +142,43 @@ def _apply_rieder_pricing_operations(value: float | None, metadata: dict[str, An
     return float(current.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
+    if not document:
+        return True
+    value = document.get("apply_pricing_adjustments")
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "ja", "y", "on"}
+
+
+def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustments: bool) -> dict[str, Any]:
+    if apply_pricing_adjustments:
+        return dict(item)
+    metadata = dict(_metadata(item))
+    if metadata.get("pricing_source") == "rieder_delivery_block":
+        return dict(item)
+
+    original_line_total = _to_float(metadata.get("rieder_original_line_total"))
+    original_unit_price = _to_float(metadata.get("rieder_original_unit_price"))
+    if original_line_total is None and original_unit_price is None:
+        return dict(item)
+
+    adjusted = dict(item)
+    metadata["rieder_pricing_effective_applied"] = False
+    metadata["rieder_pricing_disabled_by_document"] = True
+    adjusted["metadata_json"] = metadata
+    if original_line_total is not None:
+        adjusted["line_total"] = original_line_total
+    if original_unit_price is not None:
+        adjusted["unit_price"] = original_unit_price
+    elif original_line_total is not None:
+        quantity = _to_float(adjusted.get("quantity"))
+        adjusted["unit_price"] = round(original_line_total / quantity, 2) if quantity else original_line_total
+    return adjusted
+
+
 def _split_embedded_alternatives(text: str | None) -> tuple[str | None, list[str]]:
     raw = _to_str(text)
     if not raw:
@@ -164,16 +201,29 @@ def _nested_position(parent_position_no: str | None, fallback_parent_index: int,
     return f"{parent}.{alt_index}"
 
 
-def _embedded_alternative_item(parent: dict[str, Any], alt_text: str, alt_index: int) -> dict[str, Any]:
+def _embedded_alternative_item(
+    parent: dict[str, Any],
+    alt_text: str,
+    alt_index: int,
+    *,
+    apply_pricing_adjustments: bool = True,
+) -> dict[str, Any]:
     parent_id = _to_str(parent.get("id")) or _to_str(parent.get("position_no")) or "position"
     price_match = EP_PRICE_PATTERN.search(alt_text)
     metadata = dict(_metadata(parent))
     original_unit_price = _parse_euro_amount(price_match.group("amount") if price_match else None)
-    unit_price = _apply_rieder_pricing_operations(original_unit_price, metadata)
+    unit_price = (
+        _apply_rieder_pricing_operations(original_unit_price, metadata)
+        if apply_pricing_adjustments
+        else original_unit_price
+    )
     metadata["alternative_source"] = "embedded_long_text"
     metadata["main_line_item_id"] = parent_id
     if original_unit_price is not None and unit_price != original_unit_price:
         metadata["rieder_original_embedded_unit_price"] = str(original_unit_price)
+    if not apply_pricing_adjustments:
+        metadata["rieder_pricing_effective_applied"] = False
+        metadata["rieder_pricing_disabled_by_document"] = True
 
     item = dict(parent)
     item["id"] = f"{parent_id}:alt:{alt_index}"
@@ -301,7 +351,12 @@ def _alternative_append_at_end(item: dict[str, Any], mode: str) -> bool:
     return _to_bool(item.get("alternative_append_at_end")) or _to_bool(metadata.get("alternative_append_at_end"))
 
 
-def _prepare_line_items_for_export(line_items: list[Any], mode: str) -> tuple[list[dict[str, Any]], int]:
+def _prepare_line_items_for_export(
+    line_items: list[Any],
+    mode: str,
+    *,
+    apply_pricing_adjustments: bool = True,
+) -> tuple[list[dict[str, Any]], int]:
     normalized_mode = "append" if str(mode or "").strip().lower() == "append" else "nested"
     prepared: list[dict[str, Any]] = []
     append_alternatives: list[dict[str, Any]] = []
@@ -315,7 +370,7 @@ def _prepare_line_items_for_export(line_items: list[Any], mode: str) -> tuple[li
         if not isinstance(raw_item, dict):
             continue
 
-        item = dict(raw_item)
+        item = _line_item_with_pricing_mode(raw_item, apply_pricing_adjustments=apply_pricing_adjustments)
         is_alternative = _to_bool(item.get("is_alternative"))
 
         if not is_alternative:
@@ -327,7 +382,12 @@ def _prepare_line_items_for_export(line_items: list[Any], mode: str) -> tuple[li
             prepared.append(item)
 
             for alt_number, alt_text in enumerate(embedded_alternatives, start=1):
-                alt_item = _embedded_alternative_item(item, alt_text, alt_number)
+                alt_item = _embedded_alternative_item(
+                    item,
+                    alt_text,
+                    alt_number,
+                    apply_pricing_adjustments=apply_pricing_adjustments,
+                )
                 embedded_alternative_count += 1
                 parent_key = parent_position_no or str(parent_index)
                 if _alternative_append_at_end(alt_item, normalized_mode):
@@ -532,7 +592,12 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
     document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
     raw_line_items = result_data.get("line_items") if isinstance(result_data.get("line_items"), list) else []
     alternative_position_mode = "append" if document.get("alternative_position_mode") == "append" else "nested"
-    line_items, alternative_position_count = _prepare_line_items_for_export(raw_line_items, alternative_position_mode)
+    apply_pricing_adjustments = _pricing_adjustments_enabled(document)
+    line_items, alternative_position_count = _prepare_line_items_for_export(
+        raw_line_items,
+        alternative_position_mode,
+        apply_pricing_adjustments=apply_pricing_adjustments,
+    )
     images = result_data.get("images") if isinstance(result_data.get("images"), list) else []
     document_id = document.get("id")
     ext_document_id = external_document_id(document_id)
@@ -698,5 +763,6 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             "has_images": any(position.get("image_is_primary") for position in positions),
             "alternative_position_mode": alternative_position_mode,
             "alternative_position_count": alternative_position_count,
+            "apply_pricing_adjustments": apply_pricing_adjustments,
         },
     }

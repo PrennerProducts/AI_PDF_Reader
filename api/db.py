@@ -3,7 +3,7 @@ import json
 import re
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -387,6 +387,7 @@ def list_documents(limit: int = 20) -> list[dict[str, Any]]:
                 project_ref,
                 document_notes,
                 alternative_position_mode,
+                apply_pricing_adjustments,
                 approval_status,
                 reviewed_by,
                 reviewed_at,
@@ -434,6 +435,7 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 approval_note,
                 document_notes,
                 alternative_position_mode,
+                apply_pricing_adjustments,
                 status,
                 error_message,
                 raw_text_path,
@@ -509,6 +511,25 @@ def update_document_alternative_position_mode(document_id: int, *, mode: str) ->
     return dict(row) if row else None
 
 
+def update_document_pricing_adjustments(document_id: int, *, apply_pricing_adjustments: bool) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET
+                apply_pricing_adjustments = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                apply_pricing_adjustments,
+                updated_at;
+            """,
+            (bool(apply_pricing_adjustments), document_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def update_document_status(
     document_id: int,
     *,
@@ -567,6 +588,7 @@ def update_document_parse_result(
                 parse_confidence = %s,
                 raw_text_path = %s,
                 document_notes = %s,
+                apply_pricing_adjustments = TRUE,
                 approval_status = 'pending',
                 reviewed_by = NULL,
                 reviewed_at = NULL,
@@ -595,6 +617,8 @@ def update_document_parse_result(
                 reviewed_by,
                 reviewed_at,
                 approval_note,
+                alternative_position_mode,
+                apply_pricing_adjustments,
                 status,
                 updated_at;
             """,
@@ -1201,6 +1225,95 @@ def update_line_item_line_total_override(
     return dict(row) if row else None
 
 
+LINE_ITEM_EDITABLE_COLUMNS = {
+    "position_no",
+    "lv_pos",
+    "is_alternative",
+    "quantity",
+    "unit",
+    "width_mm",
+    "height_mm",
+    "description_short",
+    "description_long",
+    "unit_price",
+    "line_total",
+    "page_ref",
+}
+
+
+def update_line_item_fields(
+    document_id: int,
+    line_item_id: int,
+    updates: dict[str, Any],
+    *,
+    actor_username: str | None = None,
+) -> dict[str, Any] | None:
+    clean_updates = {
+        key: value
+        for key, value in (updates or {}).items()
+        if key in LINE_ITEM_EDITABLE_COLUMNS
+    }
+    if not clean_updates:
+        return None
+
+    edited_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    metadata_patch = {
+        "manual_edit": True,
+        "manual_edit_source": "ui_manual",
+        "manual_edit_updated_at": edited_at,
+        "manual_edit_fields": sorted(clean_updates.keys()),
+    }
+    if "line_total" in clean_updates:
+        metadata_patch["rieder_original_line_total"] = (
+            str(clean_updates["line_total"]) if clean_updates["line_total"] is not None else None
+        )
+    if "unit_price" in clean_updates:
+        metadata_patch["rieder_original_unit_price"] = (
+            str(clean_updates["unit_price"]) if clean_updates["unit_price"] is not None else None
+        )
+    if actor_username:
+        metadata_patch["manual_edit_actor"] = actor_username
+    values = list(clean_updates.values())
+    assignments = ", ".join(f"{key} = %s" for key in clean_updates)
+    sql = f"""
+        UPDATE line_items
+        SET
+            {assignments},
+            metadata_json = COALESCE(metadata_json, '{{}}'::jsonb) || %s::jsonb
+        WHERE document_id = %s AND id = %s
+        RETURNING
+            id,
+            document_id,
+            position_no,
+            lv_pos,
+            is_alternative,
+            quantity,
+            unit,
+            width_mm,
+            height_mm,
+            description_short,
+            description_long,
+            unit_price,
+            line_total,
+            page_ref,
+            confidence,
+            metadata_json;
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            sql,
+            (
+                *values,
+                json.dumps(metadata_patch, ensure_ascii=True),
+                document_id,
+                line_item_id,
+            ),
+        ).fetchone()
+        if row:
+            _clear_document_approval_state(conn, document_id)
+    return dict(row) if row else None
+
+
 def update_document_approval_state(
     document_id: int,
     *,
@@ -1440,6 +1553,7 @@ def reset_document_results(document_id: int) -> dict[str, Any] | None:
                 vat_total = NULL,
                 gross_total = NULL,
                 parse_confidence = NULL,
+                apply_pricing_adjustments = TRUE,
                 approval_status = 'pending',
                 reviewed_by = NULL,
                 reviewed_at = NULL,
@@ -1476,6 +1590,67 @@ def _to_int(value: Any) -> int | None:
 
 def _metadata_dict(item: dict[str, Any]) -> dict[str, Any]:
     return metadata_dict(item)
+
+
+def _to_decimal(value: Any) -> Decimal | None:
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
+    if not document:
+        return True
+    value = document.get("apply_pricing_adjustments")
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "ja", "y", "on"}
+
+
+def _line_item_with_document_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustments: bool) -> dict[str, Any]:
+    if apply_pricing_adjustments:
+        return item
+    metadata = _metadata_dict(item)
+    if metadata.get("pricing_source") == "rieder_delivery_block":
+        return item
+
+    original_line_total = _to_decimal(metadata.get("rieder_original_line_total"))
+    original_unit_price = _to_decimal(metadata.get("rieder_original_unit_price"))
+    if original_line_total is None and original_unit_price is None:
+        return item
+
+    adjusted = dict(item)
+    adjusted_metadata = dict(metadata)
+    adjusted_metadata["rieder_pricing_effective_applied"] = False
+    adjusted_metadata["rieder_pricing_disabled_by_document"] = True
+    adjusted["metadata_json"] = adjusted_metadata
+    if original_line_total is not None:
+        adjusted["line_total"] = original_line_total
+    if original_unit_price is not None:
+        adjusted["unit_price"] = original_unit_price
+    elif original_line_total is not None:
+        quantity = _to_decimal(adjusted.get("quantity"))
+        if quantity is not None and quantity != 0:
+            adjusted["unit_price"] = (original_line_total / quantity).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            adjusted["unit_price"] = original_line_total
+    return adjusted
+
+
+def _line_items_with_document_pricing_mode(
+    document: dict[str, Any],
+    line_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    apply_pricing_adjustments = _pricing_adjustments_enabled(document)
+    return [
+        _line_item_with_document_pricing_mode(item, apply_pricing_adjustments=apply_pricing_adjustments)
+        for item in line_items
+    ]
 
 
 def _metadata_image_ids(item: dict[str, Any], valid_ids: set[int]) -> list[int]:
@@ -1945,6 +2120,8 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
     for item in line_item_list:
         item.pop("_image_assignment_meta", None)
         item.pop("_review_meta", None)
+
+    line_item_list = _line_items_with_document_pricing_mode(document, line_item_list)
 
     validation = build_document_validation(
         document=document,

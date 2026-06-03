@@ -1,0 +1,2 @@
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS apply_pricing_adjustments BOOLEAN NOT NULL DEFAULT TRUE;
