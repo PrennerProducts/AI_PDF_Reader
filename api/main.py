@@ -139,7 +139,6 @@ class PdfCropImageRequest(BaseModel):
 
 
 class DocumentApprovalRequest(BaseModel):
-    reviewer_name: str | None = Field(default=None, max_length=160, description="Optional reviewer name.")
     note: str | None = Field(default=None, max_length=1000, description="Optional approval note.")
 
 
@@ -2138,7 +2137,7 @@ def approve_document(document_id: int, payload: DocumentApprovalRequest, request
     updated = update_document_approval_state(
         document_id,
         approval_status="approved",
-        reviewed_by=str(user.get("display_name") or user.get("username") or "").strip() or _clean_optional_str(payload.reviewer_name),
+        reviewed_by=str(user.get("username") or user.get("display_name") or "").strip(),
         approval_note=_clean_optional_str(payload.note),
     )
     if not updated:

@@ -1636,6 +1636,31 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.76);
     }
 
+    .review-approval-user {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 32, 32, 0.10);
+      background: rgba(255, 255, 255, 0.72);
+      padding: 10px 12px;
+      color: #5f5956;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .review-approval-user strong {
+      color: #2a2423;
+      font-size: 14px;
+    }
+
+    .review-approval-user small {
+      color: #827a76;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
     .review-approval-actions {
       display: flex;
       gap: 10px;
@@ -8294,6 +8319,31 @@
       background: #ffffff;
     }
 
+    .app-v3 .review-approval-user {
+      display: grid;
+      gap: 4px;
+      border-radius: 18px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: #f5f5f7;
+      padding: 12px 14px;
+      color: rgba(29, 29, 31, 0.62);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .app-v3 .review-approval-user strong {
+      color: #1d1d1f;
+      font-size: 14px;
+      font-weight: 780;
+    }
+
+    .app-v3 .review-approval-user small {
+      color: rgba(29, 29, 31, 0.52);
+      font-size: 11px;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
     .app-v3 .review-approval-actions {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -11271,16 +11321,17 @@
                   <div class="review-card-head">
                     <div>
                       <h2>Freigabe</h2>
-                      <div class="small">Status prüfen, Prüfer optional erfassen und abschließen.</div>
+                      <div class="small">Status prüfen und mit dem angemeldeten Benutzer abschließen.</div>
                     </div>
                   </div>
                   <div class="review-approval-layout">
                     <div class="review-list review-approval-summary" id="documentApprovalSummary"></div>
                     <div class="review-approval-form">
-                      <label class="review-approval-field">
+                      <div class="review-approval-user">
                         <span>Prüfer</span>
-                        <input id="documentReviewerInput" type="text" maxlength="160" placeholder="Optionaler Name">
-                      </label>
+                        <strong id="documentApprovalReviewerUser">Nicht angemeldet</strong>
+                        <small>Wird automatisch aus deinem Login protokolliert.</small>
+                      </div>
                       <label class="review-approval-field">
                         <span>Notiz</span>
                         <textarea id="documentApprovalNoteInput" rows="3" maxlength="1000" placeholder="Optionale Freigabenotiz"></textarea>
@@ -11608,7 +11659,7 @@
       sourceBreakdown: document.getElementById("sourceBreakdown"),
       documentIssueList: document.getElementById("documentIssueList"),
       documentApprovalSummary: document.getElementById("documentApprovalSummary"),
-      documentReviewerInput: document.getElementById("documentReviewerInput"),
+      documentApprovalReviewerUser: document.getElementById("documentApprovalReviewerUser"),
       documentApprovalNoteInput: document.getElementById("documentApprovalNoteInput"),
       approveDocumentBtn: document.getElementById("approveDocumentBtn"),
       resetDocumentApprovalBtn: document.getElementById("resetDocumentApprovalBtn"),
@@ -13272,7 +13323,6 @@
 
       if (!result || typeof result !== "object") {
         ui.documentApprovalSummary.innerHTML = `<div class="review-empty">Noch keine Freigabeinformationen verfügbar.</div>`;
-        if (ui.documentReviewerInput) ui.documentReviewerInput.value = "";
         if (ui.documentApprovalNoteInput) ui.documentApprovalNoteInput.value = "";
         if (ui.approveDocumentBtn) ui.approveDocumentBtn.disabled = true;
         if (ui.resetDocumentApprovalBtn) ui.resetDocumentApprovalBtn.disabled = true;
@@ -13291,9 +13341,6 @@
         reviewRowHtml("Notiz", noteText, noteText !== "-" ? reviewFlagHtml("vorhanden", "ok") : reviewFlagHtml("optional", "neutral")),
       ].join("");
 
-      if (ui.documentReviewerInput) {
-        ui.documentReviewerInput.value = reviewedBy !== "-" ? reviewedBy : "";
-      }
       if (ui.documentApprovalNoteInput) {
         ui.documentApprovalNoteInput.value = noteText !== "-" ? noteText : "";
       }
@@ -13808,8 +13855,8 @@
         if (user) ui.authUserChip.removeAttribute("hidden");
         else ui.authUserChip.setAttribute("hidden", "");
       }
-      if (ui.documentReviewerInput && user && !ui.documentReviewerInput.value) {
-        ui.documentReviewerInput.value = user.username || user.display_name || "";
+      if (ui.documentApprovalReviewerUser) {
+        ui.documentApprovalReviewerUser.textContent = user ? (user.username || user.display_name || "Angemeldet") : "Nicht angemeldet";
       }
     }
 
@@ -14763,7 +14810,6 @@
     async function setDocumentApproval(approved, button) {
       if (!state.documentId) return;
       const targetButton = button instanceof HTMLElement ? button : null;
-      const reviewerName = ui.documentReviewerInput ? String(ui.documentReviewerInput.value || "").trim() : "";
       const note = ui.documentApprovalNoteInput ? String(ui.documentApprovalNoteInput.value || "").trim() : "";
       if (targetButton) targetButton.disabled = true;
       setStatus(approved ? "Dokument wird freigegeben ..." : "Dokumentfreigabe wird zurückgesetzt ...");
@@ -14773,7 +14819,6 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              reviewer_name: reviewerName || null,
               note: note || null,
             }),
           });
