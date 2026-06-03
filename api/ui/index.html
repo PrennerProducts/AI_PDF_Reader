@@ -12319,6 +12319,14 @@
 
     function lineItemAlternativeAppendAtEnd(item) {
       if (!item || typeof item !== "object") return false;
+      if (item.__embedded_alternative) {
+        const metadata = parseLineItemMetadata(item);
+        const overrides = metadata.embedded_alternative_append_at_end;
+        const indexKey = String(item.__embedded_alternative_index || "");
+        if (overrides && typeof overrides === "object" && Object.prototype.hasOwnProperty.call(overrides, indexKey)) {
+          return boolish(overrides[indexKey]);
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(item, "alternative_append_at_end")) {
         return boolish(item.alternative_append_at_end);
       }
@@ -12377,8 +12385,28 @@
           </div>
         `;
       }
-      if (!Number.isFinite(lineItemId) || item.__embedded_alternative || item.__aggregated_alternative) return "";
       const checked = lineItemAlternativeAppendAtEnd(item);
+      if (item.__embedded_alternative) {
+        const parentLineItemId = Number(item.__parent_line_item_id);
+        const alternativeIndex = Number(item.__embedded_alternative_index);
+        if (!Number.isFinite(parentLineItemId) || !Number.isFinite(alternativeIndex)) return "";
+        return `
+          <label class="alternative-append-toggle${checked ? " is-selected" : ""}">
+            <input
+              type="checkbox"
+              data-embedded-alternative-append-toggle
+              data-line-item-id="${escapeHtml(String(parentLineItemId))}"
+              data-alternative-index="${escapeHtml(String(alternativeIndex))}"
+              ${checked ? "checked" : ""}
+            >
+            <span>
+              <strong>Am Ende anhängen</strong>
+              <small>Nur diese eingebettete Unterposition wird als eigene Position am Ende exportiert.</small>
+            </span>
+          </label>
+        `;
+      }
+      if (!Number.isFinite(lineItemId) || item.__aggregated_alternative) return "";
       return `
         <label class="alternative-append-toggle${checked ? " is-selected" : ""}">
           <input type="checkbox" data-alternative-append-toggle data-line-item-id="${escapeHtml(String(lineItemId))}" ${checked ? "checked" : ""}>
@@ -14906,6 +14934,9 @@
           "alternative_append_at_end",
           "alternative_append_at_end_source",
           "alternative_append_at_end_updated_at",
+          "embedded_alternative_append_at_end",
+          "embedded_alternative_append_at_end_source",
+          "embedded_alternative_append_at_end_updated_at",
           "referenced_lv_pos",
           "rieder_original_line_total",
           "rieder_original_unit_price",
@@ -15668,7 +15699,18 @@
 
     function countAlternativeAppendOverrides(result) {
       const items = Array.isArray(result && result.line_items) ? result.line_items : [];
-      return items.filter((item) => item && item.is_alternative && lineItemAlternativeAppendAtEnd(item)).length;
+      let count = items.filter((item) => item && item.is_alternative && lineItemAlternativeAppendAtEnd(item)).length;
+      for (const item of items) {
+        if (!item || typeof item !== "object" || item.is_alternative) continue;
+        const metadata = metadataObject(item);
+        const overrides = metadata.embedded_alternative_append_at_end;
+        if (!overrides || typeof overrides !== "object") continue;
+        const embeddedCount = embeddedAlternativeCount(item);
+        for (let index = 1; index <= embeddedCount; index += 1) {
+          if (boolish(overrides[String(index)])) count += 1;
+        }
+      }
+      return count;
     }
 
     function embeddedAlternativeCount(item) {
@@ -15805,13 +15847,22 @@
         if (item.is_alternative) return;
         embeddedAlternativeLines(item).forEach((altText, altIndex) => {
           const parentId = fmt(item.id || item.position_no || itemIndex, "position");
+          const parentLineItemId = Number(item.id);
+          const alternativeIndex = altIndex + 1;
           const metadata = metadataObject(item);
+          const appendOverrides = metadata.embedded_alternative_append_at_end;
+          const appendAtEnd = !!(
+            appendOverrides
+            && typeof appendOverrides === "object"
+            && boolish(appendOverrides[String(alternativeIndex)])
+          );
           const originalUnitPrice = epPriceFromText(altText);
           const unitPrice = applyPricingAdjustments
             ? applyRiederPricingOperationsForUi(originalUnitPrice, metadata)
             : originalUnitPrice;
           metadata.alternative_source = "embedded_long_text";
           metadata.main_line_item_id = parentId;
+          if (appendAtEnd) metadata.alternative_append_at_end = true;
           if (originalUnitPrice !== null && unitPrice !== originalUnitPrice) {
             metadata.rieder_original_embedded_unit_price = String(originalUnitPrice);
           }
@@ -15821,8 +15872,9 @@
           }
           expanded.push({
             ...item,
-            id: `${parentId}:alt:${altIndex + 1}`,
+            id: `${parentId}:alt:${alternativeIndex}`,
             is_alternative: true,
+            alternative_append_at_end: appendAtEnd,
             description_short: stripAlternativePriceTokens(altText) || "Alternative",
             description_long: altText,
             unit_price: unitPrice,
@@ -15835,6 +15887,8 @@
             validation_issue_count: 0,
             validation_status: "auto_accept",
             __embedded_alternative: true,
+            __embedded_alternative_index: alternativeIndex,
+            __parent_line_item_id: Number.isFinite(parentLineItemId) ? parentLineItemId : null,
           });
         });
       });
@@ -16154,6 +16208,22 @@
       return previous;
     }
 
+    function setLocalEmbeddedAlternativeAppendAtEnd(lineItemId, alternativeIndex, appendAtEnd) {
+      if (!state.result || !Array.isArray(state.result.line_items)) return null;
+      const item = state.result.line_items.find((candidate) => Number(candidate && candidate.id) === Number(lineItemId));
+      if (!item) return null;
+      const key = String(Math.max(1, Math.round(Number(alternativeIndex) || 1)));
+      const metadata = parseLineItemMetadata(item);
+      const overrides = metadata.embedded_alternative_append_at_end && typeof metadata.embedded_alternative_append_at_end === "object"
+        ? { ...metadata.embedded_alternative_append_at_end }
+        : {};
+      const previous = boolish(overrides[key]);
+      overrides[key] = !!appendAtEnd;
+      metadata.embedded_alternative_append_at_end = overrides;
+      item.metadata_json = metadata;
+      return previous;
+    }
+
     async function saveLineItemAlternativeAppendAtEnd(lineItemId, appendAtEnd) {
       if (!state.documentId || !Number.isFinite(lineItemId)) return;
       const previous = setLocalLineItemAlternativeAppendAtEnd(lineItemId, appendAtEnd);
@@ -16175,6 +16245,40 @@
         );
       } catch (error) {
         setLocalLineItemAlternativeAppendAtEnd(lineItemId, previous);
+        renderAlternativePositionMode(state.result);
+        renderLineItems(state.result.line_items || []);
+        setStatus(`Einstellung konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    async function saveEmbeddedAlternativeAppendAtEnd(lineItemId, alternativeIndex, appendAtEnd) {
+      if (!state.documentId || !Number.isFinite(lineItemId) || !Number.isFinite(alternativeIndex)) return;
+      const previous = setLocalEmbeddedAlternativeAppendAtEnd(lineItemId, alternativeIndex, appendAtEnd);
+      if (previous === null) return;
+      renderAlternativePositionMode(state.result);
+      renderLineItems(state.result.line_items || []);
+      try {
+        const response = await apiJson(
+          `/documents/${state.documentId}/line-items/${lineItemId}/embedded-alternatives/${alternativeIndex}/alternative-append-at-end`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ append_at_end: !!appendAtEnd }),
+          }
+        );
+        setLocalEmbeddedAlternativeAppendAtEnd(
+          lineItemId,
+          alternativeIndex,
+          !!response.alternative_append_at_end
+        );
+        renderAlternativePositionMode(state.result);
+        renderLineItems(state.result.line_items || []);
+        setStatus(
+          `Eingebettete Unterposition wird ${appendAtEnd ? "am Ende angehängt" : "unter der Hauptposition exportiert"}.`,
+          "ok"
+        );
+      } catch (error) {
+        setLocalEmbeddedAlternativeAppendAtEnd(lineItemId, alternativeIndex, previous);
         renderAlternativePositionMode(state.result);
         renderLineItems(state.result.line_items || []);
         setStatus(`Einstellung konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
@@ -16958,6 +17062,14 @@
           return;
         }
         void saveLineItemLineTotalOverride(lineItemId, lineTotal);
+        return;
+      }
+      const embeddedToggle = target.closest("[data-embedded-alternative-append-toggle]");
+      if (embeddedToggle) {
+        const lineItemId = Number(embeddedToggle.getAttribute("data-line-item-id"));
+        const alternativeIndex = Number(embeddedToggle.getAttribute("data-alternative-index"));
+        if (!Number.isFinite(lineItemId) || !Number.isFinite(alternativeIndex)) return;
+        void saveEmbeddedAlternativeAppendAtEnd(lineItemId, alternativeIndex, !!embeddedToggle.checked);
         return;
       }
       const toggle = target.closest("[data-alternative-append-toggle]");

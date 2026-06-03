@@ -40,6 +40,7 @@ from db import (
     refresh_document_links,
     reset_document_results,
     update_line_item_alternative_append_mode,
+    update_line_item_embedded_alternative_append_mode,
     update_line_item_fields,
     update_line_item_image_assignments,
     update_line_item_line_total_override,
@@ -1993,6 +1994,68 @@ def set_line_item_alternative_append_at_end(
         "ok": True,
         "document_id": document_id,
         "line_item_id": line_item_id,
+        "alternative_append_at_end": bool(payload.append_at_end),
+    }
+
+
+@app.put("/documents/{document_id}/line-items/{line_item_id}/embedded-alternatives/{alternative_index}/alternative-append-at-end")
+def set_line_item_embedded_alternative_append_at_end(
+    document_id: int,
+    line_item_id: int,
+    alternative_index: int,
+    payload: LineItemAlternativeAppendRequest,
+    request: Request,
+):
+    if alternative_index < 1:
+        raise HTTPException(status_code=400, detail="Embedded alternative index must be at least 1.")
+
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+    if bool(line_item.get("is_alternative")):
+        raise HTTPException(status_code=400, detail="Embedded alternatives can only be changed on a main line item.")
+
+    embedded_lines = [
+        line
+        for line in str(line_item.get("description_long") or "").splitlines()
+        if re.match(r"^\s*Alternativ(?:e|position)?\s*:", line, flags=re.IGNORECASE)
+    ]
+    if alternative_index > len(embedded_lines):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Embedded alternative {alternative_index} for line item {line_item_id} not found.",
+        )
+
+    updated = update_line_item_embedded_alternative_append_mode(
+        document_id,
+        line_item_id,
+        alternative_index=alternative_index,
+        append_at_end=payload.append_at_end,
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Embedded alternative append override could not be persisted.")
+
+    _audit(
+        request,
+        "line_item_embedded_alternative_append_changed",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={
+            "alternative_index": int(alternative_index),
+            "append_at_end": bool(payload.append_at_end),
+        },
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "alternative_index": int(alternative_index),
         "alternative_append_at_end": bool(payload.append_at_end),
     }
 

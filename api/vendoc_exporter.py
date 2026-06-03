@@ -211,6 +211,11 @@ def _embedded_alternative_item(
     parent_id = _to_str(parent.get("id")) or _to_str(parent.get("position_no")) or "position"
     price_match = EP_PRICE_PATTERN.search(alt_text)
     metadata = dict(_metadata(parent))
+    embedded_append_overrides = metadata.get("embedded_alternative_append_at_end")
+    append_at_end = (
+        isinstance(embedded_append_overrides, dict)
+        and _to_bool(embedded_append_overrides.get(str(alt_index)))
+    )
     original_unit_price = _parse_euro_amount(price_match.group("amount") if price_match else None)
     unit_price = (
         _apply_rieder_pricing_operations(original_unit_price, metadata)
@@ -219,6 +224,8 @@ def _embedded_alternative_item(
     )
     metadata["alternative_source"] = "embedded_long_text"
     metadata["main_line_item_id"] = parent_id
+    if append_at_end:
+        metadata["alternative_append_at_end"] = True
     if original_unit_price is not None and unit_price != original_unit_price:
         metadata["rieder_original_embedded_unit_price"] = str(original_unit_price)
     if not apply_pricing_adjustments:
@@ -228,6 +235,7 @@ def _embedded_alternative_item(
     item = dict(parent)
     item["id"] = f"{parent_id}:alt:{alt_index}"
     item["is_alternative"] = True
+    item["alternative_append_at_end"] = append_at_end
     item["description_short"] = _strip_price_tokens(alt_text)
     item["description_long"] = alt_text
     item["unit_price"] = unit_price

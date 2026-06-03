@@ -1188,6 +1188,47 @@ def update_line_item_alternative_append_mode(
     return int(updated)
 
 
+def update_line_item_embedded_alternative_append_mode(
+    document_id: int,
+    line_item_id: int,
+    *,
+    alternative_index: int,
+    append_at_end: bool,
+) -> int:
+    key = str(max(1, int(alternative_index)))
+    patch = json.dumps(
+        {
+            "embedded_alternative_append_at_end_source": "ui_manual",
+            "embedded_alternative_append_at_end_updated_at": (
+                datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            ),
+        },
+        ensure_ascii=True,
+    )
+    with get_db() as conn:
+        updated = conn.execute(
+            """
+            UPDATE line_items
+            SET metadata_json =
+                jsonb_set(
+                    CASE
+                        WHEN jsonb_typeof(COALESCE(metadata_json, '{}'::jsonb)->'embedded_alternative_append_at_end') = 'object'
+                            THEN COALESCE(metadata_json, '{}'::jsonb)
+                        ELSE COALESCE(metadata_json, '{}'::jsonb) || '{"embedded_alternative_append_at_end": {}}'::jsonb
+                    END,
+                    ARRAY['embedded_alternative_append_at_end', %s],
+                    to_jsonb(%s::boolean),
+                    TRUE
+                ) || %s::jsonb
+            WHERE document_id = %s AND id = %s;
+            """,
+            (key, bool(append_at_end), patch, document_id, line_item_id),
+        ).rowcount or 0
+        if updated:
+            _clear_document_approval_state(conn, document_id)
+    return int(updated)
+
+
 def update_line_item_line_total_override(
     document_id: int,
     line_item_id: int,
