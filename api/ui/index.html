@@ -15054,7 +15054,7 @@
                   <div class="position-image-section">
                     ${alternativeExportNote}
                     ${positionTextPanelHtml("Kurztext", lineItemShortText(item), "Kein Kurztext extrahiert.")}
-                    ${positionTextPanelHtml("Langtext / Rohblock", item.description_long, "Kein Langtext zur Position gespeichert.")}
+                    ${positionTextPanelHtml("Langtext", lineItemLongText(item), "Kein Langtext zur Position gespeichert.")}
                   </div>
                 </div>
                 <div class="position-detail-block wide">
@@ -15720,8 +15720,31 @@
         .replace(/^[-,\s]+|[-,\s]+$/g, "");
     }
 
+    function normalizePositionTextSpacing(value) {
+      return String(value || "")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\s+([,:;)\]])/g, "$1")
+        .replace(/([(\[])\s+/g, "$1")
+        .replace(/^[-,\s]+|[-,\s]+$/g, "")
+        .trim();
+    }
+
+    function stripPricesFromPositionLongText(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      return raw
+        .split(/\r?\n/)
+        .map((line) => normalizePositionTextSpacing(stripAlternativePriceTokens(line)))
+        .filter(Boolean)
+        .join("\n");
+    }
+
     function lineItemShortText(item) {
       return stripAlternativePriceTokens(item && item.description_short) || fmt(item && item.description_short);
+    }
+
+    function lineItemLongText(item) {
+      return stripPricesFromPositionLongText(item && item.description_long) || "";
     }
 
     function embeddedAlternativeLines(item) {
