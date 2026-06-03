@@ -8718,6 +8718,31 @@
       cursor: pointer;
     }
 
+    .app-v3 .alternative-append-group {
+      display: grid;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .app-v3 .alternative-append-group-title strong {
+      display: block;
+      margin-bottom: 3px;
+      color: rgba(29, 29, 31, 0.86);
+      font-size: 13px;
+      font-weight: 780;
+      line-height: 1.2;
+    }
+
+    .app-v3 .alternative-append-group-title span {
+      display: block;
+      color: rgba(29, 29, 31, 0.56);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
     .app-v3 .alternative-append-state {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -8732,11 +8757,19 @@
       color: rgba(29, 29, 31, 0.88);
     }
 
+    .app-v3 .alternative-append-toggle.is-disabled {
+      cursor: default;
+    }
+
     .app-v3 .alternative-append-toggle input {
       width: 18px;
       height: 18px;
       margin: 0;
       accent-color: #d51a0f;
+    }
+
+    .app-v3 .alternative-append-toggle input:disabled {
+      cursor: default;
     }
 
     .app-v3 .alternative-append-toggle span,
@@ -12374,48 +12407,97 @@
       `;
     }
 
+    function alternativeAppendToggleHtml({ checked, attributes, title, detail, disabled = false }) {
+      return `
+        <label class="alternative-append-toggle${checked ? " is-selected" : ""}${disabled ? " is-disabled" : ""}">
+          <input
+            type="checkbox"
+            ${attributes || ""}
+            ${checked ? "checked" : ""}
+            ${disabled ? "disabled" : ""}
+          >
+          <span>
+            <strong>${escapeHtml(title || "Am Ende anhängen")}</strong>
+            <small>${escapeHtml(detail || "Diese Unterposition wird als eigene Position am Ende exportiert.")}</small>
+          </span>
+        </label>
+      `;
+    }
+
+    function alternativeAppendSourceToggleHtml(sourceItem, sourceIndex) {
+      if (!sourceItem || typeof sourceItem !== "object") return "";
+      const checked = lineItemAlternativeAppendAtEnd(sourceItem);
+      const sourcePosition = fmt(sourceItem.position_no, "");
+      const sourceLabel = sourcePosition ? `Quelle Pos. ${sourcePosition}` : `Quelle ${sourceIndex + 1}`;
+      if (sourceItem.__embedded_alternative) {
+        const parentLineItemId = Number(sourceItem.__parent_line_item_id);
+        const alternativeIndex = Number(sourceItem.__embedded_alternative_index);
+        if (!Number.isFinite(parentLineItemId) || !Number.isFinite(alternativeIndex)) return "";
+        return alternativeAppendToggleHtml({
+          checked,
+          attributes: `data-embedded-alternative-append-toggle data-line-item-id="${escapeHtml(String(parentLineItemId))}" data-alternative-index="${escapeHtml(String(alternativeIndex))}"`,
+          title: sourceLabel,
+          detail: "Diese Quelle aus der Sammelposition am Ende anhängen.",
+        });
+      }
+      const sourceLineItemId = Number(sourceItem.id);
+      if (!Number.isFinite(sourceLineItemId)) return "";
+      return alternativeAppendToggleHtml({
+        checked,
+        attributes: `data-alternative-append-toggle data-line-item-id="${escapeHtml(String(sourceLineItemId))}"`,
+        title: sourceLabel,
+        detail: "Diese Quelle aus der Sammelposition am Ende anhängen.",
+      });
+    }
+
     function alternativeAppendControlHtml(item, lineItemId, mode) {
       if (!item || !item.is_alternative) return "";
       const normalizedMode = mode === "append" ? "append" : "nested";
       if (normalizedMode === "append") {
+        return alternativeAppendToggleHtml({
+          checked: true,
+          attributes: "",
+          title: "Am Ende anhängen",
+          detail: "Durch den Dokumentmodus für alle Alternativen aktiviert.",
+          disabled: true,
+        });
+      }
+      const checked = lineItemAlternativeAppendAtEnd(item);
+      if (item.__aggregated_alternative) {
+        const sourceItems = Array.isArray(item.__aggregate_source_items) ? item.__aggregate_source_items : [];
+        const sourceControls = sourceItems
+          .map((sourceItem, sourceIndex) => alternativeAppendSourceToggleHtml(sourceItem, sourceIndex))
+          .filter(Boolean)
+          .join("");
+        if (!sourceControls) return "";
         return `
-          <div class="alternative-append-state">
-            <strong>Am Ende angehängt</strong>
-            <span>Der Dokumentmodus hängt aktuell alle Alternativen am Ende an.</span>
+          <div class="alternative-append-group">
+            <div class="alternative-append-group-title">
+              <strong>Am Ende anhängen</strong>
+              <span>Sammelposition aus ${escapeHtml(fmt(sourceItems.length))} Quellen; die Quellen einzeln steuern.</span>
+            </div>
+            ${sourceControls}
           </div>
         `;
       }
-      const checked = lineItemAlternativeAppendAtEnd(item);
       if (item.__embedded_alternative) {
         const parentLineItemId = Number(item.__parent_line_item_id);
         const alternativeIndex = Number(item.__embedded_alternative_index);
         if (!Number.isFinite(parentLineItemId) || !Number.isFinite(alternativeIndex)) return "";
-        return `
-          <label class="alternative-append-toggle${checked ? " is-selected" : ""}">
-            <input
-              type="checkbox"
-              data-embedded-alternative-append-toggle
-              data-line-item-id="${escapeHtml(String(parentLineItemId))}"
-              data-alternative-index="${escapeHtml(String(alternativeIndex))}"
-              ${checked ? "checked" : ""}
-            >
-            <span>
-              <strong>Am Ende anhängen</strong>
-              <small>Nur diese eingebettete Unterposition wird als eigene Position am Ende exportiert.</small>
-            </span>
-          </label>
-        `;
+        return alternativeAppendToggleHtml({
+          checked,
+          attributes: `data-embedded-alternative-append-toggle data-line-item-id="${escapeHtml(String(parentLineItemId))}" data-alternative-index="${escapeHtml(String(alternativeIndex))}"`,
+          title: "Am Ende anhängen",
+          detail: "Nur diese eingebettete Unterposition wird als eigene Position am Ende exportiert.",
+        });
       }
-      if (!Number.isFinite(lineItemId) || item.__aggregated_alternative) return "";
-      return `
-        <label class="alternative-append-toggle${checked ? " is-selected" : ""}">
-          <input type="checkbox" data-alternative-append-toggle data-line-item-id="${escapeHtml(String(lineItemId))}" ${checked ? "checked" : ""}>
-          <span>
-            <strong>Am Ende anhängen</strong>
-            <small>Nur diese Unterposition wird als eigene Position am Ende exportiert.</small>
-          </span>
-        </label>
-      `;
+      if (!Number.isFinite(lineItemId)) return "";
+      return alternativeAppendToggleHtml({
+        checked,
+        attributes: `data-alternative-append-toggle data-line-item-id="${escapeHtml(String(lineItemId))}"`,
+        title: "Am Ende anhängen",
+        detail: "Nur diese Unterposition wird als eigene Position am Ende exportiert.",
+      });
     }
 
     function lineItemPriceEditable(item) {
@@ -16005,6 +16087,7 @@
           validation_issue_count: 0,
           validation_status: "auto_accept",
           __aggregated_alternative: true,
+          __aggregate_source_items: groupItems,
         });
       });
       return aggregated.concat(passthrough);
