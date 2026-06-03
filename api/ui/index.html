@@ -2129,6 +2129,12 @@
       line-height: 1.2;
     }
 
+    .price-stack .price-original {
+      color: #8a817c;
+      font-size: 10px;
+      line-height: 1.25;
+    }
+
     .position-detail-card {
       padding: 14px;
       margin: 0 10px 10px;
@@ -7550,6 +7556,12 @@
       color: rgba(29, 29, 31, 0.54);
       font-size: 12px;
       line-height: 1.35;
+    }
+
+    .app-v3 .price-stack .price-original {
+      color: rgba(29, 29, 31, 0.42);
+      font-size: 10px;
+      line-height: 1.25;
     }
 
     .app-v3 .position-meta-chips {
@@ -14613,6 +14625,9 @@
           "alternative_append_at_end_source",
           "alternative_append_at_end_updated_at",
           "referenced_lv_pos",
+          "rieder_original_line_total",
+          "rieder_original_unit_price",
+          "rieder_original_embedded_unit_price",
           "source",
           "extraction_source",
         ]);
@@ -14627,6 +14642,8 @@
         const alternativeAppendControl = alternativeAppendControlHtml(item, lineItemId, alternativeMode);
         const lineTotalOverrideControl = lineTotalOverrideControlHtml(item, lineItemId);
         const alternativeExportNote = alternativeExportNoteHtml(item, exportMeta, alternativeMode);
+        const displayLineTotal = lineTotalForDisplayItem(item);
+        const originalPriceNote = originalPriceNoteHtml(item, itemMetadata);
         const extractedFieldHtml = detailMetaCellsHtml([
           ["Datensatz-ID", item.id],
           ["Position", item.position_no],
@@ -14675,8 +14692,9 @@
           </td>
           <td>
             <div class="price-stack">
-              <strong>${escapeHtml(euro(item.line_total))}</strong>
+              <strong>${escapeHtml(displayLineTotal === null ? "-" : euro(displayLineTotal))}</strong>
               <span>EP ${escapeHtml(euro(item.unit_price))}</span>
+              ${originalPriceNote}
             </div>
           </td>
           <td class="item-image-td">${itemImageCellHtml(state.documentId, item)}</td>
@@ -15438,6 +15456,26 @@
       return match ? uiNumberValue(match[1]) : null;
     }
 
+    function applyRiederPricingOperationsForUi(value, metadata) {
+      if (value === null || value === undefined) return value;
+      const operations = metadata && Array.isArray(metadata.rieder_pricing_operations)
+        ? metadata.rieder_pricing_operations
+        : [];
+      if (!operations.length) return value;
+      let current = Number(value);
+      if (!Number.isFinite(current)) return value;
+      for (const operation of operations) {
+        if (!operation || typeof operation !== "object") continue;
+        const lineType = String(operation.line_type || "").trim().toLowerCase();
+        if (lineType !== "discount" && lineType !== "surcharge") continue;
+        const percent = uiNumberValue(operation.percent);
+        if (percent === null) continue;
+        const factor = lineType === "surcharge" ? 1 + (percent / 100) : 1 - (percent / 100);
+        current *= factor;
+      }
+      return Number.isFinite(current) ? Number(current.toFixed(2)) : value;
+    }
+
     function expandEmbeddedAlternativesForDisplay(items) {
       const expanded = [];
       (Array.isArray(items) ? items : []).forEach((item, itemIndex) => {
@@ -15447,15 +15485,20 @@
         embeddedAlternativeLines(item).forEach((altText, altIndex) => {
           const parentId = fmt(item.id || item.position_no || itemIndex, "position");
           const metadata = metadataObject(item);
+          const originalUnitPrice = epPriceFromText(altText);
+          const unitPrice = applyRiederPricingOperationsForUi(originalUnitPrice, metadata);
           metadata.alternative_source = "embedded_long_text";
           metadata.main_line_item_id = parentId;
+          if (originalUnitPrice !== null && unitPrice !== originalUnitPrice) {
+            metadata.rieder_original_embedded_unit_price = String(originalUnitPrice);
+          }
           expanded.push({
             ...item,
             id: `${parentId}:alt:${altIndex + 1}`,
             is_alternative: true,
             description_short: stripAlternativePriceTokens(altText) || "Alternative",
             description_long: altText,
-            unit_price: epPriceFromText(altText),
+            unit_price: unitPrice,
             line_total: null,
             metadata_json: metadata,
             image_ids_primary: [],
@@ -15496,6 +15539,37 @@
       const unitPrice = uiNumberValue(item && item.unit_price);
       if (quantity === null || unitPrice === null) return null;
       return quantity * unitPrice;
+    }
+
+    function originalPriceNoteHtml(item, metadata) {
+      const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
+      const currentTotal = lineTotalForDisplayItem(item);
+      const currentUnit = uiNumberValue(item && item.unit_price);
+      const deliveryPrintedTotal = uiNumberValue(source.delivery_charge_printed_total);
+      if (deliveryPrintedTotal !== null) {
+        return `<span class="price-original">(lt. Dokument: ${escapeHtml(auditMoney(deliveryPrintedTotal))} €)</span>`;
+      }
+      const originalEmbeddedUnit = uiNumberValue(source.rieder_original_embedded_unit_price);
+      if (originalEmbeddedUnit !== null && (currentUnit === null || Math.abs(originalEmbeddedUnit - currentUnit) > 0.005)) {
+        return `<span class="price-original">(Original EP ${escapeHtml(auditMoney(originalEmbeddedUnit))} €)</span>`;
+      }
+
+      const originalTotal = uiNumberValue(source.rieder_original_line_total);
+      const originalUnit = uiNumberValue(source.rieder_original_unit_price);
+      const parts = [];
+      if (originalTotal !== null && (currentTotal === null || Math.abs(originalTotal - currentTotal) > 0.005)) {
+        const sameAsUnit = originalUnit !== null && Math.abs(originalTotal - originalUnit) <= 0.005;
+        parts.push(`${sameAsUnit ? "" : "GP "}${auditMoney(originalTotal)} €`);
+      }
+      if (
+        originalUnit !== null
+        && (currentUnit === null || Math.abs(originalUnit - currentUnit) > 0.005)
+        && (originalTotal === null || Math.abs(originalTotal - originalUnit) > 0.005)
+      ) {
+        parts.push(`EP ${auditMoney(originalUnit)} €`);
+      }
+      if (!parts.length) return "";
+      return `<span class="price-original">(Original ${escapeHtml(parts.join(" / "))})</span>`;
     }
 
     function aggregateAppendAlternativesForDisplay(alternatives) {

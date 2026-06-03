@@ -12,7 +12,6 @@ from template_headers import (
     normalized_non_empty_lines,
 )
 
-
 def detect(normalized_lower: str) -> bool:
     return (
         "rieder-zillertal.at" in normalized_lower
@@ -53,17 +52,38 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
     }
 
 
-def _extract_prices(block_lines: list[str]) -> tuple[str | None, str | None]:
-    for idx, line in enumerate(block_lines):
+def _is_embedded_alternative_line(line: str) -> bool:
+    normalized = normalize_line(line).lower()
+    return normalized.startswith(("alternativ:", "alternative:", "alternativ ", "alternative "))
+
+
+def _main_price_lines(block_lines: list[str]) -> list[str]:
+    price_lines: list[str] = []
+    for line in block_lines:
+        if _is_embedded_alternative_line(line):
+            break
+        price_lines.append(line)
+    return price_lines or block_lines
+
+
+def _extract_prices(
+    block_lines: list[str],
+    *,
+    is_alternative: bool = False,
+    description_short: str | None = None,
+) -> tuple[str | None, str | None]:
+    price_lines = block_lines if is_alternative else _main_price_lines(block_lines)
+
+    for idx, line in enumerate(price_lines):
         if "ep:" in line.lower() or "gp:" in line.lower() or "alternative:" in line.lower():
             start = max(0, idx - 1)
-            end = min(len(block_lines), idx + 2)
-            snippet = " ".join(block_lines[start:end])
+            end = min(len(price_lines), idx + 2)
+            snippet = " ".join(price_lines[start:end])
             tokens = extract_amount_tokens(snippet)
             if len(tokens) >= 2:
                 return tokens[0], tokens[-1]
 
-    all_tokens = extract_amount_tokens("\n".join(block_lines))
+    all_tokens = extract_amount_tokens("\n".join(price_lines))
     if len(all_tokens) >= 2:
         return all_tokens[-2], all_tokens[-1]
     if len(all_tokens) == 1:
@@ -72,10 +92,10 @@ def _extract_prices(block_lines: list[str]) -> tuple[str | None, str | None]:
 
 
 def _is_alternative_position(block_lines: list[str]) -> bool:
-    leading_lines = [normalize_line(line).lower() for line in block_lines[:6] if normalize_line(line)]
+    leading_lines = [normalize_line(line).lower() for line in block_lines[:3] if normalize_line(line)]
     if any("alternativ für pos" in line for line in leading_lines):
         return True
-    if any(line.startswith("alternativ") for line in leading_lines):
+    if leading_lines and leading_lines[0].startswith("alternativ"):
         return True
     if any("ku.pos.: variante" in line for line in leading_lines):
         return True
@@ -220,8 +240,12 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
             skip_prefixes=("ku.pos", "ep:", "gp:", "flgnr", "summe", "zwischensumme"),
             preferred_words=("fenster", "tuer", "t\u00fcre", "fixfenster", "brandschutz", "schema", "dreh", "kipp"),
         )
-        unit_price_raw, line_total_raw = _extract_prices(block_lines)
         is_alternative = _is_alternative_position(block_lines)
+        unit_price_raw, line_total_raw = _extract_prices(
+            block_lines,
+            is_alternative=is_alternative,
+            description_short=description_short,
+        )
 
         items.append(
             {

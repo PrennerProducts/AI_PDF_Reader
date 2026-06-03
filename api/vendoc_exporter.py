@@ -1,5 +1,5 @@
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
@@ -117,6 +117,31 @@ def _parse_euro_amount(value: str | None) -> float | None:
         return None
 
 
+def _apply_rieder_pricing_operations(value: float | None, metadata: dict[str, Any]) -> float | None:
+    if value is None:
+        return None
+    operations = metadata.get("rieder_pricing_operations")
+    if not isinstance(operations, list) or not operations:
+        return value
+    try:
+        current = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return value
+    for operation in operations:
+        if not isinstance(operation, dict):
+            continue
+        line_type = str(operation.get("line_type") or "").strip().lower()
+        if line_type not in {"discount", "surcharge"}:
+            continue
+        try:
+            percent = Decimal(str(operation.get("percent"))) / Decimal("100")
+        except (InvalidOperation, ValueError):
+            continue
+        factor = Decimal("1") + percent if line_type == "surcharge" else Decimal("1") - percent
+        current = current * factor
+    return float(current.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
 def _split_embedded_alternatives(text: str | None) -> tuple[str | None, list[str]]:
     raw = _to_str(text)
     if not raw:
@@ -142,10 +167,13 @@ def _nested_position(parent_position_no: str | None, fallback_parent_index: int,
 def _embedded_alternative_item(parent: dict[str, Any], alt_text: str, alt_index: int) -> dict[str, Any]:
     parent_id = _to_str(parent.get("id")) or _to_str(parent.get("position_no")) or "position"
     price_match = EP_PRICE_PATTERN.search(alt_text)
-    unit_price = _parse_euro_amount(price_match.group("amount") if price_match else None)
     metadata = dict(_metadata(parent))
+    original_unit_price = _parse_euro_amount(price_match.group("amount") if price_match else None)
+    unit_price = _apply_rieder_pricing_operations(original_unit_price, metadata)
     metadata["alternative_source"] = "embedded_long_text"
     metadata["main_line_item_id"] = parent_id
+    if original_unit_price is not None and unit_price != original_unit_price:
+        metadata["rieder_original_embedded_unit_price"] = str(original_unit_price)
 
     item = dict(parent)
     item["id"] = f"{parent_id}:alt:{alt_index}"

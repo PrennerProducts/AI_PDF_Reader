@@ -114,6 +114,32 @@ def test_rieder_processing_adds_delivery_position_and_applies_sequential_discoun
     assert validation["totals"]["rieder_pricing_sequence"]["net_matches"] is True
 
 
+def test_rieder_main_price_ignores_embedded_alternative_prices() -> None:
+    text = """
+Rieder GmbH
+Angebot: 20252202
+Kommission: Test
+Position: 2
+Ku.Pos.: Pos. 2
+1 Stück
+Fenster 1flg DKL                                                    € 527,00
+Beschlagsdetails und Profiltext
+Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 57,97 GP: € 57,97
+Alternativ: Holzart: Lärche 3-schicht verleimt EP: € 87,97 GP: € 87,97
+Position: 3
+1 Stück
+Fixfenster 1flg                                                     € 100,00
+""".strip()
+
+    items = extract_line_items(text, "rieder")
+
+    assert items[0]["position_no"] == "2"
+    assert items[0]["is_alternative"] is False
+    assert items[0]["description_short"] == "Fenster 1flg DKL"
+    assert items[0]["unit_price_raw"] == "€ 527,00"
+    assert items[0]["line_total_raw"] == "€ 527,00"
+
+
 def test_entholzer_regression() -> None:
     text = _read_text_fixture(ROOT / "samples/text/AN_Enth_neu_12502888-00_20250909_Email.txt")
     parsed = parse_document_text(text)

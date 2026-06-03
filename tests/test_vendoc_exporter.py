@@ -155,6 +155,34 @@ def test_vendoc_payload_exports_embedded_alternatives_nested(tmp_path: Path) -> 
     assert payload["positions"][2]["description_short"] == "Holzart: Lärche 3-schicht verleimt"
 
 
+def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["alternative_position_mode"] = "nested"
+    result["line_items"][0]["description_long"] = "\n".join(
+        [
+            "Fenster 1flg DKL",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 57,97 GP: € 57,97",
+        ]
+    )
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert payload["positions"][1]["unit_price"] == 31.33
+
+
 def test_vendoc_payload_renumbers_nested_alternatives_without_gaps(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)

@@ -1146,8 +1146,8 @@ def _apply_rieder_operations(value: Decimal, operations: list[dict[str, Any]]) -
     for operation in operations:
         percent = operation["percent"] / Decimal("100")
         factor = Decimal("1") + percent if operation["line_type"] == "surcharge" else Decimal("1") - percent
-        current = _money(current * factor)
-    return current
+        current = current * factor
+    return _money(current)
 
 
 def _update_row_unit_price_from_total(row: dict[str, Any]) -> None:
