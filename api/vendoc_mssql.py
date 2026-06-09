@@ -52,6 +52,7 @@ POSITION_COLUMNS = [
     "page_ref",
     "image_long_text_rtf",
     "image_only_rtf",
+    "image_hex",
     "image_is_primary",
     "created_at",
     "article_no",

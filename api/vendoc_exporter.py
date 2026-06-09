@@ -742,6 +742,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         )
         image_bytes = image_payload.pop("image_bytes", None)
         image_name = image_payload.pop("image_name", None)
+        image_hex = image_bytes.hex() if isinstance(image_bytes, bytes) else None
         text_only_rtf = build_vendoc_long_text_rtf(description_long)
         image_only_rtf = None
         if isinstance(image_bytes, bytes):
@@ -796,6 +797,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             "text_only_rtf": text_only_rtf,
             "image_long_text_rtf": image_long_text_rtf,
             "image_only_rtf": image_only_rtf,
+            "image_hex": image_hex,
             "unit_price": _to_float(raw_item.get("unit_price")),
             "page_ref": _to_str(raw_item.get("page_ref")),
             **image_payload,

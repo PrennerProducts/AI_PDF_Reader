@@ -111,6 +111,7 @@ def test_vendoc_payload_maps_header_positions_and_primary_image(tmp_path: Path) 
     assert "\\pngblip" in position["image_only_rtf"]
     assert image_bytes.hex() in position["image_only_rtf"]
     assert "Tuerelement mit Seitenteil" not in position["image_only_rtf"]
+    assert position["image_hex"] == image_bytes.hex()
     assert position["image_is_primary"] is True
     assert position["main_line_item_id"] == "57.05.21.A"
 
@@ -121,6 +122,7 @@ def test_vendoc_payload_reports_missing_primary_image_file(tmp_path: Path) -> No
     assert payload["errors"] == []
     assert payload["warnings"][0]["code"] == "primary_image_file_missing"
     assert payload["positions"][0]["image_only_rtf"] is None
+    assert payload["positions"][0]["image_hex"] is None
     assert "\\pngblip" not in payload["positions"][0]["image_long_text_rtf"]
     assert "\\pngblip" not in payload["positions"][0]["text_only_rtf"]
     assert payload["positions"][0]["image_is_primary"] is False
@@ -538,6 +540,8 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
     assert "dbo.vendoc_import_headers" in script
     assert "dbo.vendoc_import_positions" in script
     assert "image_long_text_rtf" in script
+    assert "image_hex" in script
+    assert payload["positions"][0]["image_hex"] in script
     assert "\\pngblip" in script
     assert "CONVERT(datetime, '20251110', 112)" in script
     assert "image_base64" not in script
@@ -561,6 +565,7 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
         "page_ref",
         "image_long_text_rtf",
         "image_only_rtf",
+        "image_hex",
         "image_is_primary",
         "created_at",
         "article_no",
