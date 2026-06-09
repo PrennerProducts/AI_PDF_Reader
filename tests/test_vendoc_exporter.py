@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 
 from vendoc_exporter import (
+    _split_embedded_alternatives,
     _strip_price_tokens,
     _strip_prices_from_long_text,
     build_vendoc_payload,
@@ -459,6 +460,10 @@ def test_vendoc_payload_exports_rieder_alternative_under_parent() -> None:
         ("4", False),
     ]
     assert payload["positions"][1]["description_short"] == "HS Schema A nach links"
+    assert payload["positions"][1]["description_long"].splitlines()[0] == "B/H: 4000,0 x 2520,0"
+    assert payload["positions"][1]["description_long"].splitlines()[-1] == "FlgNr: 2 Griffsitz: 1 000,0"
+    assert "1 Stück B/H" not in payload["positions"][1]["description_long"]
+    assert "Alternative:" not in payload["positions"][1]["description_long"]
 
 
 def test_vendoc_payload_exports_rieder_alternative_appended() -> None:
@@ -493,6 +498,10 @@ def test_vendoc_payload_exports_rieder_alternative_appended() -> None:
         ("5", True),
     ]
     assert payload["positions"][-1]["description_short"] == "HS Schema A nach links"
+    assert payload["positions"][-1]["description_long"].splitlines()[0] == "B/H: 4000,0 x 2520,0"
+    assert payload["positions"][-1]["description_long"].splitlines()[-1] == "FlgNr: 2 Griffsitz: 1 000,0"
+    assert "1 Stück B/H" not in payload["positions"][-1]["description_long"]
+    assert "Alternative:" not in payload["positions"][-1]["description_long"]
 
 
 def test_vendoc_payload_requires_positions() -> None:
@@ -624,6 +633,7 @@ def test_strip_prices_from_long_text_removes_embedded_price_lines() -> None:
             "Fenster 2flg DLS DKR € 1.090,00 €",
             "EP: 1 385,02 GP: € 16.620,24",
             "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 119,90 GP: € 1.438,80",
+            "Alternative: EP: € 3.258,05 GP: € 3.258,05",
             "12 Stück B/H: 950,0 x 1300,0",
         ]
     )
@@ -656,3 +666,36 @@ def test_strip_prices_from_long_text_keeps_weights_and_measurements() -> None:
             "95,6 kg / Elementumfang 6,8 lfm",
         ]
     )
+
+
+def test_strip_prices_from_long_text_removes_only_leading_position_quantity() -> None:
+    raw = "\n".join(
+        [
+            "1 Stück B/H: 4000,0 x 2520,0",
+            "1 Stk. ECO PASS bis 240 mm, Maß: 4000*220",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw, quantity="1", unit="Stück")
+
+    assert cleaned == "\n".join(
+        [
+            "B/H: 4000,0 x 2520,0",
+            "1 Stk. ECO PASS bis 240 mm, Maß: 4000*220",
+        ]
+    )
+
+
+def test_split_embedded_alternatives_ignores_price_only_alternative_marker() -> None:
+    main, alternatives = _split_embedded_alternatives(
+        "\n".join(
+            [
+                "Fenster 1flg",
+                "Alternative: EP: € 3.258,05 GP: € 3.258,05",
+                "Alternativ: Holzart: Douglas EP: € 119,90 GP: € 119,90",
+            ]
+        )
+    )
+
+    assert main == "Fenster 1flg"
+    assert alternatives == ["Holzart: Douglas EP: € 119,90 GP: € 119,90"]

@@ -12,7 +12,12 @@ VENDOC_NAMESPACE = UUID("8f0f8c50-0f58-45d8-b8e5-83a0f7e79a11")
 PRICE_AMOUNT_PATTERN = re.compile(r"(?:€\s*\d{1,3}(?:[ .]\d{3})*,\d{2}|\d{1,3}(?:[ .]\d{3})*,\d{2}\s*€)")
 PRICE_LABEL_PATTERN = re.compile(r"\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?", re.IGNORECASE)
 ALTERNATIVE_LINE_PATTERN = re.compile(r"^\s*Alternativ(?:e|position)?\s*:\s*(?P<text>.+?)\s*$", re.IGNORECASE)
+EMPTY_ALTERNATIVE_LABEL_PATTERN = re.compile(r"^\s*Alternativ(?:e|position)?\s*:?\s*$", re.IGNORECASE)
 EP_PRICE_PATTERN = re.compile(r"\bEP\s*:\s*(?:€\s*)?(?P<amount>\d{1,3}(?:[ .]\d{3})*,\d{2})(?:\s*€)?", re.IGNORECASE)
+POSITION_QUANTITY_PREFIX_PATTERN = re.compile(
+    r"^\s*(?P<quantity>[0-9]+(?:[.,][0-9]+)?)\s*(?P<unit>St[üu]ck|Stueck|Stk\.?|St\.?|St)(?:\s+|$)(?P<rest>.*)$",
+    re.IGNORECASE,
+)
 
 SUPPLIER_ID_ALIASES: dict[str, str] = {
     "rieder": "300774",
@@ -88,7 +93,65 @@ def _strip_price_tokens(text: str | None) -> str | None:
     return cleaned.strip(" -,\t") or None
 
 
-def _strip_prices_from_long_text(text: str | None) -> str | None:
+def _number_value(value: Any) -> float | None:
+    raw = _to_str(value)
+    if not raw:
+        return None
+    normalized = raw.replace(" ", "")
+    if "," in normalized:
+        normalized = normalized.replace(".", "").replace(",", ".")
+    try:
+        return float(normalized)
+    except ValueError:
+        return None
+
+
+def _normalized_unit_key(value: Any) -> str | None:
+    raw = _to_str(value)
+    if not raw:
+        return None
+    normalized = raw.lower().replace(".", "").replace("ü", "ue")
+    normalized = re.sub(r"\s+", "", normalized)
+    if normalized in {"stueck", "stuck", "stk", "st"}:
+        return "piece"
+    return normalized
+
+
+def _strip_position_quantity_from_first_line(
+    lines: list[str],
+    *,
+    quantity: Any = None,
+    unit: Any = None,
+) -> list[str]:
+    if not lines:
+        return lines
+
+    match = POSITION_QUANTITY_PREFIX_PATTERN.match(lines[0])
+    if not match:
+        return lines
+
+    expected_quantity = _number_value(quantity)
+    line_quantity = _number_value(match.group("quantity"))
+    if expected_quantity is not None and line_quantity is not None and abs(expected_quantity - line_quantity) > 0.001:
+        return lines
+
+    expected_unit = _normalized_unit_key(unit)
+    line_unit = _normalized_unit_key(match.group("unit"))
+    if expected_unit is not None and line_unit != expected_unit:
+        return lines
+
+    rest = _normalize_inline_spacing(match.group("rest"))
+    if not rest:
+        return lines[1:]
+    return [rest, *lines[1:]]
+
+
+def _strip_prices_from_long_text(
+    text: str | None,
+    *,
+    quantity: Any = None,
+    unit: Any = None,
+) -> str | None:
     raw = _to_str(text)
     if not raw:
         return raw
@@ -101,8 +164,11 @@ def _strip_prices_from_long_text(text: str | None) -> str | None:
         if not sanitized:
             continue
         sanitized = _normalize_inline_spacing(sanitized)
+        if EMPTY_ALTERNATIVE_LABEL_PATTERN.match(sanitized):
+            continue
         if sanitized:
             cleaned_lines.append(sanitized)
+    cleaned_lines = _strip_position_quantity_from_first_line(cleaned_lines, quantity=quantity, unit=unit)
     return "\n".join(cleaned_lines) or None
 
 
@@ -189,7 +255,7 @@ def _split_embedded_alternatives(text: str | None) -> tuple[str | None, list[str
         match = ALTERNATIVE_LINE_PATTERN.match(original_line)
         if match:
             alt_text = match.group("text").strip()
-            if alt_text:
+            if alt_text and _strip_price_tokens(alt_text):
                 alternatives.append(alt_text)
             continue
         main_lines.append(original_line)
@@ -666,7 +732,14 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             warnings=warnings,
         )
         description_short = _strip_price_tokens(raw_item.get("description_short"))
-        description_long = _strip_prices_from_long_text(raw_item.get("description_long"))
+        quantity_for_long_text = raw_item.get("quantity")
+        if quantity_for_long_text is None:
+            quantity_for_long_text = raw_item.get("quantity_raw") or metadata.get("quantity_raw")
+        description_long = _strip_prices_from_long_text(
+            raw_item.get("description_long"),
+            quantity=quantity_for_long_text,
+            unit=raw_item.get("unit"),
+        )
         image_bytes = image_payload.pop("image_bytes", None)
         image_name = image_payload.pop("image_name", None)
         text_only_rtf = build_vendoc_long_text_rtf(description_long)

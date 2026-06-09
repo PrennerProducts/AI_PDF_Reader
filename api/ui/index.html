@@ -15898,13 +15898,55 @@
         .trim();
     }
 
-    function stripPricesFromPositionLongText(value) {
+    function isEmptyAlternativeLabel(value) {
+      return /^\s*Alternativ(?:e|position)?\s*:?\s*$/i.test(String(value || ""));
+    }
+
+    function normalizedPositionUnit(value) {
+      const normalized = String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\./g, "")
+        .replace(/ü/g, "ue")
+        .replace(/\s+/g, "");
+      if (!normalized) return "";
+      if (["stueck", "stuck", "stk", "st"].includes(normalized)) return "piece";
+      return normalized;
+    }
+
+    function positionQuantityForLongText(item) {
+      if (!item || typeof item !== "object") return null;
+      if (item.quantity !== null && item.quantity !== undefined && item.quantity !== "") return uiNumberValue(item.quantity);
+      if (item.quantity_raw !== null && item.quantity_raw !== undefined && item.quantity_raw !== "") return uiNumberValue(item.quantity_raw);
+      const metadata = metadataObject(item);
+      return uiNumberValue(metadata.quantity_raw);
+    }
+
+    function stripLeadingPositionQuantityLine(lines, item) {
+      if (!Array.isArray(lines) || !lines.length) return lines;
+      const match = String(lines[0] || "").match(/^\s*([0-9]+(?:[.,][0-9]+)?)\s*(Stück|Stueck|Stk\.?|St\.?|St)(?:\s+|$)(.*)$/i);
+      if (!match) return lines;
+
+      const expectedQuantity = positionQuantityForLongText(item);
+      const lineQuantity = uiNumberValue(match[1]);
+      if (expectedQuantity !== null && lineQuantity !== null && Math.abs(expectedQuantity - lineQuantity) > 0.001) return lines;
+
+      const expectedUnit = normalizedPositionUnit(item && item.unit);
+      const lineUnit = normalizedPositionUnit(match[2]);
+      if (expectedUnit && lineUnit !== expectedUnit) return lines;
+
+      const rest = normalizePositionTextSpacing(match[3]);
+      return rest ? [rest, ...lines.slice(1)] : lines.slice(1);
+    }
+
+    function stripPricesFromPositionLongText(value, item = null) {
       const raw = String(value || "").trim();
       if (!raw) return "";
-      return raw
+      const lines = raw
         .split(/\r?\n/)
         .map((line) => normalizePositionTextSpacing(stripAlternativePriceTokens(line)))
-        .filter(Boolean)
+        .filter((line) => line && !isEmptyAlternativeLabel(line));
+      return stripLeadingPositionQuantityLine(lines, item)
         .join("\n");
     }
 
@@ -15913,7 +15955,7 @@
     }
 
     function lineItemLongText(item) {
-      return stripPricesFromPositionLongText(item && item.description_long) || "";
+      return stripPricesFromPositionLongText(item && item.description_long, item) || "";
     }
 
     function embeddedAlternativeLines(item) {
@@ -15923,7 +15965,7 @@
         .map((line) => line.match(/^\s*Alternativ(?:e|position)?\s*:\s*(.+?)\s*$/i))
         .filter(Boolean)
         .map((match) => match[1].trim())
-        .filter(Boolean);
+        .filter((line) => line && stripAlternativePriceTokens(line));
     }
 
     function metadataObject(item) {
