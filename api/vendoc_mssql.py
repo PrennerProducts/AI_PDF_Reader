@@ -291,6 +291,8 @@ def _mssql_literal(value: Any) -> str:
         return "NULL"
     if isinstance(value, bool):
         return "1" if value else "0"
+    if isinstance(value, bytes):
+        return f"0x{value.hex()}"
     if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
         return str(value)
     if isinstance(value, (datetime, date)):
@@ -427,6 +429,15 @@ def _coerce_value_for_column(table: str, target_column: str, value: Any) -> Any:
     if target_column in DATETIME_COLUMNS.get(table, set()):
         parsed = _parse_datetime_like(value)
         return parsed if parsed is not None else value
+    if table == POSITION_TABLE and target_column.lower() == "image_hex":
+        if isinstance(value, bytes):
+            return value
+        text = _clean(value)
+        if text:
+            try:
+                return bytes.fromhex(text[2:] if text.lower().startswith("0x") else text)
+            except ValueError:
+                return value
     return value
 
 

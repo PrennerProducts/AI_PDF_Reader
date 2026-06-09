@@ -15,7 +15,14 @@ from vendoc_exporter import (
     external_document_id,
     external_line_item_id,
 )
-from vendoc_mssql import POSITION_COLUMNS, POSITION_TABLE, _resolve_column_bindings, build_srtemp_export_preview, build_srtemp_insert_script
+from vendoc_mssql import (
+    POSITION_COLUMNS,
+    POSITION_TABLE,
+    _binding_row_values,
+    _resolve_column_bindings,
+    build_srtemp_export_preview,
+    build_srtemp_insert_script,
+)
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 from parser import parse_document_text
 from structured_parser import extract_line_items
@@ -541,7 +548,7 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
     assert "dbo.vendoc_import_positions" in script
     assert "image_long_text_rtf" in script
     assert "image_hex" in script
-    assert payload["positions"][0]["image_hex"] in script
+    assert f"0x{payload['positions'][0]['image_hex']}" in script
     assert "\\pngblip" in script
     assert "CONVERT(datetime, '20251110', 112)" in script
     assert "image_base64" not in script
@@ -575,6 +582,20 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
         "unity",
         "main_line_item_id",
     ]
+
+
+def test_srtemp_image_hex_binds_as_varbinary_bytes(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    image_bytes = _write_png(image_path)
+    payload = build_vendoc_payload(_sample_result(image_path))
+
+    values = _binding_row_values(
+        POSITION_TABLE,
+        payload["positions"][0],
+        [("image_hex", "image_hex")],
+    )
+
+    assert values == [image_bytes]
 
 
 def test_srtemp_preview_uses_runtime_resolved_column_names(monkeypatch, tmp_path: Path) -> None:
