@@ -16706,6 +16706,7 @@
         header: vendoc.header,
         positions: positions.map((position) => {
           const rtf = String(position.image_long_text_rtf || "");
+          const imageHex = String(position.image_hex || "");
           return {
             external_line_item_id: position.external_line_item_id,
             position_no: position.position_no,
@@ -16717,6 +16718,8 @@
             image_is_primary: position.image_is_primary,
             image_long_text_rtf_length: rtf.length,
             image_long_text_rtf_has_png: rtf.includes("\\pngblip"),
+            image_hex_length: imageHex.length,
+            image_hex_present: imageHex.length > 0,
           };
         }),
         warnings: vendoc.warnings || [],
