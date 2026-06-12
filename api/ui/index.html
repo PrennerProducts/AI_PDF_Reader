@@ -1804,6 +1804,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 7px;
       min-height: 36px;
       padding: 0 12px;
       border-radius: 999px;
@@ -1841,6 +1842,17 @@
       border-color: rgba(240, 171, 0, 0.28);
       color: #775000;
       box-shadow: 0 12px 24px rgba(240, 171, 0, 0.12);
+    }
+
+    .review-action-icon {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .review-row {
@@ -11162,8 +11174,8 @@
           <div class="pdf-crop-overlay" id="pdfCropOverlay" hidden>
             <div class="pdf-crop-toolbar">
               <div>
-                <strong id="pdfCropTitle">PDF-Bereich setzen</strong>
-                <span>Rechteck auf der Seite ziehen, um das Bild der Position zuzuordnen.</span>
+                <strong id="pdfCropTitle">Screenshot setzen</strong>
+                <span>Rechteck auf der PDF-Seite ziehen, um einen Screenshot der Position zuzuordnen.</span>
               </div>
               <button class="pdf-crop-cancel" id="pdfCropCancelBtn" type="button">Abbrechen</button>
             </div>
@@ -13120,14 +13132,17 @@
 
     function reviewTaskActionHtml(label, action, extra = {}) {
       const attrs = Object.entries(extra)
-        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .filter(([key, value]) => key !== "icon" && value !== null && value !== undefined && value !== "")
         .map(([key, value]) => `data-${key}="${escapeHtml(String(value))}"`)
         .join(" ");
       const classNames = ["review-task-action"];
       if (extra.primary) classNames.push("primary");
       if (extra.subtle) classNames.push("subtle");
       if (extra.warning) classNames.push("warning");
-      return `<button type="button" class="${classNames.join(" ")}" data-review-action="${escapeHtml(action)}" ${attrs}>${escapeHtml(label)}</button>`;
+      const iconHtml = extra.icon === "screenshot"
+        ? `<svg class="review-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4"></path><path d="M15 3h4a2 2 0 0 1 2 2v4"></path><path d="M21 15v4a2 2 0 0 1-2 2h-4"></path><path d="M9 21H5a2 2 0 0 1-2-2v-4"></path><rect x="8" y="8" width="8" height="8" rx="1.5"></rect></svg>`
+        : "";
+      return `<button type="button" class="${classNames.join(" ")}" data-review-action="${escapeHtml(action)}" ${attrs}>${iconHtml}<span>${escapeHtml(label)}</span></button>`;
     }
 
     function buildReviewTasks(result) {
@@ -14723,7 +14738,7 @@
       if (!state.documentId || !state.pdfCrop.active || !Number.isFinite(Number(state.pdfCrop.lineItemId))) return;
       if (!selection || selection.width < 12 || selection.height < 12) {
         resetPdfCropSelection();
-        setStatus("Der ausgewählte PDF-Bereich ist zu klein.", "warn");
+        setStatus("Der ausgewählte Screenshot-Ausschnitt ist zu klein.", "warn");
         return;
       }
       const lineItemId = Number(state.pdfCrop.lineItemId);
@@ -14735,7 +14750,7 @@
         width_ratio: selection.width / selection.imageWidth,
         height_ratio: selection.height / selection.imageHeight,
       };
-      setStatus(`PDF-Bereich wird als Bild für Position ${lineItemId} gespeichert ...`);
+      setStatus(`Screenshot-Ausschnitt wird als Bild für Position ${lineItemId} gespeichert ...`);
       try {
         const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/crop-image`, {
           method: "POST",
@@ -14749,9 +14764,9 @@
         state.expandedItemKeys = expandedSnapshot;
         if (state.result) renderLineItems(state.result.line_items || []);
         setExtractTab("items");
-        setStatus(`Manueller PDF-Bereich wurde als Bild #${response.image_id} zugeordnet.`, "ok");
+        setStatus(`Screenshot-Ausschnitt wurde als Bild #${response.image_id} zugeordnet.`, "ok");
       } catch (error) {
-        setStatus(`PDF-Bereich konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+        setStatus(`Screenshot-Ausschnitt konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
       }
     }
 
@@ -14853,7 +14868,7 @@
       const value = String(source || "").trim().toLowerCase();
       if (!value) return "-";
       if (value === "manual") return "Manuell";
-      if (value === "manual_crop") return "Manueller PDF-Bereich";
+      if (value === "manual_crop") return "Screenshot-Ausschnitt";
       if (value === "heuristic") return "Heuristik";
       if (value === "page_layout") return "Seitenlayout";
       if (value === "page_neighbor_fallback") return "Nachbarseite";
@@ -15043,7 +15058,7 @@
         ].filter(Boolean).join("");
         const imageActionButtons = [
           !isNonVisual && Number.isFinite(lineItemId)
-            ? reviewTaskActionHtml("PDF-Bereich setzen", "crop-image", { line_item_id: lineItemId, item_key: itemKey, primary: true })
+            ? reviewTaskActionHtml("Screenshot setzen", "crop-image", { line_item_id: lineItemId, item_key: itemKey, primary: true, icon: "screenshot" })
             : "",
           !isNonVisual && Number.isFinite(lineItemId)
             ? reviewTaskActionHtml("Kein Bild setzen", "clear-image", { line_item_id: lineItemId, warning: true })
