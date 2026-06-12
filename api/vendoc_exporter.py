@@ -18,6 +18,7 @@ POSITION_QUANTITY_PREFIX_PATTERN = re.compile(
     r"^\s*(?P<quantity>[0-9]+(?:[.,][0-9]+)?)\s*(?P<unit>St[üu]ck|Stueck|Stk\.?|St\.?|St)(?:\s+|$)(?P<rest>.*)$",
     re.IGNORECASE,
 )
+VENDOC_PURCHASE_PRICE_UNIT_SENTINEL = 999999.0
 
 SUPPLIER_ID_ALIASES: dict[str, str] = {
     "rieder": "300774",
@@ -219,19 +220,38 @@ def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "ja", "y", "on"}
 
 
+def _uses_purchase_price_unit_sentinel(document: dict[str, Any], *, apply_pricing_adjustments: bool) -> bool:
+    if not apply_pricing_adjustments:
+        return False
+    supplier_key = _normalize_lookup_key(document.get("supplier_name"))
+    return "rieder" in supplier_key
+
+
 def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustments: bool) -> dict[str, Any]:
+    current_unit_price = _to_float(item.get("unit_price"))
     if apply_pricing_adjustments:
-        return dict(item)
+        adjusted = dict(item)
+        if _to_float(adjusted.get("purchase_price")) is None and current_unit_price is not None:
+            adjusted["purchase_price"] = current_unit_price
+        return adjusted
     metadata = dict(_metadata(item))
     if metadata.get("pricing_source") == "rieder_delivery_block":
-        return dict(item)
+        adjusted = dict(item)
+        if _to_float(adjusted.get("purchase_price")) is None and current_unit_price is not None:
+            adjusted["purchase_price"] = current_unit_price
+        return adjusted
 
     original_line_total = _to_float(metadata.get("rieder_original_line_total"))
     original_unit_price = _to_float(metadata.get("rieder_original_unit_price"))
     if original_line_total is None and original_unit_price is None:
-        return dict(item)
+        adjusted = dict(item)
+        if _to_float(adjusted.get("purchase_price")) is None and current_unit_price is not None:
+            adjusted["purchase_price"] = current_unit_price
+        return adjusted
 
     adjusted = dict(item)
+    if _to_float(adjusted.get("purchase_price")) is None and current_unit_price is not None:
+        adjusted["purchase_price"] = current_unit_price
     metadata["rieder_pricing_effective_applied"] = False
     metadata["rieder_pricing_disabled_by_document"] = True
     adjusted["metadata_json"] = metadata
@@ -283,8 +303,9 @@ def _embedded_alternative_item(
         and _to_bool(embedded_append_overrides.get(str(alt_index)))
     )
     original_unit_price = _parse_euro_amount(price_match.group("amount") if price_match else None)
+    purchase_price = _apply_rieder_pricing_operations(original_unit_price, metadata)
     unit_price = (
-        _apply_rieder_pricing_operations(original_unit_price, metadata)
+        purchase_price
         if apply_pricing_adjustments
         else original_unit_price
     )
@@ -305,6 +326,7 @@ def _embedded_alternative_item(
     item["description_short"] = _strip_price_tokens(alt_text)
     item["description_long"] = alt_text
     item["unit_price"] = unit_price
+    item["purchase_price"] = purchase_price
     item["line_total"] = None
     item["metadata_json"] = metadata
     item["image_ids_primary"] = []
@@ -667,6 +689,10 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
     raw_line_items = result_data.get("line_items") if isinstance(result_data.get("line_items"), list) else []
     alternative_position_mode = "append" if document.get("alternative_position_mode") == "append" else "nested"
     apply_pricing_adjustments = _pricing_adjustments_enabled(document)
+    use_purchase_price_unit_sentinel = _uses_purchase_price_unit_sentinel(
+        document,
+        apply_pricing_adjustments=apply_pricing_adjustments,
+    )
     line_items, alternative_position_count = _prepare_line_items_for_export(
         raw_line_items,
         alternative_position_mode,
@@ -780,6 +806,14 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             )
             image_payload["image_is_primary"] = False
             image_long_text_rtf = text_only_rtf
+        purchase_price = _to_float(raw_item.get("purchase_price"))
+        if purchase_price is None:
+            purchase_price = _to_float(raw_item.get("unit_price"))
+        unit_price = (
+            VENDOC_PURCHASE_PRICE_UNIT_SENTINEL
+            if use_purchase_price_unit_sentinel and purchase_price is not None
+            else _to_float(raw_item.get("unit_price"))
+        )
         line_item_ids[source_line_item_id] = ext_line_item_id
         position = {
             "external_line_item_id": ext_line_item_id,
@@ -798,7 +832,8 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             "image_long_text_rtf": image_long_text_rtf,
             "image_only_rtf": image_only_rtf,
             "image_hex": image_hex,
-            "unit_price": _to_float(raw_item.get("unit_price")),
+            "unit_price": unit_price,
+            "purchase_price": purchase_price,
             "page_ref": _to_str(raw_item.get("page_ref")),
             **image_payload,
             "created_at": created_at,

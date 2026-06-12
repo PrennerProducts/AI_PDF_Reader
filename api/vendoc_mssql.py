@@ -49,6 +49,7 @@ POSITION_COLUMNS = [
     "description_long",
     "text_only_rtf",
     "unit_price",
+    "purchase_price",
     "page_ref",
     "image_long_text_rtf",
     "image_only_rtf",

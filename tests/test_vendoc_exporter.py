@@ -107,6 +107,8 @@ def test_vendoc_payload_maps_header_positions_and_primary_image(tmp_path: Path) 
     assert position["quantity"] == 1.0
     assert position["unit_code"] == "Stk"
     assert position["description_long"] == "Tuerelement mit Seitenteil"
+    assert position["unit_price"] == 1900.59
+    assert position["purchase_price"] == 1900.59
     assert position["text_only_rtf"].startswith("{\\rtf1")
     assert "\\pngblip" not in position["text_only_rtf"]
     assert "Tuerelement mit Seitenteil" in position["text_only_rtf"]
@@ -161,6 +163,7 @@ def test_vendoc_payload_exports_embedded_alternatives_nested(tmp_path: Path) -> 
     assert payload["positions"][1]["is_alternative"] is True
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
     assert payload["positions"][1]["unit_price"] == 119.9
+    assert payload["positions"][1]["purchase_price"] == 119.9
     assert payload["positions"][1]["image_is_primary"] is False
     assert payload["positions"][2]["description_short"] == "Holzart: Lärche 3-schicht verleimt"
 
@@ -214,7 +217,8 @@ def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_pat
     payload = build_vendoc_payload(result)
 
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
-    assert payload["positions"][1]["unit_price"] == 31.33
+    assert payload["positions"][1]["unit_price"] == 999999.0
+    assert payload["positions"][1]["purchase_price"] == 31.33
 
 
 def test_vendoc_payload_can_skip_rieder_sequence_for_embedded_alternatives(tmp_path: Path) -> None:
@@ -245,6 +249,7 @@ def test_vendoc_payload_can_skip_rieder_sequence_for_embedded_alternatives(tmp_p
     assert payload["summary"]["apply_pricing_adjustments"] is False
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
     assert payload["positions"][1]["unit_price"] == 57.97
+    assert payload["positions"][1]["purchase_price"] == 31.33
 
 
 def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: Path) -> None:
@@ -269,6 +274,32 @@ def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: 
 
     assert payload["summary"]["apply_pricing_adjustments"] is False
     assert payload["positions"][0]["unit_price"] == 57.97
+    assert payload["positions"][0]["purchase_price"] == 31.33
+
+
+def test_vendoc_payload_marks_unit_price_when_rieder_pricing_enabled(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["apply_pricing_adjustments"] = True
+    result["line_items"][0]["unit_price"] = "31.33"
+    result["line_items"][0]["line_total"] = "31.33"
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_original_unit_price": "57.97",
+        "rieder_original_line_total": "57.97",
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is True
+    assert payload["positions"][0]["unit_price"] == 999999.0
+    assert payload["positions"][0]["purchase_price"] == 31.33
 
 
 def test_vendoc_payload_renumbers_nested_alternatives_without_gaps(tmp_path: Path) -> None:
@@ -569,6 +600,7 @@ def test_srtemp_insert_script_targets_confirmed_image_long_text_schema(tmp_path:
         "description_long",
         "text_only_rtf",
         "unit_price",
+        "purchase_price",
         "page_ref",
         "image_long_text_rtf",
         "image_only_rtf",
