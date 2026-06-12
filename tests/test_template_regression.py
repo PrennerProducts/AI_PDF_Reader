@@ -154,6 +154,27 @@ def test_rieder_validation_can_skip_sequential_discounts() -> None:
     }.isdisjoint({"rieder_pricing_sequence_mismatch", "net_component_mismatch"})
 
 
+def test_rieder_multiline_inline_kommission_regression() -> None:
+    text = """
+Rieder GmbH
+www.rieder-zillertal.at
+Ried, am 09.06.2026
+Kommission: BV Bauernhaus
+Hochschwarzwald
+Angebot: 20260679
+Position: 1
+1 Stück B/H: 1000,0 x 1000,0
+Fenster 1flg                                                             € 1.000,00       € 1.000,00
+EP: 1 000,00 GP: € 1.000,00
+""".strip()
+
+    parsed = parse_document_text(text)
+
+    assert parsed["template"] == "rieder"
+    assert parsed["document_number"] == "20260679"
+    assert parsed["project_ref"] == "BV Bauernhaus\nHochschwarzwald"
+
+
 def test_rieder_main_price_ignores_embedded_alternative_prices() -> None:
     text = """
 Rieder GmbH

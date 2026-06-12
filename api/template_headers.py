@@ -129,13 +129,14 @@ def extract_order_confirmation_number(normalized_text: str) -> str | None:
     )
 
 
-def collect_multiline_label_value(lines: list[str], label: str, *, max_lines: int = 2) -> str | None:
-    label_prefix = f"{label.lower()}:"
+def collect_multiline_label_value(lines: list[str], label: str, *, max_lines: int = 2, separator: str = " ") -> str | None:
+    label_re = re.compile(rf"^{re.escape(label)}\s*:\s*(?P<value>.*)$", flags=re.IGNORECASE)
     for idx, line in enumerate(lines):
-        if not line.lower().startswith(label_prefix):
+        match = label_re.match(line)
+        if not match:
             continue
 
-        initial = line.split(":", 1)[1].strip()
+        initial = match.group("value").strip()
         parts = [initial] if initial else []
 
         for step in range(1, max_lines + 1):
@@ -152,5 +153,5 @@ def collect_multiline_label_value(lines: list[str], label: str, *, max_lines: in
             parts.append(probe)
 
         if parts:
-            return collapse_header_value(" ".join(parts))
+            return separator.join(collapse_header_value(part) or "" for part in parts if collapse_header_value(part))
     return None

@@ -31,9 +31,18 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
     if not looks_like_document_number(document_number):
         document_number = extract_order_confirmation_number(normalized_text)
 
+    lines = normalized_non_empty_lines(normalized_text, normalize_line)
+    multiline_project_ref = collect_multiline_label_value(lines, "Kommission", separator="\n")
+    if multiline_project_ref and (
+        not looks_like_project_ref(project_ref)
+        or not project_ref
+        or multiline_project_ref == project_ref
+        or multiline_project_ref.startswith(f"{project_ref}\n")
+        or project_ref.endswith("+")
+    ):
+        project_ref = multiline_project_ref
+
     if not looks_like_project_ref(project_ref) or (project_ref and project_ref.endswith("+")):
-        lines = normalized_non_empty_lines(normalized_text, normalize_line)
-        multiline_project_ref = collect_multiline_label_value(lines, "Kommission")
         if not multiline_project_ref:
             multiline_project_ref = find_nearby_label_value(
                 lines,
