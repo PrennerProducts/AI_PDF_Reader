@@ -12,6 +12,9 @@ from template_headers import (
     normalized_non_empty_lines,
 )
 
+CUSTOMER_POSITION_LINE_RE = re.compile(r"^\s*Ku\.?\s*Pos\.?\s*:\s*.*$", re.IGNORECASE)
+
+
 def detect(normalized_lower: str) -> bool:
     return (
         "rieder-zillertal.at" in normalized_lower
@@ -238,14 +241,15 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         if not block_lines:
             continue
 
-        block_text = "\n".join(block_lines)
+        description_lines = [line for line in block_lines if not CUSTOMER_POSITION_LINE_RE.match(line)]
+        block_text = "\n".join(description_lines or block_lines)
         qty_match = re.search(r"([0-9]+(?:[.,][0-9]+)?)\s*(St[ue\u00fc]ck|Stk\.?|Stk)\b", block_text, flags=re.IGNORECASE)
         quantity_raw = qty_match.group(1) if qty_match else None
         unit = qty_match.group(2).replace(".", "") if qty_match else None
 
         width_raw, height_raw = extract_dimensions(block_text)
         description_short = extract_first_description(
-            block_lines,
+            description_lines or block_lines,
             skip_prefixes=("ku.pos", "ep:", "gp:", "flgnr", "summe", "zwischensumme"),
             preferred_words=("fenster", "tuer", "t\u00fcre", "fixfenster", "brandschutz", "schema", "dreh", "kipp"),
         )

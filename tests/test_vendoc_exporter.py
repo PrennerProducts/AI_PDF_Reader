@@ -726,6 +726,26 @@ def test_strip_prices_from_long_text_keeps_weights_and_measurements() -> None:
     )
 
 
+def test_strip_prices_from_long_text_removes_customer_position_marker() -> None:
+    raw = "\n".join(
+        [
+            "B/H: 4000,0 x 2520,0",
+            "Ku.Pos.: Pos 1",
+            "Ku.Pos.: Variante",
+            "Fixfenster 1flg",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw)
+
+    assert cleaned == "\n".join(
+        [
+            "B/H: 4000,0 x 2520,0",
+            "Fixfenster 1flg",
+        ]
+    )
+
+
 def test_strip_prices_from_long_text_removes_only_leading_position_quantity() -> None:
     raw = "\n".join(
         [

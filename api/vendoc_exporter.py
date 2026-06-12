@@ -14,6 +14,7 @@ PRICE_LABEL_PATTERN = re.compile(r"\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:
 ALTERNATIVE_LINE_PATTERN = re.compile(r"^\s*Alternativ(?:e|position)?\s*:\s*(?P<text>.+?)\s*$", re.IGNORECASE)
 EMPTY_ALTERNATIVE_LABEL_PATTERN = re.compile(r"^\s*Alternativ(?:e|position)?\s*:?\s*$", re.IGNORECASE)
 EP_PRICE_PATTERN = re.compile(r"\bEP\s*:\s*(?:€\s*)?(?P<amount>\d{1,3}(?:[ .]\d{3})*,\d{2})(?:\s*€)?", re.IGNORECASE)
+CUSTOMER_POSITION_LINE_PATTERN = re.compile(r"^\s*Ku\.?\s*Pos\.?\s*:\s*.*$", re.IGNORECASE)
 POSITION_QUANTITY_PREFIX_PATTERN = re.compile(
     r"^\s*(?P<quantity>[0-9]+(?:[.,][0-9]+)?)\s*(?P<unit>St[üu]ck|Stueck|Stk\.?|St\.?|St)(?:\s+|$)(?P<rest>.*)$",
     re.IGNORECASE,
@@ -166,6 +167,8 @@ def _strip_prices_from_long_text(
             continue
         sanitized = _normalize_inline_spacing(sanitized)
         if EMPTY_ALTERNATIVE_LABEL_PATTERN.match(sanitized):
+            continue
+        if CUSTOMER_POSITION_LINE_PATTERN.match(sanitized):
             continue
         if sanitized:
             cleaned_lines.append(sanitized)

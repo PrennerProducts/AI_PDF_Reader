@@ -197,6 +197,7 @@ Fixfenster 1flg                                                     € 100,00
     assert items[0]["position_no"] == "2"
     assert items[0]["is_alternative"] is False
     assert items[0]["description_short"] == "Fenster 1flg DKL"
+    assert "Ku.Pos." not in items[0]["description_long"]
     assert items[0]["unit_price_raw"] == "€ 527,00"
     assert items[0]["line_total_raw"] == "€ 527,00"
 
