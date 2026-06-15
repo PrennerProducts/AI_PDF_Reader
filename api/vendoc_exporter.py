@@ -17,9 +17,13 @@ EMPTY_ALTERNATIVE_LABEL_PATTERN = re.compile(r"^\s*Alternativ(?:e|position)?\s*:
 EP_PRICE_PATTERN = re.compile(r"\bEP\s*:\s*(?:€\s*)?(?P<amount>\d{1,3}(?:[ .]\d{3})*,\d{2})(?:\s*€)?", re.IGNORECASE)
 CUSTOMER_POSITION_LINE_PATTERN = re.compile(r"^\s*Ku\.?\s*Pos\.?\s*:\s*.*$", re.IGNORECASE)
 MONEY_NUMBER_PATTERN = r"\d{1,3}(?:[ .]\d{3})*,\d{2}"
-POSITION_UNIT_PATTERN = r"(?:St[üu]ck|Stueck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)"
+POSITION_UNIT_PATTERN = r"(?:St[üu]ck|Stueck|Stuck|Stck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)"
 POSITION_HEADER_UNLABELED_PRICE_PAIR_PATTERN = re.compile(
     rf"^(?P<prefix>\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d{{1,4}})?\s*{POSITION_UNIT_PATTERN}\b(?:\s+|$).+?)\s+{MONEY_NUMBER_PATTERN}\s+{MONEY_NUMBER_PATTERN}\s*$",
+    re.IGNORECASE,
+)
+POSITION_HEADER_UNIT_ONLY_PATTERN = re.compile(
+    rf"^\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d+)?\s*{POSITION_UNIT_PATTERN}\.?\s*$",
     re.IGNORECASE,
 )
 POSITION_TABLE_ROW_PRICE_PAIR_PATTERN = re.compile(
@@ -116,6 +120,20 @@ def _strip_unlabeled_position_header_price_pair(text: str | None) -> str | None:
     return _normalize_inline_spacing(match.group("prefix")).strip(" :,-\t") or None
 
 
+def _is_numeric_layout_line(text: str | None) -> bool:
+    raw = _to_str(text)
+    if not raw:
+        return False
+    return bool(re.fullmatch(r"[0-9.,/\sxX*+-]+", raw))
+
+
+def _is_numeric_layout_price_pair_line(text: str | None) -> bool:
+    raw = _to_str(text)
+    if not raw or not _is_numeric_layout_line(raw):
+        return False
+    return len(re.findall(MONEY_NUMBER_PATTERN, raw)) >= 2
+
+
 def _number_value(value: Any) -> float | None:
     raw = _to_str(value)
     if not raw:
@@ -135,7 +153,7 @@ def _normalized_unit_key(value: Any) -> str | None:
         return None
     normalized = raw.lower().replace(".", "").replace("ü", "ue").replace("²", "2")
     normalized = re.sub(r"\s+", "", normalized)
-    if normalized in {"stueck", "stuck", "stk", "st"}:
+    if normalized in {"stueck", "stuck", "stck", "stk", "st"}:
         return "piece"
     return normalized
 
@@ -228,6 +246,10 @@ def _strip_prices_from_long_text(
         line = original_line.strip()
         if not line:
             continue
+        if POSITION_HEADER_UNIT_ONLY_PATTERN.match(line):
+            continue
+        if _is_numeric_layout_price_pair_line(line):
+            continue
         if POSITION_TABLE_ROW_PRICE_PAIR_PATTERN.match(line):
             continue
         if _is_long_text_noise_line(line):
@@ -239,6 +261,8 @@ def _strip_prices_from_long_text(
         if not sanitized:
             continue
         sanitized = _normalize_inline_spacing(sanitized)
+        if _is_numeric_layout_line(sanitized):
+            continue
         if _is_long_text_noise_line(sanitized):
             continue
         if EMPTY_ALTERNATIVE_LABEL_PATTERN.match(sanitized):

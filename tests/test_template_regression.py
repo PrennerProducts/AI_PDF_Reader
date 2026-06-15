@@ -399,6 +399,13 @@ def test_schuchter_discounts_prices_and_long_text_are_clean() -> None:
             assert not money_pattern.search(description_long)
             assert "Übertrag:" not in description_long
             assert "E-Preis" not in description_long
+            for line in description_long.splitlines():
+                assert not re.fullmatch(
+                    r"\d+[A-Za-z]?\s+\d+(?:[,.]\d+)?\s+(?:Stck\.?|Stk\.?|PA|Pauschale|Psch)",
+                    line,
+                    flags=re.IGNORECASE,
+                )
+                assert not re.fullmatch(r"[0-9.,/\sxX*+-]+", line)
 
     text = _read_pdf_text(ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf")
     parsed = parse_document_text(text)

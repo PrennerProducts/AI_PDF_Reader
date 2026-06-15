@@ -1264,6 +1264,7 @@ def test_strip_prices_from_long_text_removes_position_table_row_with_price_pair(
     raw = "\n".join(
         [
             "1 Hoppy 1 Raff S 918,04 918,04",
+            "1.146,15 1.146,15 750 750",
             "RAFF S Putz",
             "001 16,00 Stk. EI2-30C Tür 1050 x 2100 2.047,71 32.763,36",
             "Serie: heroal D82FP",
@@ -1294,6 +1295,25 @@ def test_strip_prices_from_long_text_removes_only_leading_position_quantity() ->
         [
             "B/H: 4000,0 x 2520,0",
             "1 Stk. ECO PASS bis 240 mm, Maß: 4000*220",
+        ]
+    )
+
+
+def test_strip_prices_from_long_text_removes_schuchter_position_header_line() -> None:
+    raw = "\n".join(
+        [
+            "1 1 Stck",
+            "EI2-30C Tür 1050 x 2100",
+            "Serie: heroal D82FP",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw, quantity="1", unit="Stck")
+
+    assert cleaned == "\n".join(
+        [
+            "EI2-30C Tür 1050 x 2100",
+            "Serie: heroal D82FP",
         ]
     )
 

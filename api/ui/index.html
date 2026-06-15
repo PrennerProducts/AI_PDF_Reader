@@ -16202,7 +16202,7 @@
       const raw = String(value || "").trim();
       if (!raw) return "";
       return raw
-        .replace(/^(\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d{1,4})?\s*(?:Stück|Stueck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)\b(?:\s+|$).+?)\s+\d{1,3}(?:[ .]\d{3})*,\d{2}\s+\d{1,3}(?:[ .]\d{3})*,\d{2}\s*$/i, "$1")
+        .replace(/^(\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d{1,4})?\s*(?:Stück|Stueck|Stuck|Stck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)\b(?:\s+|$).+?)\s+\d{1,3}(?:[ .]\d{3})*,\d{2}\s+\d{1,3}(?:[ .]\d{3})*,\d{2}\s*$/i, "$1")
         .replace(/^[-,\s]+|[-,\s:]+$/g, "")
         .trim();
     }
@@ -16212,6 +16212,22 @@
       if (!raw) return false;
       const money = "\\d{1,3}(?:[ .]\\d{3})*,\\d{2}";
       return new RegExp(`^\\s*\\d+[A-Za-z]?\\s+(?=.*[A-Za-zÄÖÜäöüß])(?=.*\\s${money}\\s+${money}\\s*$).*$`, "i").test(raw);
+    }
+
+    function isNumericLayoutLine(value) {
+      const raw = String(value || "").trim();
+      return !!raw && /^[0-9.,/\sxX*+\-]+$/.test(raw);
+    }
+
+    function isNumericLayoutPricePairLine(value) {
+      const raw = String(value || "").trim();
+      if (!raw || !isNumericLayoutLine(raw)) return false;
+      return (raw.match(/\d{1,3}(?:[ .]\d{3})*,\d{2}/g) || []).length >= 2;
+    }
+
+    function isPositionHeaderUnitOnlyLine(value) {
+      const raw = String(value || "").trim();
+      return !!raw && /^\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d+)?\s*(?:Stück|Stueck|Stuck|Stck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)\.?\s*$/i.test(raw);
     }
 
     function isEmptyAlternativeLabel(value) {
@@ -16269,7 +16285,7 @@
         .replace(/²/g, "2")
         .replace(/\s+/g, "");
       if (!normalized) return "";
-      if (["stueck", "stuck", "stk", "st"].includes(normalized)) return "piece";
+      if (["stueck", "stuck", "stck", "stk", "st"].includes(normalized)) return "piece";
       return normalized;
     }
 
@@ -16283,7 +16299,7 @@
 
     function stripLeadingPositionQuantityLine(lines, item) {
       if (!Array.isArray(lines) || !lines.length) return lines;
-      const match = String(lines[0] || "").match(/^\s*(?:\d+[A-Za-z]?\s+)?([0-9]+(?:[.,][0-9]+)?)\s*(Stück|Stueck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)(?:\s+|$)(.*)$/i);
+      const match = String(lines[0] || "").match(/^\s*(?:\d+[A-Za-z]?\s+)?([0-9]+(?:[.,][0-9]+)?)\s*(Stück|Stueck|Stuck|Stck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)(?:\s+|$)(.*)$/i);
       if (!match) return lines;
 
       const expectedQuantity = positionQuantityForLongText(item);
@@ -16304,11 +16320,13 @@
       if (!raw) return "";
       const lines = raw
         .split(/\r?\n/)
+        .filter((line) => !isPositionHeaderUnitOnlyLine(line))
+        .filter((line) => !isNumericLayoutPricePairLine(line))
         .filter((line) => !isPositionTableRowWithPricePair(line))
         .filter((line) => !isPositionLongTextNoiseLine(line))
         .filter((line) => !isAlternativeTextLine(line))
         .map((line) => normalizePositionTextSpacing(stripUnlabeledPositionHeaderPrices(stripAlternativePriceTokens(line))))
-        .filter((line) => line && !isEmptyAlternativeLabel(line) && !isPositionLongTextNoiseLine(line));
+        .filter((line) => line && !isPositionHeaderUnitOnlyLine(line) && !isNumericLayoutLine(line) && !isEmptyAlternativeLabel(line) && !isPositionLongTextNoiseLine(line));
       return stripLeadingPositionQuantityLine(lines, item)
         .join("\n");
     }

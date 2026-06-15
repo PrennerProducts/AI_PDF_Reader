@@ -153,6 +153,14 @@ def _is_description_noise_line(line: str) -> bool:
         return True
     if line in {".", "-"}:
         return True
+    if re.fullmatch(
+        r"\d+[A-Za-z]?\s+\d+(?:[,.]\d+)?\s+(?:Stck\.?|Stk\.?|PA|Pauschale|Psch)",
+        line,
+        flags=re.IGNORECASE,
+    ):
+        return True
+    if re.fullmatch(r"[0-9.,/\sxX*+-]+", line):
+        return True
     if re.fullmatch(r"[-_—=]{4,}", line):
         return True
     if lower.startswith(
