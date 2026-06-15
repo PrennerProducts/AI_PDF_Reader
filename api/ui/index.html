@@ -15363,7 +15363,7 @@
           </td>
           <td>
             <div class="price-stack">
-              <strong>${escapeHtml(displayLineTotal === null ? "-" : euro(displayLineTotal))}</strong>
+              <strong>${escapeHtml(displayLineTotal === null ? "-" : `GP ${euro(displayLineTotal)}`)}</strong>
               ${exportPriceStack.html}
               ${priceAggregationInline}
               ${originalPriceNote}
@@ -16264,7 +16264,7 @@
           metadata.alternative_source = "embedded_long_text";
           metadata.main_line_item_id = parentId;
           if (appendAtEnd) metadata.alternative_append_at_end = true;
-          if (originalUnitPrice !== null && unitPrice !== originalUnitPrice) {
+          if (originalUnitPrice !== null) {
             metadata.rieder_original_embedded_unit_price = String(originalUnitPrice);
           }
           if (!applyPricingAdjustments) {
@@ -16315,6 +16315,15 @@
     }
 
     function lineTotalForDisplayItem(item) {
+      const metadata = metadataObject(item);
+      if (metadata.alternative_source === "aggregated_nested" || metadata.alternative_source === "aggregated_append" || item && item.__aggregated_alternative) {
+        const details = aggregatePriceDetailsForUi(item, metadata);
+        if (details) {
+          const usePurchaseTotal = pricingAdjustmentsEnabled(state.result) && details.purchaseLineTotal !== null;
+          const aggregateTotal = usePurchaseTotal ? details.purchaseLineTotal : details.unitLineTotal;
+          if (aggregateTotal !== null) return aggregateTotal;
+        }
+      }
       const lineTotal = uiNumberValue(item && item.line_total);
       if (lineTotal !== null) return lineTotal;
       const quantity = uiNumberValue(item && item.quantity);
@@ -16515,7 +16524,11 @@
       if (!details) return "";
       const count = details.components.length || Number((metadata || {}).alternative_group_source_count || 0);
       const unitFormula = priceAdditionFormula(details.unitParts, details.unitTotal);
-      return `<span class="price-aggregation-note">${escapeHtml(`${count} Preise addiert${unitFormula ? `: ${unitFormula}` : ""}`)}</span>`;
+      const usePurchaseTotal = pricingAdjustmentsEnabled(state.result) && details.purchaseLineTotal !== null;
+      const totalLabel = usePurchaseTotal ? "Purchase GP" : "GP";
+      const totalValue = usePurchaseTotal ? details.purchaseLineTotal : details.unitLineTotal;
+      const totalText = totalValue !== null ? ` · ${totalLabel} ${auditMoney(totalValue)} €` : "";
+      return `<span class="price-aggregation-note">${escapeHtml(`${count} Preise addiert${unitFormula ? `: ${unitFormula}` : ""}${totalText}`)}</span>`;
     }
 
     function priceAggregationDetailHtml(item, metadata) {

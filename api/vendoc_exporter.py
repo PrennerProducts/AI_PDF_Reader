@@ -430,7 +430,7 @@ def _embedded_alternative_item(
     metadata["main_line_item_id"] = parent_id
     if append_at_end:
         metadata["alternative_append_at_end"] = True
-    if original_unit_price is not None and unit_price != original_unit_price:
+    if original_unit_price is not None:
         metadata["rieder_original_embedded_unit_price"] = str(original_unit_price)
     if not apply_pricing_adjustments:
         metadata["rieder_pricing_effective_applied"] = False
