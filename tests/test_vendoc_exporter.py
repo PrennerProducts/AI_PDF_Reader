@@ -27,6 +27,7 @@ from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 from parser import parse_document_text
 from structured_parser import extract_line_items
 from main import _build_amount_line_rows, _build_line_item_rows, _parse_eu_decimal
+from extractor import extract_pdf_text
 
 
 def _write_png(path: Path) -> bytes:
@@ -665,6 +666,65 @@ def test_vendoc_payload_exports_schachermayer_basis_unit_and_discounted_purchase
     assert payload["positions"][0]["purchase_price"] == 110.09
 
 
+def test_vendoc_payload_exports_schlotterer_group_discount_purchase_and_prefixed_aggregate() -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf"
+    text = extract_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+
+    payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 681,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": parsed["document_date"],
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "net_total": _parse_eu_decimal(parsed["totals"]["net_total"]),
+                "vat_total": _parse_eu_decimal(parsed["totals"]["vat_total"]),
+                "gross_total": _parse_eu_decimal(parsed["totals"]["gross_total"]),
+                "apply_pricing_adjustments": True,
+            },
+            "line_items": rows,
+            "images": [],
+        }
+    )
+
+    first = payload["positions"][0]
+    appended_alternative = payload["positions"][-1]
+    assert first["description_short"] == "Raff S"
+    assert first["unit_price"] == 918.04
+    assert first["purchase_price"] == 473.68
+    assert payload["summary"]["alternative_position_count"] == 5
+    assert appended_alternative["description_short"] == "Vorsatzrollladen"
+    assert appended_alternative["is_alternative"] is True
+    assert appended_alternative["unit_price"] == 1049.96
+    assert appended_alternative["purchase_price"] == 1049.96
+    assert appended_alternative["source_line_item_id"].startswith("15:aggregate:alt:")
+
+    payload_without_adjustments = build_vendoc_payload(
+        {
+            "document": {
+                "id": 681,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": parsed["document_date"],
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "apply_pricing_adjustments": False,
+            },
+            "line_items": rows,
+            "images": [],
+        }
+    )
+    assert payload_without_adjustments["positions"][0]["unit_price"] == 918.04
+    assert payload_without_adjustments["positions"][0]["purchase_price"] == 473.68
+
+
 def test_vendoc_payload_can_skip_entholzer_sonderrabatt_for_stored_positions(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
@@ -856,6 +916,7 @@ def test_vendoc_payload_groups_appended_alternatives_by_description(tmp_path: Pa
     assert grouped["quantity"] == 10.0
     assert grouped["unit_price"] == 16.0
     assert grouped["purchase_price"] == 16.0
+    assert grouped["source_line_item_id"] == "77:aggregate:alt:1:holzart fichte 3 schicht verleimt"
     assert grouped["image_is_primary"] is False
 
 
@@ -1133,6 +1194,49 @@ def test_strip_prices_from_long_text_removes_customer_position_marker() -> None:
         [
             "B/H: 4000,0 x 2520,0",
             "Fixfenster 1flg",
+        ]
+    )
+
+
+def test_strip_prices_from_long_text_removes_schlotterer_footer_lines() -> None:
+    raw = "\n".join(
+        [
+            "RAFF S Putz",
+            "Breite:1200mm Höhe:1580mm",
+            "Geschäftsführung: Schlotterer Sonnenschutz Systeme GmbH T: +43 6245 855 91 0 Landesgericht Salzburg",
+            "DI Peter Gubisch 5421 Adnet, Seefeldmühle 67 b, Austria F: +43 6245 855 91 9100 FN212294y",
+            "Wolfgang Neutatz www.schlotterer.com M: office@schlotterer.at UID-Nr.: ATU 63513727",
+            "Farbe:lt. Schlotterer Kollektion",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw)
+
+    assert cleaned == "\n".join(
+        [
+            "RAFF S Putz",
+            "Breite:1200mm Höhe:1580mm",
+            "Farbe:lt. Schlotterer Kollektion",
+        ]
+    )
+
+
+def test_strip_prices_from_long_text_removes_position_table_row_with_price_pair() -> None:
+    raw = "\n".join(
+        [
+            "1 Hoppy 1 Raff S 918,04 918,04",
+            "RAFF S Putz",
+            "001 16,00 Stk. EI2-30C Tür 1050 x 2100 2.047,71 32.763,36",
+            "Serie: heroal D82FP",
+        ]
+    )
+
+    cleaned = _strip_prices_from_long_text(raw)
+
+    assert cleaned == "\n".join(
+        [
+            "RAFF S Putz",
+            "Serie: heroal D82FP",
         ]
     )
 

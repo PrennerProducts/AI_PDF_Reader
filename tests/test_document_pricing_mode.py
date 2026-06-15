@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 
-from db import _line_item_with_document_pricing_mode
+from db import _document_suppresses_position_images, _line_item_with_document_pricing_mode
 
 
 def test_document_pricing_mode_can_show_entholzer_basis_price() -> None:
@@ -75,3 +75,16 @@ def test_document_pricing_mode_can_show_schachermayer_basis_price() -> None:
     assert adjusted["line_total"] == Decimal("4803.84")
     assert adjusted["metadata_json"]["pricing_disabled_by_document"] is True
     assert adjusted["metadata_json"]["schachermayer_pricing_disabled_by_document"] is True
+
+
+def test_schlotterer_document_results_suppress_stored_position_images() -> None:
+    assert _document_suppresses_position_images(
+        {"supplier_name": "Schlotterer Sonnenschutz Systeme GmbH", "document_type": "angebot"}
+    )
+    assert _document_suppresses_position_images(
+        {"supplier_name": "Schlotterer Sonnenschutz Systeme GmbH", "document_type": "auftragsbestaetigung"}
+    )
+    assert not _document_suppresses_position_images(
+        {"supplier_name": "Schlotterer Sonnenschutz Systeme GmbH", "document_type": "rechnung"}
+    )
+    assert not _document_suppresses_position_images({"supplier_name": "Rieder", "document_type": "angebot"})

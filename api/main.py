@@ -517,6 +517,9 @@ def _postprocess_image_rows(
     if template == "schachermayer" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
         return []
 
+    if template == "schlotterer" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
+        return []
+
     if template == "koch" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
         return [
             row
@@ -1549,6 +1552,384 @@ def _apply_schachermayer_line_pricing_to_line_item_rows(rows: list[dict[str, Any
         _set_line_item_metadata(row, metadata)
 
 
+SCHLOTTERER_AMOUNT_PATTERN = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
+SCHLOTTERER_DISCOUNT_GROUP_RE = re.compile(
+    rf"^\s*(?P<label>[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9 /+._-]*?)\s+"
+    rf"(?P<base>{SCHLOTTERER_AMOUNT_PATTERN})\s+"
+    rf"(?P<percent>[0-9]+(?:[,.][0-9]+)?)\s*%\s+"
+    rf"(?P<amount>-?\s*{SCHLOTTERER_AMOUNT_PATTERN})",
+    flags=re.IGNORECASE,
+)
+
+
+def _is_schlotterer_unrebated_row(row: dict[str, Any], metadata: dict[str, Any]) -> bool:
+    description = " ".join(str(row.get(key) or "") for key in ("position_no", "lv_pos", "description_short")).lower()
+    return (
+        "auftragsinfo" in description
+        or "verpackungsbeitrag" in description
+        or "web erfasser" in description
+        or metadata.get("pricing_source") == "schlotterer_unrebated"
+    )
+
+
+def _schlotterer_normalized_key(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    text = (
+        text.replace("ä", "ae")
+        .replace("ö", "oe")
+        .replace("ü", "ue")
+        .replace("ß", "ss")
+    )
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split())
+
+
+def _schlotterer_group_key(label: str) -> str:
+    normalized = _schlotterer_normalized_key(label)
+    if "motor" in normalized:
+        return "motor"
+    if normalized.startswith("igi ") or normalized == "igi":
+        return "igi"
+    if "zubehoer" in normalized or "panzer" in normalized:
+        return "panzer"
+    return normalized
+
+
+def _parse_schlotterer_discount_groups(extracted_text: str | None) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    seen: set[tuple[str, Decimal, Decimal]] = set()
+    if not extracted_text:
+        return groups
+
+    for raw_line in extracted_text.splitlines():
+        line = re.sub(r"\s+", " ", raw_line.replace("\u00a0", " ")).strip()
+        if not line:
+            continue
+        match = SCHLOTTERER_DISCOUNT_GROUP_RE.match(line)
+        if not match:
+            continue
+        label = match.group("label").strip()
+        label_key = _schlotterer_normalized_key(label)
+        if label_key.startswith(("rabatte", "summe", "gesamt", "mwst", "unrabattierte")):
+            continue
+        base_amount = _parse_eu_decimal(match.group("base"))
+        percent = _parse_eu_decimal(match.group("percent"))
+        discount_amount = _parse_eu_decimal(match.group("amount"))
+        if base_amount is None or percent is None or discount_amount is None:
+            continue
+        discount_amount = -abs(discount_amount)
+        key = (label_key, base_amount, percent)
+        if key in seen:
+            continue
+        seen.add(key)
+        groups.append(
+            {
+                "label": label,
+                "key": _schlotterer_group_key(label),
+                "base_amount": base_amount,
+                "percent": percent,
+                "discount_amount": discount_amount,
+            }
+        )
+    return groups
+
+
+def _schlotterer_row_group_key(row: dict[str, Any], groups_by_key: dict[str, dict[str, Any]]) -> str | None:
+    description = _schlotterer_normalized_key(row.get("description_short"))
+    if not description:
+        return None
+    if "igi" in groups_by_key and description.startswith("igi"):
+        return "igi"
+    if "panzer" in groups_by_key and ("panzer" in description or "artikel mit bearbeitung" in description):
+        return "panzer"
+
+    for key in groups_by_key:
+        if key in {"motor", "igi", "panzer"}:
+            continue
+        if description == key or description.startswith(f"{key} ") or key.startswith(f"{description} "):
+            return key
+    return None
+
+
+def _schlotterer_component_total(
+    components: Any,
+    quantity: Decimal | None,
+    *,
+    group_key: str,
+) -> Decimal:
+    if not isinstance(components, list):
+        return Decimal("0.00")
+    multiplier = quantity if isinstance(quantity, Decimal) and quantity != 0 else Decimal("1")
+    total = Decimal("0.00")
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        label = _schlotterer_normalized_key(component.get("label"))
+        if group_key == "motor" and "motor" not in label:
+            continue
+        amount = _parse_eu_decimal(str(component.get("amount_raw") or ""))
+        if amount is None:
+            continue
+        total += amount * multiplier
+    return _money(total)
+
+
+def _schlotterer_operation_metadata(groups: list[dict[str, Any]]) -> list[dict[str, str]]:
+    return [
+        {
+            "line_type": "discount",
+            "percent": str(group["percent"]),
+            "label_raw": group["label"],
+        }
+        for group in groups
+    ]
+
+
+def _restore_line_item_snapshots(rows: list[dict[str, Any]], snapshots: list[dict[str, Any]]) -> None:
+    for index, snapshot in enumerate(snapshots):
+        rows[index].clear()
+        rows[index].update(snapshot)
+
+
+def _apply_schlotterer_discount_group_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+    extracted_text: str | None,
+) -> bool:
+    discount_groups = _parse_schlotterer_discount_groups(extracted_text)
+    if not discount_groups:
+        return False
+
+    groups_by_key = {group["key"]: group for group in discount_groups}
+    target_net = _net_total_from_amount_lines(amount_line_rows)
+    snapshots = [dict(row) for row in rows]
+    adjusted_non_alt_indexes: list[int] = []
+    operation_metadata = _schlotterer_operation_metadata(discount_groups)
+
+    for index, row in enumerate(rows):
+        line_total = row.get("line_total")
+        if not isinstance(line_total, Decimal):
+            continue
+        metadata = _line_item_metadata_dict(row)
+        if _is_schlotterer_unrebated_row(row, metadata):
+            continue
+
+        original_line_total = line_total
+        original_unit_price = row.get("unit_price")
+        quantity = row.get("quantity") if isinstance(row.get("quantity"), Decimal) else None
+        remaining_total = original_line_total
+        allocations: list[dict[str, Any]] = []
+        row_group_key = _schlotterer_row_group_key(row, groups_by_key)
+        row_group = groups_by_key.get(row_group_key or "")
+
+        motor_group = groups_by_key.get("motor")
+        if motor_group and row_group:
+            motor_total = _schlotterer_component_total(
+                metadata.get("schlotterer_pricing_components"),
+                quantity,
+                group_key="motor",
+            )
+            if motor_total > 0 and motor_total <= remaining_total + Decimal("0.01"):
+                remaining_total = _money(remaining_total - motor_total)
+                allocations.append({"group": motor_group, "original_total": motor_total})
+
+        if row_group and remaining_total > 0:
+            allocations.append({"group": row_group, "original_total": remaining_total})
+
+        if not allocations:
+            continue
+
+        adjusted_line_total = Decimal("0.00")
+        allocation_metadata: list[dict[str, str]] = []
+        for allocation in allocations:
+            group = allocation["group"]
+            original_total = allocation["original_total"]
+            factor = Decimal("1") - (group["percent"] / Decimal("100"))
+            adjusted_total = _money(original_total * factor)
+            adjusted_line_total += adjusted_total
+            allocation_metadata.append(
+                {
+                    "label": group["label"],
+                    "percent": str(group["percent"]),
+                    "original_total": str(original_total),
+                    "adjusted_total": str(adjusted_total),
+                }
+            )
+        adjusted_line_total = _money(adjusted_line_total)
+        row["line_total"] = adjusted_line_total
+        _update_row_unit_price_from_total(row)
+
+        metadata["pricing_adjustment_source"] = "schlotterer_discount_groups"
+        metadata["pricing_adjustments_applied"] = True
+        metadata["pricing_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata["pricing_original_unit_price"] = str(original_unit_price)
+        metadata["pricing_adjusted_line_total"] = str(adjusted_line_total)
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata["pricing_adjusted_unit_price"] = str(row["unit_price"])
+        metadata["pricing_operations"] = operation_metadata
+        metadata["schlotterer_pricing_applied"] = True
+        metadata["schlotterer_pricing_mode"] = "discount_groups"
+        metadata["schlotterer_discount_allocations"] = allocation_metadata
+        metadata["schlotterer_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata["schlotterer_original_unit_price"] = str(original_unit_price)
+        metadata["schlotterer_adjusted_line_total"] = str(adjusted_line_total)
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata["schlotterer_adjusted_unit_price"] = str(row["unit_price"])
+        metadata["schlotterer_pricing_operations"] = operation_metadata
+        _set_line_item_metadata(row, metadata)
+
+        if not bool(row.get("is_alternative")):
+            adjusted_non_alt_indexes.append(index)
+
+    if not adjusted_non_alt_indexes:
+        _restore_line_item_snapshots(rows, snapshots)
+        return False
+
+    if target_net is None:
+        return True
+
+    current_non_alt_total = sum(
+        (row.get("line_total") for row in rows if not bool(row.get("is_alternative")) and isinstance(row.get("line_total"), Decimal)),
+        Decimal("0.00"),
+    )
+    delta = _money(target_net - current_non_alt_total)
+    if abs(delta) > Decimal("0.25"):
+        _restore_line_item_snapshots(rows, snapshots)
+        return False
+    if delta == 0:
+        return True
+
+    target_row = rows[adjusted_non_alt_indexes[-1]]
+    if not isinstance(target_row.get("line_total"), Decimal):
+        _restore_line_item_snapshots(rows, snapshots)
+        return False
+    target_row["line_total"] = _money(target_row["line_total"] + delta)
+    _update_row_unit_price_from_total(target_row)
+    metadata = _line_item_metadata_dict(target_row)
+    metadata["pricing_rounding_delta"] = str(delta)
+    metadata["schlotterer_rounding_delta"] = str(delta)
+    metadata["pricing_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata["pricing_adjusted_unit_price"] = str(target_row["unit_price"])
+    metadata["schlotterer_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata["schlotterer_adjusted_unit_price"] = str(target_row["unit_price"])
+    _set_line_item_metadata(target_row, metadata)
+    return True
+
+
+def _apply_schlotterer_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+    extracted_text: str | None = None,
+) -> None:
+    if _apply_schlotterer_discount_group_pricing_to_line_item_rows(rows, amount_line_rows, extracted_text):
+        return
+
+    target_net = _net_total_from_amount_lines(amount_line_rows)
+    if target_net is None:
+        return
+
+    eligible_non_alt_indexes: list[int] = []
+    eligible_all_indexes: list[int] = []
+    unrebated_non_alt_total = Decimal("0.00")
+    for index, row in enumerate(rows):
+        line_total = row.get("line_total")
+        if not isinstance(line_total, Decimal):
+            continue
+        metadata = _line_item_metadata_dict(row)
+        is_unrebated = _is_schlotterer_unrebated_row(row, metadata)
+        if is_unrebated and not bool(row.get("is_alternative")):
+            unrebated_non_alt_total += line_total
+            continue
+        if is_unrebated:
+            continue
+        eligible_all_indexes.append(index)
+        if not bool(row.get("is_alternative")):
+            eligible_non_alt_indexes.append(index)
+
+    eligible_non_alt_total = sum((rows[index].get("line_total") for index in eligible_non_alt_indexes), Decimal("0.00"))
+    if eligible_non_alt_total <= 0:
+        return
+    adjusted_eligible_target = target_net - unrebated_non_alt_total
+    if adjusted_eligible_target <= 0:
+        return
+    if abs((eligible_non_alt_total + unrebated_non_alt_total) - target_net) <= Decimal("0.01"):
+        return
+
+    factor = adjusted_eligible_target / eligible_non_alt_total
+    if factor <= 0 or factor > Decimal("2"):
+        return
+
+    discount_percent = _money((Decimal("1") - factor) * Decimal("100"))
+    operation_metadata = [
+        {
+            "line_type": "discount" if discount_percent >= 0 else "surcharge",
+            "percent": str(abs(discount_percent)),
+            "label_raw": "Schlotterer Effektivrabatt aus Nettosumme",
+        }
+    ]
+
+    rounding_candidates: list[int] = []
+    for index in eligible_all_indexes:
+        row = rows[index]
+        line_total = row.get("line_total")
+        if not isinstance(line_total, Decimal):
+            continue
+        original_line_total = line_total
+        original_unit_price = row.get("unit_price")
+        adjusted_line_total = _money(original_line_total * factor)
+        row["line_total"] = adjusted_line_total
+        _update_row_unit_price_from_total(row)
+
+        metadata = _line_item_metadata_dict(row)
+        metadata["pricing_adjustment_source"] = "schlotterer_effective_discount"
+        metadata["pricing_adjustments_applied"] = True
+        metadata["pricing_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata["pricing_original_unit_price"] = str(original_unit_price)
+        metadata["pricing_adjusted_line_total"] = str(adjusted_line_total)
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata["pricing_adjusted_unit_price"] = str(row["unit_price"])
+        metadata["pricing_operations"] = operation_metadata
+        metadata["schlotterer_pricing_applied"] = True
+        metadata["schlotterer_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata["schlotterer_original_unit_price"] = str(original_unit_price)
+        metadata["schlotterer_adjusted_line_total"] = str(adjusted_line_total)
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata["schlotterer_adjusted_unit_price"] = str(row["unit_price"])
+        metadata["schlotterer_pricing_operations"] = operation_metadata
+        metadata["schlotterer_effective_discount_factor"] = str(factor.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP))
+        _set_line_item_metadata(row, metadata)
+
+        if index in eligible_non_alt_indexes:
+            rounding_candidates.append(index)
+
+    adjusted_non_alt_total = sum((rows[index].get("line_total") for index in eligible_non_alt_indexes), Decimal("0.00"))
+    delta = _money(adjusted_eligible_target - adjusted_non_alt_total)
+    if not rounding_candidates or delta == 0 or abs(delta) > Decimal("0.10"):
+        return
+
+    target_row = rows[rounding_candidates[-1]]
+    if not isinstance(target_row.get("line_total"), Decimal):
+        return
+    target_row["line_total"] = _money(target_row["line_total"] + delta)
+    _update_row_unit_price_from_total(target_row)
+    metadata = _line_item_metadata_dict(target_row)
+    metadata["pricing_rounding_delta"] = str(delta)
+    metadata["schlotterer_rounding_delta"] = str(delta)
+    metadata["pricing_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata["pricing_adjusted_unit_price"] = str(target_row["unit_price"])
+    metadata["schlotterer_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata["schlotterer_adjusted_unit_price"] = str(target_row["unit_price"])
+    _set_line_item_metadata(target_row, metadata)
+
+
 def _build_line_item_rows(
     extracted_text: str,
     template: str,
@@ -1639,6 +2020,8 @@ def _build_line_item_rows(
             metadata["image_required"] = bool(item.get("image_required"))
         if "image_auto_match_allowed" in item:
             metadata["image_auto_match_allowed"] = bool(item.get("image_auto_match_allowed"))
+        if "alternative_append_at_end" in item:
+            metadata["alternative_append_at_end"] = bool(item.get("alternative_append_at_end"))
         for key in (
             "pricing_source",
             "manual_price_editable",
@@ -1647,6 +2030,7 @@ def _build_line_item_rows(
             "delivery_charge_printed_total",
             "delivery_charge_fallback",
             "delivery_charge_lines",
+            "schlotterer_pricing_components",
         ):
             if key in item:
                 metadata[key] = item.get(key)
@@ -1682,6 +2066,8 @@ def _build_line_item_rows(
         _apply_koch_pricing_to_line_item_rows(rows, amount_line_rows)
     elif template == "schachermayer":
         _apply_schachermayer_line_pricing_to_line_item_rows(rows)
+    elif template == "schlotterer":
+        _apply_schlotterer_pricing_to_line_item_rows(rows, amount_line_rows, extracted_text=extracted_text)
     return rows
 
 

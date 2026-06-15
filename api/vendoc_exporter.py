@@ -22,6 +22,10 @@ POSITION_HEADER_UNLABELED_PRICE_PAIR_PATTERN = re.compile(
     rf"^(?P<prefix>\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d{{1,4}})?\s*{POSITION_UNIT_PATTERN}\b(?:\s+|$).+?)\s+{MONEY_NUMBER_PATTERN}\s+{MONEY_NUMBER_PATTERN}\s*$",
     re.IGNORECASE,
 )
+POSITION_TABLE_ROW_PRICE_PAIR_PATTERN = re.compile(
+    rf"^\s*\d+[A-Za-z]?\s+(?=.+[A-Za-zÄÖÜäöüß])(?=.+\s{MONEY_NUMBER_PATTERN}\s+{MONEY_NUMBER_PATTERN}\s*$).*$",
+    re.IGNORECASE,
+)
 POSITION_QUANTITY_PREFIX_PATTERN = re.compile(
     rf"^\s*(?:\d+[A-Za-z]?\s+)?(?P<quantity>[0-9]+(?:[.,][0-9]+)?)\s*(?P<unit>{POSITION_UNIT_PATTERN})(?:\s+|$)(?P<rest>.*)$",
     re.IGNORECASE,
@@ -167,6 +171,49 @@ def _strip_position_quantity_from_first_line(
     return [rest, *lines[1:]]
 
 
+def _is_long_text_noise_line(text: str) -> bool:
+    lower = text.lower().strip()
+    if not lower:
+        return True
+    if lower.startswith(
+        (
+            "geschäftsführung:",
+            "geschaeftsfuehrung:",
+            "di peter gubisch",
+            "wolfgang neutatz",
+            "angebot:",
+            "auftragsbestätigung:",
+            "auftragsbestaetigung:",
+            "auftragsnummer:",
+            "pos-nr.",
+            "zahlungskonditionen:",
+            "gesamtpreis positionen",
+            "gesamt nettosumme",
+            "rabatte:",
+            "zwischensumme",
+            "mwst",
+            "gesamtsumme",
+            "summe:",
+        )
+    ):
+        return True
+    return any(
+        token in lower
+        for token in (
+            "wert/stück",
+            "wert gesamt",
+            "landesgericht",
+            "fn212294",
+            "uid-nr",
+            "www.schlotterer",
+            "office@schlotterer",
+            "schlotterer sonnenschutz systeme gmbh",
+            "5421 adnet, seefeldmühle",
+            "5421 adnet, seefeldmuehle",
+        )
+    )
+
+
 def _strip_prices_from_long_text(
     text: str | None,
     *,
@@ -181,6 +228,10 @@ def _strip_prices_from_long_text(
         line = original_line.strip()
         if not line:
             continue
+        if POSITION_TABLE_ROW_PRICE_PAIR_PATTERN.match(line):
+            continue
+        if _is_long_text_noise_line(line):
+            continue
         if ALTERNATIVE_LINE_PATTERN.match(line):
             continue
         sanitized = _strip_price_tokens(line)
@@ -188,6 +239,8 @@ def _strip_prices_from_long_text(
         if not sanitized:
             continue
         sanitized = _normalize_inline_spacing(sanitized)
+        if _is_long_text_noise_line(sanitized):
+            continue
         if EMPTY_ALTERNATIVE_LABEL_PATTERN.match(sanitized):
             continue
         if CUSTOMER_POSITION_LINE_PATTERN.match(sanitized):
@@ -259,7 +312,7 @@ def _metadata_price_value(metadata: dict[str, Any], keys: tuple[str, ...]) -> fl
 
 
 def _pricing_provider_keys(metadata: dict[str, Any]) -> tuple[str, ...]:
-    provider_keys = ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer"]
+    provider_keys = ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"]
     return tuple(provider for provider in provider_keys if metadata.get(f"{provider}_pricing_applied"))
 
 
@@ -366,13 +419,14 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
             adjusted["purchase_price"] = current_unit_price
         return adjusted
 
+    provider_keys = ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer")
     original_line_total = None
-    for key in ("pricing_original_line_total", "rieder_original_line_total", "entholzer_original_line_total"):
+    for key in ("pricing_original_line_total", *(f"{provider}_original_line_total" for provider in provider_keys)):
         original_line_total = _to_float(metadata.get(key))
         if original_line_total is not None:
             break
     original_unit_price = None
-    for key in ("pricing_original_unit_price", "rieder_original_unit_price", "entholzer_original_unit_price"):
+    for key in ("pricing_original_unit_price", *(f"{provider}_original_unit_price" for provider in provider_keys)):
         original_unit_price = _to_float(metadata.get(key))
         if original_unit_price is not None:
             break
@@ -387,7 +441,7 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
         adjusted["purchase_price"] = current_unit_price
     metadata["pricing_effective_applied"] = False
     metadata["pricing_disabled_by_document"] = True
-    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer"):
+    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"):
         if metadata.get(f"{provider_key}_pricing_applied"):
             metadata[f"{provider_key}_pricing_effective_applied"] = False
             metadata[f"{provider_key}_pricing_disabled_by_document"] = True
@@ -513,7 +567,7 @@ def _money_sum(values: list[float | None]) -> float | None:
 
 def _clear_pricing_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     cleaned = dict(metadata)
-    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer"):
+    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"):
         for suffix in (
             "original_unit_price",
             "original_line_total",
@@ -719,7 +773,11 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         ]
 
         aggregate = dict(first)
-        parent_source_line_item_id = _embedded_parent_source_line_item_id(first)
+        parent_source_line_item_id = (
+            _embedded_parent_source_line_item_id(first)
+            or _to_str(first.get("id"))
+            or _to_str(first.get("position_no"))
+        )
         aggregate_source_line_item_id = _aggregate_source_line_item_id(
             parent_source_line_item_id=parent_source_line_item_id,
             aggregate_kind="alt",

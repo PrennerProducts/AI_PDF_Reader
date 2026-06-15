@@ -15299,6 +15299,16 @@
           "schachermayer_rounding_delta",
           "schachermayer_pricing_effective_applied",
           "schachermayer_pricing_disabled_by_document",
+          "schlotterer_original_line_total",
+          "schlotterer_original_unit_price",
+          "schlotterer_adjusted_line_total",
+          "schlotterer_adjusted_unit_price",
+          "schlotterer_pricing_applied",
+          "schlotterer_pricing_operations",
+          "schlotterer_rounding_delta",
+          "schlotterer_pricing_effective_applied",
+          "schlotterer_pricing_disabled_by_document",
+          "schlotterer_effective_discount_factor",
           "source",
           "extraction_source",
           "manual_edit",
@@ -16163,12 +16173,57 @@
         .trim();
     }
 
+    function isPositionTableRowWithPricePair(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return false;
+      const money = "\\d{1,3}(?:[ .]\\d{3})*,\\d{2}";
+      return new RegExp(`^\\s*\\d+[A-Za-z]?\\s+(?=.*[A-Za-zÄÖÜäöüß])(?=.*\\s${money}\\s+${money}\\s*$).*$`, "i").test(raw);
+    }
+
     function isEmptyAlternativeLabel(value) {
       return /^\s*Alternativ(?:e|position)?\s*:?\s*$/i.test(String(value || ""));
     }
 
     function isAlternativeTextLine(value) {
       return /^\s*Alternativ(?:e|position)?\s*:/i.test(String(value || ""));
+    }
+
+    function isPositionLongTextNoiseLine(value) {
+      const lower = String(value || "").trim().toLowerCase();
+      if (!lower) return true;
+      if (
+        lower.startsWith("geschäftsführung:")
+        || lower.startsWith("geschaeftsfuehrung:")
+        || lower.startsWith("di peter gubisch")
+        || lower.startsWith("wolfgang neutatz")
+        || lower.startsWith("angebot:")
+        || lower.startsWith("auftragsbestätigung:")
+        || lower.startsWith("auftragsbestaetigung:")
+        || lower.startsWith("auftragsnummer:")
+        || lower.startsWith("pos-nr.")
+        || lower.startsWith("zahlungskonditionen:")
+        || lower.startsWith("gesamtpreis positionen")
+        || lower.startsWith("gesamt nettosumme")
+        || lower.startsWith("rabatte:")
+        || lower.startsWith("zwischensumme")
+        || lower.startsWith("mwst")
+        || lower.startsWith("gesamtsumme")
+        || lower.startsWith("summe:")
+      ) {
+        return true;
+      }
+      return [
+        "wert/stück",
+        "wert gesamt",
+        "landesgericht",
+        "fn212294",
+        "uid-nr",
+        "www.schlotterer",
+        "office@schlotterer",
+        "schlotterer sonnenschutz systeme gmbh",
+        "5421 adnet, seefeldmühle",
+        "5421 adnet, seefeldmuehle",
+      ].some((token) => lower.includes(token));
     }
 
     function normalizedPositionUnit(value) {
@@ -16215,9 +16270,11 @@
       if (!raw) return "";
       const lines = raw
         .split(/\r?\n/)
+        .filter((line) => !isPositionTableRowWithPricePair(line))
+        .filter((line) => !isPositionLongTextNoiseLine(line))
         .filter((line) => !isAlternativeTextLine(line))
         .map((line) => normalizePositionTextSpacing(stripUnlabeledPositionHeaderPrices(stripAlternativePriceTokens(line))))
-        .filter((line) => line && !isEmptyAlternativeLabel(line));
+        .filter((line) => line && !isEmptyAlternativeLabel(line) && !isPositionLongTextNoiseLine(line));
       return stripLeadingPositionQuantityLine(lines, item)
         .join("\n");
     }
@@ -16382,7 +16439,7 @@
 
     function pricingProviderKeys(source) {
       const metadata = source && typeof source === "object" ? source : {};
-      return ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
+      return ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
     }
 
     function roundedMoneyNumber(value) {
@@ -16500,7 +16557,7 @@
 
     function clearPricingMetadataForUi(metadata) {
       const cleaned = { ...(metadata && typeof metadata === "object" ? metadata : {}) };
-      ["pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer"].forEach((provider) => {
+      ["pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"].forEach((provider) => {
         [
           "original_unit_price",
           "original_line_total",
@@ -16752,6 +16809,7 @@
         || source.rekord_vomp_pricing_disabled_by_document
         || source.koch_pricing_disabled_by_document
         || source.schachermayer_pricing_disabled_by_document
+        || source.schlotterer_pricing_disabled_by_document
       );
       const adjustedTotal = firstMetadataNumber(source, [
         "pricing_adjusted_line_total",
@@ -16760,6 +16818,7 @@
         "rekord_vomp_adjusted_line_total",
         "koch_adjusted_line_total",
         "schachermayer_adjusted_line_total",
+        "schlotterer_adjusted_line_total",
       ]);
       const adjustedUnit = firstMetadataNumber(source, [
         "pricing_adjusted_unit_price",
@@ -16768,6 +16827,7 @@
         "rekord_vomp_adjusted_unit_price",
         "koch_adjusted_unit_price",
         "schachermayer_adjusted_unit_price",
+        "schlotterer_adjusted_unit_price",
       ]);
       if (pricingDisabled) {
         const disabledParts = [];
@@ -16792,6 +16852,7 @@
         "rekord_vomp_original_line_total",
         "koch_original_line_total",
         "schachermayer_original_line_total",
+        "schlotterer_original_line_total",
       ]);
       const originalUnit = firstMetadataNumber(source, [
         "pricing_original_unit_price",
@@ -16800,6 +16861,7 @@
         "rekord_vomp_original_unit_price",
         "koch_original_unit_price",
         "schachermayer_original_unit_price",
+        "schlotterer_original_unit_price",
       ]);
       const parts = [];
       if (originalTotal !== null && (currentTotal === null || Math.abs(originalTotal - currentTotal) > 0.005)) {

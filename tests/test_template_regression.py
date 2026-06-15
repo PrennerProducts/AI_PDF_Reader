@@ -1114,6 +1114,83 @@ def test_schlotterer_regression() -> None:
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
 
 
+def test_schlotterer_long_text_images_alternatives_and_pricing_are_clean(tmp_path: Path) -> None:
+    pdf_paths = [
+        ROOT / "samples/pdfs/regression/offers/schlotterer/Angebot_Schlotterer.pdf",
+        ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf",
+        ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_schlotterer3.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/Auftragsbestaetigung_260012068_Kreisern_Version_1.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/Auftragsbestaetigung_260014367_Rendl Franz_Version_1.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schlotterer/Auftragsbestaetigung_260015417_Libiseller_Version_1.pdf",
+    ]
+    row_header = re.compile(r"(?m)^\s*\d+\s+.+\s+\d+\s+[A-Za-zÄÖÜäöüß].*\d{1,3}(?:[. ][0-9]{3})*,\d{2}\s*$")
+    trailing_price = re.compile(r"(?m)(?:^|\s)\d{1,3}(?:[. ][0-9]{3})*,\d{2}\s*$")
+
+    for pdf_path in pdf_paths:
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+        amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+        line_rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+        filtered_images = _postprocess_image_rows(
+            extract_pdf_images(pdf_path, tmp_path / pdf_path.stem),
+            template=parsed["template"],
+            document_type=parsed["document_type"],
+            extracted_text=text,
+        )
+
+        assert parsed["template"] == "schlotterer"
+        assert filtered_images == []
+        assert sum((row.get("line_total") or Decimal("0.00") for row in line_rows if not row.get("is_alternative")), Decimal("0.00")) == _decimal_amount(parsed["totals"]["net_total"])
+
+        for item in items:
+            description_long = item["description_long"]
+            assert item["image_required"] is False
+            assert item["image_auto_match_allowed"] is False
+            assert not row_header.search(description_long)
+            assert "Geschäftsführung:" not in description_long
+            assert "Grundpreis:" not in description_long
+            assert "Pos-Nr." not in description_long
+            for line in description_long.splitlines():
+                assert not (line.startswith("-") and trailing_price.search(line))
+
+    text = _read_pdf_text(ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf")
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    item_by_pos = {item["position_no"]: item for item in items}
+    assert [position for position, item in item_by_pos.items() if item["is_alternative"]] == ["15", "16", "17", "18", "19"]
+    assert all(item_by_pos[position]["alternative_append_at_end"] is True for position in ["15", "16", "17", "18", "19"])
+
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    rows = _build_line_item_rows(
+        text,
+        parsed["template"],
+        source_path=ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf",
+        amount_line_rows=amount_rows,
+    )
+    first_metadata = json.loads(rows[0]["metadata_json"])
+    packaging = next(row for row in rows if row["description_short"] == "Verpackungsbeitrag")
+    assert first_metadata["schlotterer_pricing_applied"] is True
+    assert first_metadata["pricing_adjustment_source"] == "schlotterer_discount_groups"
+    assert first_metadata["schlotterer_original_unit_price"] == "918.04"
+    assert first_metadata["schlotterer_adjusted_unit_price"] == "473.68"
+    assert first_metadata["schlotterer_discount_allocations"] == [
+        {
+            "label": "Raffstorenmotor eingebaut",
+            "percent": "50.00",
+            "original_total": "185.00",
+            "adjusted_total": "92.50",
+        },
+        {
+            "label": "Raff S",
+            "percent": "48.00",
+            "original_total": "733.04",
+            "adjusted_total": "381.18",
+        },
+    ]
+    assert json.loads(packaging["metadata_json"]).get("schlotterer_pricing_applied") is None
+
+
 def test_rieder_ab_reference_regression() -> None:
     pdf_path = ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/rieder/131584_Sevignani, zu 130629_3.pdf"
     text = _read_pdf_text(pdf_path)

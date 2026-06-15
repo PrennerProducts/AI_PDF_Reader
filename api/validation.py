@@ -103,6 +103,7 @@ def _item_prices_include_adjustments(item: dict[str, Any]) -> bool:
         or metadata.get("rekord_vomp_pricing_disabled_by_document")
         or metadata.get("koch_pricing_disabled_by_document")
         or metadata.get("schachermayer_pricing_disabled_by_document")
+        or metadata.get("schlotterer_pricing_disabled_by_document")
     ):
         return False
     return bool(
@@ -112,6 +113,7 @@ def _item_prices_include_adjustments(item: dict[str, Any]) -> bool:
         or metadata.get("rekord_vomp_pricing_applied")
         or metadata.get("koch_pricing_applied")
         or metadata.get("schachermayer_pricing_applied")
+        or metadata.get("schlotterer_pricing_applied")
     )
 
 

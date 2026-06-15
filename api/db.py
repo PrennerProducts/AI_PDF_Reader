@@ -1779,6 +1779,12 @@ def _dedupe_ints(values: list[int]) -> list[int]:
     return result
 
 
+def _document_suppresses_position_images(document: dict[str, Any]) -> bool:
+    supplier_name = str(document.get("supplier_name") or "").strip().lower()
+    document_type = str(document.get("document_type") or "").strip().lower()
+    return "schlotterer" in supplier_name and document_type in {"angebot", "auftragsbestaetigung"}
+
+
 def get_document_result(document_id: int) -> dict[str, Any] | None:
     document = get_document(document_id)
     if not document:
@@ -1849,7 +1855,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             (document_id,),
         ).fetchall()
 
-    image_list = [dict(row) for row in images]
+    image_list = [] if _document_suppresses_position_images(document) else [dict(row) for row in images]
     hash_pages: dict[str, set[int]] = {}
     images_by_page: dict[int, list[dict[str, Any]]] = {}
     for image in image_list:
