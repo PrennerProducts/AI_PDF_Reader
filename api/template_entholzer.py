@@ -67,6 +67,11 @@ def _clean_description_lines(block_lines: list[str]) -> list[str]:
         if normalized.lower() == "(symbolfoto)":
             continue
         normalized = EMPTY_PRICE_HEADER_RE.sub("", normalized).strip()
+        price_remainder = PRICE_PAIR_RE.sub("", normalized)
+        price_remainder = re.sub(r"\b(?:EP|GP)\s*:", "", price_remainder, flags=re.IGNORECASE)
+        price_remainder = re.sub(r"(?:EUR|\u20ac)", "", price_remainder, flags=re.IGNORECASE).strip(" :,-")
+        if not price_remainder:
+            continue
         if normalized:
             cleaned.append(normalized)
     return cleaned
@@ -94,11 +99,11 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         )
         if not block_lines:
             continue
-        block_lines = _clean_description_lines(block_lines)
-        if not block_lines:
+        description_lines = _clean_description_lines(block_lines)
+        if not description_lines:
             continue
 
-        block_text = "\n".join(block_lines)
+        block_text = "\n".join(description_lines)
         qty_match = re.search(
             r"([0-9]+(?:[.,][0-9]+)?)\s*(Stk\.?|Stk|St[ue\u00fc]ck|LFM|lfm)\b",
             block_text,
@@ -113,7 +118,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         is_alternative = "alternativ" in block_text.lower()
 
         description_short = extract_first_description(
-            block_lines,
+            description_lines,
             skip_prefixes=(
                 "lv-pos:",
                 "ep:",

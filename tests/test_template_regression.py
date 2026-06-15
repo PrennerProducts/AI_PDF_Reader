@@ -255,6 +255,9 @@ def test_entholzer_processing_applies_sonderrabatt_to_positions() -> None:
     position_two = rows_by_pos["2"]
     metadata = json.loads(position_two["metadata_json"])
 
+    assert "751,44 €" not in position_two["description_long"]
+    assert "EP:" not in position_two["description_long"]
+    assert "GP:" not in position_two["description_long"]
     assert position_two["unit_price"] == Decimal("676.30")
     assert position_two["line_total"] == Decimal("676.30")
     assert metadata["entholzer_original_unit_price"] == "751.44"
