@@ -29,7 +29,12 @@ TOTAL_LINE_RE = re.compile(
     r"([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})\)?",
     flags=re.IGNORECASE,
 )
-LEADING_DIAGRAM_MARKERS_RE = re.compile(r"^(?:[0-9]+(?:\.[0-9]+)?\s+){1,3}(?=[A-Za-zÄÖÜäöüß])")
+AMOUNT_RE = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
+TRAILING_PRICE_RE = re.compile(rf"\s+(?:EUR|\u20ac)?\s*{AMOUNT_RE}\s*(?:EUR|\u20ac)?$", flags=re.IGNORECASE)
+QUANTITY_ONLY_RE = re.compile(r"^[0-9]+(?:[.,][0-9]+)?\s*(?:St[üu]ck|Stk\.?|PA|lfm|m²|m)?$", flags=re.IGNORECASE)
+LEADING_DESCRIPTOR_RE = re.compile(
+    r"(?i)\b(?:\d+tlg\.|kunststoff|element|fenster|balkontüre|hebeschiebetür|nebentüre|türe|serie:|beschlag:|ram:|xx-|summ-)"
+)
 STRUCTURE_MARKER_RE = re.compile(
     r"(?<!\n)(Alternative:|Arch\.-Pos\.:|Pos\.\s*[0-9]+(?:\.[0-9]+)?\s+[0-9]+(?:[.,][0-9]+)?\s+St[üu]ck|Summe der Positionen)",
     flags=re.IGNORECASE,
@@ -202,13 +207,60 @@ def _extract_description_short(block_lines: list[str], arch_pos: str | None) -> 
             "alternative:",
             "arch.-pos.:",
         ),
-        preferred_words=("kunststoff", "fenster", "balkontüre", "element", "lieferung", "umfang"),
+        preferred_words=("hebeschiebetür", "kunststoff", "fenster", "balkontüre", "nebentüre", "element", "lieferung", "umfang"),
     )
     if description:
-        description = LEADING_DIAGRAM_MARKERS_RE.sub("", description).strip()
+        description = _strip_leading_diagram_markers(description)
     if description:
         return description
     return arch_pos
+
+
+def _strip_leading_diagram_markers(line: str) -> str:
+    normalized = normalize_line(line)
+    match = LEADING_DESCRIPTOR_RE.search(normalized)
+    if match and match.start() > 0:
+        prefix = normalized[: match.start()]
+        if re.fullmatch(r"[\d\s.,/]+", prefix):
+            return normalized[match.start() :].strip()
+    return normalized
+
+
+def _clean_description_line(line: str) -> str | None:
+    normalized = normalize_line(line)
+    if not normalized:
+        return None
+    lower = normalized.lower()
+    if POSITION_RE.match(normalized):
+        return None
+    if lower.startswith(("arch.-pos.:", "alternative:", "übertrag", "(zu pos")):
+        return None
+    if lower in {"position stück menge preis", "skizze bezeichnung - € -", "skizze bezeichnung - eur -"}:
+        return None
+    if "skizze" in lower and "bezeichnung" in lower:
+        return None
+    if lower.startswith("gesamt ") or TOTAL_LINE_RE.search(normalized):
+        return None
+
+    cleaned = _strip_leading_diagram_markers(normalized)
+    cleaned = TRAILING_PRICE_RE.sub("", cleaned).strip()
+    if not re.search(r"[A-Za-zÄÖÜäöüß]", cleaned):
+        return None
+    if not cleaned or QUANTITY_ONLY_RE.fullmatch(cleaned):
+        return None
+    return cleaned
+
+
+def _clean_description_lines(block_lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for line in block_lines:
+        normalized = _clean_description_line(line)
+        if not normalized:
+            continue
+        if cleaned and cleaned[-1].lower() == normalized.lower():
+            continue
+        cleaned.append(normalized)
+    return cleaned
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:
@@ -258,10 +310,9 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         if quantity_value not in {None, Decimal("0")} and line_total_value is not None:
             unit_price_raw = _format_eu_decimal(line_total_value / quantity_value)
 
-        description_short = _extract_description_short(block_lines[1:], arch_pos)
-        description_long = block_joined[:8000]
-        if arch_pos and arch_pos not in description_long:
-            description_long = f"Arch.-Pos.: {arch_pos}\n{description_long}"[:8000]
+        description_lines = _clean_description_lines(block_lines)
+        description_short = _extract_description_short(description_lines, arch_pos)
+        description_long = "\n".join(description_lines)[:8000]
 
         items.append(
             {

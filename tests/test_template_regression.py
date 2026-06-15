@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import subprocess
 from decimal import Decimal
@@ -446,6 +447,36 @@ def test_rekord_vomp_processing_applies_discounts_and_delivery_rules() -> None:
         assert metadata["rekord_vomp_original_line_total"] is not None
         assert metadata["rekord_vomp_pricing_operations"][0]["percent"] == "39.00"
 
+        if filename == "Angebot_VAX60326.pdf":
+            relevant_amount_rows = [
+                (row["line_type"], row["label_raw"], row.get("percent"), row["amount"])
+                for row in amount_rows
+                if row["line_type"] in {"subtotal", "discount", "net_total"}
+            ]
+            assert relevant_amount_rows == [
+                ("subtotal", "Summe der Positionen 43.343,19", None, Decimal("43343.19")),
+                ("discount", "Händlerrabatt -39,00 % -16.903,84", Decimal("39.00"), Decimal("-16903.84")),
+                ("discount", "Zusatzrabatt -15,00 % -3.965,90", Decimal("15.00"), Decimal("-3965.90")),
+                ("net_total", "Summe Netto 22.473,45", None, Decimal("22473.45")),
+            ]
+            subtotal_after_dealer_discount = Decimal("43343.19") + Decimal("-16903.84")
+            assert subtotal_after_dealer_discount == Decimal("26439.35")
+            assert subtotal_after_dealer_discount + Decimal("-3965.90") == Decimal("22473.45")
+            assert metadata["rekord_vomp_pricing_operations"] == [
+                {
+                    "line_type": "discount",
+                    "percent": "39.00",
+                    "label_raw": "Händlerrabatt -39,00 % -16.903,84",
+                },
+                {
+                    "line_type": "discount",
+                    "percent": "15.00",
+                    "label_raw": "Zusatzrabatt -15,00 % -3.965,90",
+                },
+            ]
+            assert metadata["rekord_vomp_original_line_total"] == "4028.95"
+            assert metadata["rekord_vomp_adjusted_line_total"] == "2089.01"
+
         validation = build_document_validation(
             document={
                 "supplier_name": parsed["supplier_name"],
@@ -467,6 +498,38 @@ def test_rekord_vomp_processing_applies_discounts_and_delivery_rules() -> None:
         assert validation["status"] == "auto_accept"
         assert validation["totals"]["component_check_mode"] == "rekord_vomp_adjusted_positions"
         assert validation["totals"]["component_sum_matches_net"] is True
+
+
+def test_rekord_vomp_long_text_strips_position_headers_and_prices() -> None:
+    amount_at_line_end = re.compile(
+        r"(?m)\b[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}\s*$|\b[0-9]+,[0-9]{2}\s*$"
+    )
+    forbidden_fragments = (
+        "Position Stück Menge Preis",
+        "Skizze Bezeichnung",
+        "Übertrag",
+        "€",
+        " EUR",
+    )
+
+    for filename in ("Angebot_VAX53456.pdf", "Angebot_VAX60326.pdf", "VAX30295.pdf"):
+        pdf_path = ROOT / "samples/pdfs/regression/offers/rekord_vomp" / filename
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+        item_by_pos = {item["position_no"]: item for item in items}
+
+        for item in items:
+            description_long = item["description_long"]
+            for line in description_long.splitlines():
+                assert not line.startswith("Pos.")
+                assert not line.startswith("Gesamt ")
+            assert all(fragment not in description_long for fragment in forbidden_fragments)
+            assert not amount_at_line_end.search(description_long)
+
+        if filename == "Angebot_VAX60326.pdf":
+            assert item_by_pos["8"]["description_short"] == "2tlg.Hebeschiebetür Schema A"
+            assert "9.681,56" not in item_by_pos["8"]["description_long"]
 
 
 def test_sr_schauraum_compact_extractor_regression() -> None:
