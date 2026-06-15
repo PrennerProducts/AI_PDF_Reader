@@ -576,6 +576,8 @@ def test_alu_one_a2602224mc_regression() -> None:
     _assert_totals(parsed, ("€ 11.807,99", "€ 2.361,60", "€ 14.169,59"))
     assert len(items) == 9
     assert items[0]["description_short"] == "Türelement 1850 mm x 2450 mm 43.51.11 W"
+    assert "001 1,00 Stk" not in items[0]["description_long"]
+    assert "€ 3.334,05" not in items[0]["description_long"]
     assert items[4]["description_short"].startswith("Aufpreis von 3-fach verriegelndes")
     assert items[5]["is_alternative"] is True
     assert items[-1]["position_no"] == "008"
@@ -598,6 +600,9 @@ def test_alu_one_c2509283tb_regression() -> None:
     _assert_totals(parsed, ("€ 16.984,29", "€ 3.396,86", "€ 20.381,15"))
     assert len(items) == 9
     assert items[0]["description_short"] == "Vorbemerkungen"
+    assert "000 1,00 Stk" not in items[0]["description_long"]
+    assert "€ 0,00" not in items[0]["description_long"]
+    assert "Gerichtsstand" not in items[1]["description_long"]
     assert items[1]["width_raw"] == "2650"
     assert items[1]["height_raw"] == "2700"
     assert items[-1]["description_short"] == "AZ - Glasauschnitt"
@@ -639,6 +644,58 @@ Bruttobetrag € 20.381,15
     _assert_totals(parsed, ("€ 16.984,29", "€ 3.396,86", "€ 20.381,15"))
     assert len(items) == 2
     assert items[1]["description_short"] == "Türelement 2650 mm x 2700 mm"
+
+
+def test_alu_one_candidate_2400061_positions_and_amount_lines() -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/alu_one/Angebot 2400061DL-1_i.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    line_rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+    item_by_pos = {item["position_no"]: item for item in items}
+    row_by_pos = {row["position_no"]: row for row in line_rows}
+
+    assert parsed["document_number"] == "2400061DL-1"
+    assert len(items) == 32
+    assert item_by_pos["014-1"]["is_alternative"] is False
+    assert item_by_pos["013A"]["is_alternative"] is True
+    assert item_by_pos["990c-202"]["description_short"] == "Anlieferungspauschale Brandschutzglas < 20 m²"
+    assert row_by_pos["990c-202"]["line_total"] == Decimal("64.00")
+    assert [row["line_type"] for row in amount_rows] == ["net_total", "vat", "total"]
+    assert sum((row.get("line_total") or Decimal("0.00") for row in line_rows if not row.get("is_alternative")), Decimal("0.00")) == Decimal("128994.39")
+    assert "990c-202 1,00 Stk" not in item_by_pos["990c-202"]["description_long"]
+    assert "€ 64,00" not in item_by_pos["990c-202"]["description_long"]
+
+
+def test_alu_one_candidate_a2506340_keeps_surcharge_positions_out_of_amount_lines() -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/alu_one/Angebot A2506340MC-1.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    line_rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+    item_by_pos = {item["position_no"]: item for item in items}
+
+    assert parsed["document_number"] == "A2506340MC-1"
+    assert len(items) == 9
+    assert item_by_pos["991-2024"]["description_short"] == "Farbmindermengenzuschlag pro Farbe"
+    assert item_by_pos["993-2025"]["description_short"] == "Mindermengenzuschlag Brandschutzglas < 20 m²"
+    assert [row["line_type"] for row in amount_rows] == ["net_total", "vat", "total"]
+    assert sum((row.get("line_total") or Decimal("0.00") for row in line_rows if not row.get("is_alternative")), Decimal("0.00")) == Decimal("24127.54")
+
+
+def test_alu_one_candidate_c2308329_falls_back_from_empty_price_header() -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/alu_one/Angebot C2308329MK.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    item_by_pos = {item["position_no"]: item for item in items}
+
+    assert parsed["document_number"] == "C2308329MK"
+    assert item_by_pos["013"]["description_short"] == "HER 6022 39 Winkelprofil 20x30x2 RAL 6000 mm"
+    assert "€ 11.010,23" not in item_by_pos["013"]["description_short"]
+    assert "€ 11.010,23" not in item_by_pos["013"]["description_long"]
 
 
 def test_koch_regression() -> None:

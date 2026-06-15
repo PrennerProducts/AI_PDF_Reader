@@ -14,7 +14,8 @@ from template_headers import (
 )
 
 AMOUNT_PATTERN = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
-POSITION_PATTERN = r"\d{3}(?:[A-Za-z]|-\d+)?"
+POSITION_PATTERN = r"\d{3}[A-Za-z]?(?:-\d+)?"
+PRICE_ONLY_LABEL_RE = re.compile(rf"^(?:EUR|\u20ac)?\s*{AMOUNT_PATTERN}\s*(?:EUR|\u20ac)?$", flags=re.IGNORECASE)
 ITEM_HEADER_RE = re.compile(
     rf"^\s*(?P<position>{POSITION_PATTERN})\s+"
     rf"(?P<qty>[0-9]+(?:[.,][0-9]+)?)\s+"
@@ -26,6 +27,18 @@ ITEM_HEADER_RE = re.compile(
 )
 DIMENSION_RE = re.compile(r"\b([0-9]{3,4})\s*mm\s*x\s*([0-9]{3,4})\s*mm\b", flags=re.IGNORECASE)
 LV_RE = re.compile(r"\b([0-9]{2}\.[0-9]{2}\.[0-9]{2}\s*[A-Za-z])\b")
+POSITION_REFERENCE_RE = re.compile(rf"^Pos\s+{POSITION_PATTERN}$", flags=re.IGNORECASE)
+FOOTER_PREFIXES = (
+    "gerichtsstand vöcklabruck",
+    "unsere allgemeinen verkaufs- und lieferbedingungen",
+    "verzugszinsen verrechnet",
+)
+JOINED_SPECIAL_HEADER_RE = re.compile(
+    rf"(?m)^(?P<prefix>\s*\d{{3}}[A-Za-z]-\d{{3}})\d-\d{{2}}(?P<qty>[0-9]+(?:[.,][0-9]+)?\s+(?:Stk|Stück|LFM|lfm)\b)"
+)
+SUFFIXED_SPECIAL_HEADER_RE = re.compile(
+    rf"(?m)^(?P<prefix>\s*\d{{3}}-\d{{4}})-\d{{2}}\s+(?P<qty>[0-9]+(?:[.,][0-9]+)?\s+(?:Stk|Stück|LFM|lfm)\b)"
+)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -38,7 +51,12 @@ def detect(normalized_lower: str) -> bool:
 
 
 def count_positions(text: str) -> int:
-    return len(ITEM_HEADER_RE.findall(text))
+    return len(ITEM_HEADER_RE.findall(_normalize_header_spacing(normalize_text(text))))
+
+
+def _normalize_header_spacing(text: str) -> str:
+    text = JOINED_SPECIAL_HEADER_RE.sub(r"\g<prefix> \g<qty>", text)
+    return SUFFIXED_SPECIAL_HEADER_RE.sub(r"\g<prefix> \g<qty>", text)
 
 
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
@@ -93,15 +111,33 @@ def _description_needs_fallback(label: str) -> bool:
     clean = normalize_line(label)
     if not clean:
         return True
+    if PRICE_ONLY_LABEL_RE.fullmatch(clean):
+        return True
     if re.fullmatch(r"[0-9]{2}\.[0-9]{2}\.[0-9]{2}\s*[A-Za-z]", clean):
         return True
     return len(clean) < 8
+
+
+def _description_from_quantity_detail(line: str) -> str | None:
+    match = re.match(
+        r"^[0-9]+(?:[.,][0-9]+)?\s*(?:Stk\.?|Stück|LFM|lfm)\s+(.+)$",
+        normalize_line(line),
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return normalize_line(match.group(1)) or None
 
 
 def _extract_description_short(header_label: str, body_lines: list[str]) -> str | None:
     clean_header = normalize_line(header_label)
     if clean_header and not _description_needs_fallback(clean_header):
         return clean_header
+
+    for line in body_lines:
+        detail_description = _description_from_quantity_detail(line)
+        if detail_description:
+            return detail_description
 
     fallback = extract_first_description(
         body_lines,
@@ -134,6 +170,39 @@ def _extract_description_short(header_label: str, body_lines: list[str]) -> str 
         ),
     )
     return fallback or clean_header or None
+
+
+def _clean_description_lines(header_label: str, body_lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    header = normalize_line(header_label)
+    if header and not _description_needs_fallback(header):
+        cleaned.append(header)
+
+    for line in body_lines:
+        normalized = normalize_line(line)
+        if not normalized:
+            continue
+        lower = normalized.lower()
+        if POSITION_REFERENCE_RE.fullmatch(normalized):
+            continue
+        if lower.startswith(FOOTER_PREFIXES) or "die ware bleibt bis zur vollständigen bezahlung" in lower:
+            continue
+        if cleaned and cleaned[-1].lower() == lower:
+            continue
+        cleaned.append(normalized)
+
+    return cleaned
+
+
+def _is_alternative_context(recent_lines: list[str]) -> bool:
+    for line in reversed(recent_lines):
+        lower = line.lower()
+        if lower.startswith("alternativ:"):
+            return True
+        if lower.startswith("pos.") and "anzahl" in lower:
+            continue
+        return False
+    return False
 
 
 def extract_line_item_layout_hints(pdf_path: Path) -> list[dict[str, Any]]:
@@ -228,7 +297,7 @@ def extract_line_item_layout_hints(pdf_path: Path) -> list[dict[str, Any]]:
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:
-    normalized_text = normalize_text(text)
+    normalized_text = _normalize_header_spacing(normalize_text(text))
     matches = list(ITEM_HEADER_RE.finditer(normalized_text))
     items: list[dict[str, Any]] = []
 
@@ -251,20 +320,20 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "mit freundlichen grüßen",
             ),
         )
-        description_short = _extract_description_short(header_label, body_lines)
+        description_lines = _clean_description_lines(header_label, body_lines)
+        description_short = _extract_description_short(header_label, description_lines)
         width_raw, height_raw = _extract_dimensions(header_label)
         if width_raw is None or height_raw is None:
-            width_raw, height_raw = _extract_dimensions("\n".join(body_lines[:8]))
+            width_raw, height_raw = _extract_dimensions("\n".join(description_lines[:8]))
 
         recent_lines = _recent_non_empty_lines(normalized_text[max(0, match.start() - 300) : match.start()])
-        is_alternative = any(line.lower().startswith("alternativ:") for line in recent_lines[-3:])
-        header_line = normalize_line(match.group(0))
-        full_block_lines = [header_line, *body_lines]
+        is_alternative = _is_alternative_context(recent_lines[-4:])
+        full_block_lines = description_lines
 
         items.append(
             {
                 "position_no": position_no,
-                "lv_pos": _extract_lv_pos(header_label, "\n".join(body_lines[:6])),
+                "lv_pos": _extract_lv_pos(header_label, "\n".join(description_lines[:6])),
                 "is_alternative": is_alternative,
                 "quantity_raw": quantity_raw,
                 "unit": unit,

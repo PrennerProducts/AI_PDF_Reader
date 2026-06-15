@@ -1117,15 +1117,23 @@ def _heuristic_match_for_item(
     }
 
 
-def _build_amount_line_rows(extracted_text: str, totals: dict[str, str | None]) -> list[dict]:
+def _build_amount_line_rows(
+    extracted_text: str,
+    totals: dict[str, str | None],
+    *,
+    template: str | None = None,
+) -> list[dict]:
     rows: list[dict] = []
     for item in extract_amount_lines(extracted_text):
+        line_type = item.get("line_type", "other")
+        if template == "alu_one" and line_type not in {"net_total", "vat", "total"}:
+            continue
         amount = _parse_eu_decimal(item.get("amount_raw"))
         if amount is None:
             continue
         rows.append(
             {
-                "line_type": item.get("line_type", "other"),
+                "line_type": line_type,
                 "label_raw": item.get("label_raw", ""),
                 "percent": _parse_eu_decimal(item.get("percent_raw")),
                 "base_amount": _parse_eu_decimal(item.get("base_amount_raw")),
@@ -3421,6 +3429,7 @@ def process_document(
         amount_line_rows = _build_amount_line_rows(
             extracted_text,
             parsed.get("totals") if isinstance(parsed.get("totals"), dict) else {},
+            template=template,
         )
         line_item_rows = _build_line_item_rows(
             extracted_text,
