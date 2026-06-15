@@ -16477,9 +16477,11 @@
     function aggregateSourcePriceComponents(groupItems) {
       return (Array.isArray(groupItems) ? groupItems : []).map((item, index) => {
         const info = exportPriceInfoForUi(item, metadataObject(item));
+        const quantity = uiNumberValue(item && item.quantity);
         return {
           source_id: fmt(item && item.id, `Quelle ${index + 1}`),
           source_position: fmt(item && item.position_no, ""),
+          quantity,
           unit_price: info.unitPrice,
           purchase_price: info.purchasePrice,
         };
@@ -16496,20 +16498,38 @@
       if (components.length < 2 && Number(source.alternative_group_source_count || 0) < 2) return null;
       const unitParts = components.map((part) => uiNumberValue(part && part.unit_price));
       const purchaseParts = components.map((part) => uiNumberValue(part && part.purchase_price));
+      const unitSourceTotals = components.map((part) => {
+        const quantity = uiNumberValue(part && part.quantity);
+        const unit = uiNumberValue(part && part.unit_price);
+        return quantity !== null && unit !== null ? roundedMoneyNumber(quantity * unit) : null;
+      });
+      const purchaseSourceTotals = components.map((part) => {
+        const quantity = uiNumberValue(part && part.quantity);
+        const purchase = uiNumberValue(part && part.purchase_price);
+        return quantity !== null && purchase !== null ? roundedMoneyNumber(quantity * purchase) : null;
+      });
+      const isAppendedAggregate = source.alternative_source === "aggregated_append";
       const unitTotal = uiNumberValue(source.alternative_group_unit_price) ?? moneySumForUi(unitParts);
       const purchaseTotal = uiNumberValue(source.alternative_group_purchase_price) ?? moneySumForUi(purchaseParts);
       const quantity = uiNumberValue(item && item.quantity);
-      const unitLineTotal = quantity !== null && unitTotal !== null ? roundedMoneyNumber(quantity * unitTotal) : null;
-      const purchaseLineTotal = quantity !== null && purchaseTotal !== null ? roundedMoneyNumber(quantity * purchaseTotal) : null;
+      const unitLineTotal = isAppendedAggregate
+        ? moneySumForUi(unitSourceTotals)
+        : (quantity !== null && unitTotal !== null ? roundedMoneyNumber(quantity * unitTotal) : null);
+      const purchaseLineTotal = isAppendedAggregate
+        ? moneySumForUi(purchaseSourceTotals)
+        : (quantity !== null && purchaseTotal !== null ? roundedMoneyNumber(quantity * purchaseTotal) : null);
       return {
         components,
         unitParts,
         purchaseParts,
+        unitSourceTotals,
+        purchaseSourceTotals,
         unitTotal,
         purchaseTotal,
         quantity,
         unitLineTotal,
         purchaseLineTotal,
+        isAppendedAggregate,
       };
     }
 
@@ -16523,19 +16543,30 @@
       const details = aggregatePriceDetailsForUi(item, metadata);
       if (!details) return "";
       const count = details.components.length || Number((metadata || {}).alternative_group_source_count || 0);
-      const unitFormula = priceAdditionFormula(details.unitParts, details.unitTotal);
+      const unitFormula = details.isAppendedAggregate
+        ? ""
+        : priceAdditionFormula(details.unitParts, details.unitTotal);
+      const weightedUnitText = details.isAppendedAggregate && details.unitTotal !== null
+        ? ` · gew. Unit EP ${auditMoney(details.unitTotal)} €`
+        : "";
       const usePurchaseTotal = pricingAdjustmentsEnabled(state.result) && details.purchaseLineTotal !== null;
       const totalLabel = usePurchaseTotal ? "Purchase GP" : "GP";
       const totalValue = usePurchaseTotal ? details.purchaseLineTotal : details.unitLineTotal;
       const totalText = totalValue !== null ? ` · ${totalLabel} ${auditMoney(totalValue)} €` : "";
-      return `<span class="price-aggregation-note">${escapeHtml(`${count} Preise addiert${unitFormula ? `: ${unitFormula}` : ""}${totalText}`)}</span>`;
+      return `<span class="price-aggregation-note">${escapeHtml(`${count} Quellen addiert${unitFormula ? `: ${unitFormula}` : ""}${weightedUnitText}${totalText}`)}</span>`;
     }
 
     function priceAggregationDetailHtml(item, metadata) {
       const details = aggregatePriceDetailsForUi(item, metadata);
       if (!details) return "";
-      const unitFormula = priceAdditionFormula(details.unitParts, details.unitTotal);
-      const purchaseFormula = priceAdditionFormula(details.purchaseParts, details.purchaseTotal);
+      const unitFormula = details.isAppendedAggregate ? "" : priceAdditionFormula(details.unitParts, details.unitTotal);
+      const purchaseFormula = details.isAppendedAggregate ? "" : priceAdditionFormula(details.purchaseParts, details.purchaseTotal);
+      const weightedUnit = details.isAppendedAggregate && details.unitTotal !== null
+        ? `Gewichteter Unit EP: ${auditMoney(details.unitTotal)} €`
+        : "";
+      const weightedPurchase = details.isAppendedAggregate && details.purchaseTotal !== null
+        ? `Gewichteter Purchase EP: ${auditMoney(details.purchaseTotal)} €`
+        : "";
       const unitTotalFormula = details.quantity !== null && details.unitLineTotal !== null
         ? `${auditMoney(details.unitTotal)} € × ${formatQuantity(details.quantity)} = ${auditMoney(details.unitLineTotal)} €`
         : "";
@@ -16544,21 +16575,26 @@
         : "";
       const rows = details.components.map((part, index) => {
         const label = fmt(part && (part.source_position || part.source_id), `Quelle ${index + 1}`);
+        const quantity = uiNumberValue(part && part.quantity);
         const unit = uiNumberValue(part && part.unit_price);
         const purchase = uiNumberValue(part && part.purchase_price);
+        const unitLineTotal = details.unitSourceTotals[index];
+        const purchaseLineTotal = details.purchaseSourceTotals[index];
         return `
           <div class="price-aggregation-source">
             <strong>${escapeHtml(label)}</strong>
-            <span>Unit EP ${escapeHtml(unit === null ? "-" : `${auditMoney(unit)} €`)}</span>
-            <span>Purchase EP ${escapeHtml(purchase === null ? "-" : `${auditMoney(purchase)} €`)}</span>
+            <span>${escapeHtml(quantity === null ? "" : `${formatQuantity(quantity)} × `)}Unit EP ${escapeHtml(unit === null ? "-" : `${auditMoney(unit)} €`)}${escapeHtml(unitLineTotal === null ? "" : ` = ${auditMoney(unitLineTotal)} €`)}</span>
+            <span>Purchase EP ${escapeHtml(purchase === null ? "-" : `${auditMoney(purchase)} €`)}${escapeHtml(purchaseLineTotal === null ? "" : ` = ${auditMoney(purchaseLineTotal)} €`)}</span>
           </div>
         `;
       }).join("");
       return `
         <div class="price-aggregation-detail">
           <strong>Zusammengezählte Alternativpreise</strong>
+          ${weightedUnit ? `<span>${escapeHtml(weightedUnit)}</span>` : ""}
           ${unitFormula ? `<span>Unit EP: ${escapeHtml(unitFormula)}</span>` : ""}
           ${unitTotalFormula ? `<span>Unit GP: ${escapeHtml(unitTotalFormula)}</span>` : ""}
+          ${weightedPurchase ? `<span>${escapeHtml(weightedPurchase)}</span>` : ""}
           ${purchaseFormula ? `<span>Purchase EP: ${escapeHtml(purchaseFormula)}</span>` : ""}
           ${purchaseTotalFormula ? `<span>Purchase GP: ${escapeHtml(purchaseTotalFormula)}</span>` : ""}
           ${rows ? `<div class="price-aggregation-sources">${rows}</div>` : ""}
@@ -16750,15 +16786,31 @@
         const first = groupItems[0];
         const label = alternativeGroupLabel(first) || "Alternative";
         const quantitySum = groupItems.reduce((sum, item) => sum + (uiNumberValue(item.quantity) || 0), 0);
-        const totalValues = groupItems.map(lineTotalForDisplayItem);
-        const hasTotal = totalValues.some((value) => value !== null);
-        const totalSum = totalValues.reduce((sum, value) => sum + (value || 0), 0);
-        const unitPrice = hasTotal && quantitySum ? totalSum / quantitySum : uiNumberValue(first.unit_price);
-        const metadata = metadataObject(first);
+        const components = aggregateSourcePriceComponents(groupItems);
+        const unitTotals = components.map((part) => {
+          const quantity = uiNumberValue(part.quantity);
+          const unit = uiNumberValue(part.unit_price);
+          return quantity !== null && unit !== null ? roundedMoneyNumber(quantity * unit) : null;
+        });
+        const purchaseTotals = components.map((part) => {
+          const quantity = uiNumberValue(part.quantity);
+          const purchase = uiNumberValue(part.purchase_price);
+          return quantity !== null && purchase !== null ? roundedMoneyNumber(quantity * purchase) : null;
+        });
+        const totalSum = moneySumForUi(unitTotals);
+        const purchaseTotalSum = moneySumForUi(purchaseTotals);
+        const hasTotal = totalSum !== null;
+        const unitPrice = hasTotal && quantitySum ? roundedMoneyNumber(totalSum / quantitySum) : uiNumberValue(first.unit_price);
+        const purchasePrice = purchaseTotalSum !== null && quantitySum ? roundedMoneyNumber(purchaseTotalSum / quantitySum) : uiNumberValue(first.purchase_price);
+        const metadata = clearPricingMetadataForUi(metadataObject(first));
         metadata.alternative_source = "aggregated_append";
+        metadata.alternative_append_at_end = true;
         metadata.alternative_group_source_count = groupItems.length;
         metadata.alternative_group_source_ids = groupItems.map((item) => fmt(item.id, "")).filter(Boolean);
         metadata.alternative_group_source_positions = groupItems.map((item) => fmt(item.position_no, "")).filter(Boolean);
+        metadata.alternative_group_unit_price = unitPrice;
+        metadata.alternative_group_purchase_price = purchasePrice;
+        metadata.alternative_group_price_components = components;
         aggregated.push({
           ...first,
           id: `aggregate:alt:${groupIndex + 1}:${normalizedUiText(label).slice(0, 48)}`,
@@ -16771,6 +16823,7 @@
             `Anzahl Quellpositionen: ${groupItems.length}`,
           ].join("\n"),
           unit_price: unitPrice,
+          purchase_price: purchasePrice,
           line_total: hasTotal ? totalSum : null,
           metadata_json: metadata,
           image_ids_primary: [],
@@ -16786,7 +16839,7 @@
       return aggregated.concat(passthrough);
     }
 
-    function aggregateNestedAlternativesForDisplay(alternatives, parentPositionNo = "") {
+    function aggregateNestedAlternativesForDisplay(alternatives, parentPositionNo = "", options = {}) {
       const groups = new Map();
       const passthrough = [];
       (Array.isArray(alternatives) ? alternatives : []).forEach((item) => {
@@ -16815,8 +16868,9 @@
           ? roundedMoneyNumber(quantity * unitPrice)
           : null;
         const metadata = clearPricingMetadataForUi(metadataObject(first));
-        metadata.alternative_source = "aggregated_nested";
-        metadata.alternative_append_at_end = false;
+        const appendAtEnd = !!options.appendAtEnd;
+        metadata.alternative_source = appendAtEnd ? "aggregated_parent_append" : "aggregated_nested";
+        metadata.alternative_append_at_end = appendAtEnd;
         metadata.alternative_group_source_count = groupItems.length;
         metadata.alternative_group_source_ids = groupItems.map((item) => fmt(item.id, "")).filter(Boolean);
         metadata.alternative_group_source_positions = groupItems.map((item) => fmt(item.position_no, "")).filter(Boolean);
@@ -16828,9 +16882,9 @@
         metadata.pricing_adjusted_unit_price = purchasePrice;
         aggregated.push({
           ...first,
-          id: `aggregate:nested:${parentPositionNo || "parent"}:${groupIndex + 1}:${normalizedUiText(label).slice(0, 48)}`,
+          id: `aggregate:${appendAtEnd ? "parent-append" : "nested"}:${parentPositionNo || "parent"}:${groupIndex + 1}:${normalizedUiText(label).slice(0, 48)}`,
           is_alternative: true,
-          alternative_append_at_end: false,
+          alternative_append_at_end: appendAtEnd,
           description_short: label,
           description_long: [
             `Gesammelte Alternative: ${label}`,
@@ -16859,41 +16913,71 @@
         const visible = [];
         const appendAlternatives = [];
         let nestedAlternatives = [];
+        let parentAppendAlternatives = [];
         let parentPositionNo = "";
-        const flushNestedAlternatives = () => {
-          if (!nestedAlternatives.length) return;
-          visible.push(...aggregateNestedAlternativesForDisplay(nestedAlternatives, parentPositionNo));
+        const flushParentAlternatives = () => {
+          if (nestedAlternatives.length) {
+            visible.push(...aggregateNestedAlternativesForDisplay(nestedAlternatives, parentPositionNo));
+          }
+          if (parentAppendAlternatives.length) {
+            appendAlternatives.push(...aggregateNestedAlternativesForDisplay(parentAppendAlternatives, parentPositionNo, { appendAtEnd: true }));
+          }
           nestedAlternatives = [];
+          parentAppendAlternatives = [];
         };
         (Array.isArray(items) ? items : []).forEach((item) => {
           if (!item || typeof item !== "object") return;
           if (!item.is_alternative) {
-            flushNestedAlternatives();
+            flushParentAlternatives();
             parentPositionNo = fmt(item.position_no, "");
             visible.push(item);
             return;
           }
           if (lineItemAlternativeAppendAtEnd(item)) {
-            appendAlternatives.push(item);
+            if (item.__embedded_alternative) {
+              parentAppendAlternatives.push(item);
+            } else {
+              flushParentAlternatives();
+              appendAlternatives.push(item);
+            }
             return;
           }
           if (item.__embedded_alternative) {
             nestedAlternatives.push(item);
             return;
           }
-          flushNestedAlternatives();
+          flushParentAlternatives();
           visible.push(item);
         });
-        flushNestedAlternatives();
+        flushParentAlternatives();
         return visible.concat(aggregateAppendAlternativesForDisplay(appendAlternatives));
       }
       const mains = [];
       const alternatives = [];
+      let parentEmbeddedAlternatives = [];
+      let parentPositionNo = "";
+      const flushParentEmbeddedAlternatives = () => {
+        if (parentEmbeddedAlternatives.length) {
+          alternatives.push(...aggregateNestedAlternativesForDisplay(parentEmbeddedAlternatives, parentPositionNo, { appendAtEnd: true }));
+          parentEmbeddedAlternatives = [];
+        }
+      };
       (Array.isArray(items) ? items : []).forEach((item) => {
         if (!item || typeof item !== "object") return;
-        if (item.is_alternative) alternatives.push(item);
-        else mains.push(item);
+        if (!item.is_alternative) {
+          flushParentEmbeddedAlternatives();
+          parentPositionNo = fmt(item.position_no, "");
+          mains.push(item);
+          return;
+        }
+        if (item.__embedded_alternative) {
+          parentEmbeddedAlternatives.push(item);
+          return;
+        }
+        flushParentEmbeddedAlternatives();
+        alternatives.push(item);
       });
+      flushParentEmbeddedAlternatives();
       return mains.concat(aggregateAppendAlternativesForDisplay(alternatives));
     }
 

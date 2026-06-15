@@ -341,6 +341,44 @@ def test_vendoc_payload_groups_duplicate_embedded_alternatives_with_pricing_disa
     assert payload["positions"][1]["purchase_price"] == 167.99
 
 
+def test_vendoc_payload_groups_duplicate_embedded_alternatives_before_appending(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["alternative_position_mode"] = "append"
+    result["document"]["apply_pricing_adjustments"] = False
+    result["line_items"][0]["quantity"] = "12"
+    result["line_items"][0]["description_long"] = "\n".join(
+        [
+            "Fenster 2flg DLS DKR",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 119,90 GP: € 1.438,80",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 190,90 GP: € 2.290,80",
+        ]
+    )
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_original_unit_price": "1385.02",
+        "rieder_adjusted_unit_price": "748.62",
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["alternative_position_mode"] == "append"
+    assert [position["position_no"] for position in payload["positions"]] == ["1", "2"]
+    appended = payload["positions"][1]
+    assert appended["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert appended["quantity"] == 12.0
+    assert appended["unit_price"] == 310.8
+    assert appended["purchase_price"] == 167.99
+
+
 def test_vendoc_payload_can_skip_rieder_sequence_for_embedded_alternatives(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)

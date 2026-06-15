@@ -509,6 +509,7 @@ def _aggregate_nested_alternatives(
     alternatives: list[dict[str, Any]],
     *,
     parent_position_no: str | None,
+    append_at_end: bool = False,
 ) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
     order: list[str] = []
@@ -543,8 +544,8 @@ def _aggregate_nested_alternatives(
         source_ids = [_to_str(item.get("id")) for item in group_items if _to_str(item.get("id"))]
         source_positions = [_to_str(item.get("position_no")) for item in group_items if _to_str(item.get("position_no"))]
         metadata = _clear_pricing_metadata(_metadata(first))
-        metadata["alternative_source"] = "aggregated_nested"
-        metadata["alternative_append_at_end"] = False
+        metadata["alternative_source"] = "aggregated_parent_append" if append_at_end else "aggregated_nested"
+        metadata["alternative_append_at_end"] = append_at_end
         metadata["alternative_group_source_count"] = len(group_items)
         metadata["alternative_group_source_ids"] = source_ids
         metadata["alternative_group_source_positions"] = source_positions
@@ -567,9 +568,10 @@ def _aggregate_nested_alternatives(
         ]
 
         aggregate = dict(first)
-        aggregate["id"] = f"aggregate:nested:{parent_position_no or 'parent'}:{group_index}:{_normalize_lookup_key(label)[:48]}"
+        aggregate_kind = "parent-append" if append_at_end else "nested"
+        aggregate["id"] = f"aggregate:{aggregate_kind}:{parent_position_no or 'parent'}:{group_index}:{_normalize_lookup_key(label)[:48]}"
         aggregate["is_alternative"] = True
-        aggregate["alternative_append_at_end"] = False
+        aggregate["alternative_append_at_end"] = append_at_end
         aggregate["description_short"] = label
         aggregate["description_long"] = "\n".join(line for line in detail_lines if line)
         aggregate["unit_price"] = unit_price
@@ -633,7 +635,7 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         )
         source_ids = [_to_str(item.get("id")) for item in group_items if _to_str(item.get("id"))]
         source_positions = [_to_str(item.get("position_no")) for item in group_items if _to_str(item.get("position_no"))]
-        metadata = dict(_metadata(first))
+        metadata = _clear_pricing_metadata(_metadata(first))
         metadata["alternative_source"] = "aggregated_append"
         metadata["alternative_append_at_end"] = True
         metadata["alternative_group_source_count"] = len(group_items)
@@ -713,6 +715,7 @@ def _prepare_line_items_for_export(
             item["position_no"] = parent_position_no
             prepared.append(item)
             nested_alternatives: list[dict[str, Any]] = []
+            parent_append_alternatives: list[dict[str, Any]] = []
 
             for alt_number, alt_text in enumerate(embedded_alternatives, start=1):
                 alt_item = _embedded_alternative_item(
@@ -724,7 +727,7 @@ def _prepare_line_items_for_export(
                 embedded_alternative_count += 1
                 parent_key = parent_position_no or str(parent_index)
                 if _alternative_append_at_end(alt_item, normalized_mode):
-                    append_alternatives.append(alt_item)
+                    parent_append_alternatives.append(alt_item)
                 else:
                     nested_alternatives.append(alt_item)
 
@@ -736,6 +739,13 @@ def _prepare_line_items_for_export(
                 parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
                 alt_item["position_no"] = _nested_position(parent_position_no, parent_index, parent_alt_counts[parent_key])
                 prepared.append(alt_item)
+            append_alternatives.extend(
+                _aggregate_nested_alternatives(
+                    parent_append_alternatives,
+                    parent_position_no=parent_position_no,
+                    append_at_end=True,
+                )
+            )
             continue
 
         existing_alternative_count += 1
