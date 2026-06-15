@@ -6,6 +6,7 @@ from template_common import normalize_line as _normalize_line
 from template_registry import extract_line_items_for_template
 
 PERCENT_RE = re.compile(r"([0-9]+(?:[.,][0-9]+)?)\s*%")
+INLINE_ITEM_DISCOUNT_RE = re.compile(r"\b[0-9]+(?:[.,][0-9]+)?-\s*%\s*Rabatt\b", flags=re.IGNORECASE)
 
 
 def _has_vat_term(lower: str) -> bool:
@@ -52,6 +53,8 @@ def _has_amount_trigger(line: str) -> bool:
     if "inklusive rabatte" in lower:
         return False
     if lower.startswith("der sonderrabatt ist"):
+        return False
+    if INLINE_ITEM_DISCOUNT_RE.search(line) and not lower.startswith(("abzüglich", "zuzüglich", "rabatt", "zuschlag")):
         return False
     return any(
         word in lower

@@ -1507,6 +1507,45 @@ def _apply_koch_pricing_to_line_item_rows(
     )
 
 
+def _apply_schachermayer_line_pricing_to_line_item_rows(rows: list[dict[str, Any]]) -> None:
+    for row in rows:
+        quantity = row.get("quantity")
+        unit_price = row.get("unit_price")
+        line_total = row.get("line_total")
+        if not all(isinstance(value, Decimal) for value in (quantity, unit_price, line_total)):
+            continue
+        if quantity == 0:
+            continue
+        original_line_total = _money(unit_price * quantity)
+        if original_line_total <= 0 or abs(original_line_total - line_total) <= Decimal("0.01"):
+            continue
+
+        adjusted_unit_price = _money(line_total / quantity)
+        discount_percent = _money((Decimal("1") - (line_total / original_line_total)) * Decimal("100"))
+        metadata = _line_item_metadata_dict(row)
+        metadata["pricing_adjustment_source"] = "schachermayer_line_discount"
+        metadata["pricing_adjustments_applied"] = True
+        metadata["pricing_original_line_total"] = str(original_line_total)
+        metadata["pricing_original_unit_price"] = str(unit_price)
+        metadata["pricing_adjusted_line_total"] = str(line_total)
+        metadata["pricing_adjusted_unit_price"] = str(adjusted_unit_price)
+        metadata["pricing_operations"] = [
+            {
+                "line_type": "discount",
+                "percent": str(discount_percent),
+                "label_raw": "Schachermayer Positionsrabatt laut Nettobetrag",
+            }
+        ]
+        metadata["schachermayer_pricing_applied"] = True
+        metadata["schachermayer_original_line_total"] = str(original_line_total)
+        metadata["schachermayer_original_unit_price"] = str(unit_price)
+        metadata["schachermayer_adjusted_line_total"] = str(line_total)
+        metadata["schachermayer_adjusted_unit_price"] = str(adjusted_unit_price)
+        metadata["schachermayer_pricing_operations"] = metadata["pricing_operations"]
+        row["unit_price"] = adjusted_unit_price
+        _set_line_item_metadata(row, metadata)
+
+
 def _build_line_item_rows(
     extracted_text: str,
     template: str,
@@ -1636,6 +1675,8 @@ def _build_line_item_rows(
         _apply_rekord_vomp_pricing_to_line_item_rows(rows, amount_line_rows)
     elif template == "koch":
         _apply_koch_pricing_to_line_item_rows(rows, amount_line_rows)
+    elif template == "schachermayer":
+        _apply_schachermayer_line_pricing_to_line_item_rows(rows)
     return rows
 
 

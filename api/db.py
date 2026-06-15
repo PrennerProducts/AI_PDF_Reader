@@ -1677,7 +1677,7 @@ def _line_item_with_document_pricing_mode(item: dict[str, Any], *, apply_pricing
     adjusted_metadata = dict(metadata)
     adjusted_metadata["pricing_effective_applied"] = False
     adjusted_metadata["pricing_disabled_by_document"] = True
-    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch"):
+    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer"):
         if adjusted_metadata.get(f"{provider_key}_pricing_applied"):
             adjusted_metadata[f"{provider_key}_pricing_effective_applied"] = False
             adjusted_metadata[f"{provider_key}_pricing_disabled_by_document"] = True

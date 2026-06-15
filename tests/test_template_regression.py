@@ -36,6 +36,13 @@ def _assert_totals(parsed: dict, expected: tuple[str, str, str]) -> None:
     assert totals.get("gross_total") == expected[2]
 
 
+def _decimal_amount(value: str | None) -> Decimal:
+    assert value is not None
+    cleaned = value.replace("EUR", "").replace("€", "").strip()
+    cleaned = cleaned.replace(" ", "").replace(".", "").replace(",", ".")
+    return Decimal(cleaned)
+
+
 def test_first_description_strips_trailing_currency_price() -> None:
     assert (
         extract_first_description(
@@ -976,6 +983,66 @@ def test_schachermayer_regression() -> None:
     assert items[2]["lv_pos"] == "02 ZARGE BIS MST 295"
     assert items[3]["description_short"] == "Rosettenlochbohrung (Önorm, 7,5 mm)"
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
+def test_schachermayer_long_text_and_line_discounts_are_clean() -> None:
+    pdf_paths = [
+        ROOT / "samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF",
+        ROOT / "samples/pdfs/candidates/offers/schachermayer/SCH Offert 225009480.PDF",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schachermayer/SCH Auftragsbestätigung 39160014.PDF",
+    ]
+    row_header = re.compile(r"(?m)^\s*[0-9]{2,3}\s+[0-9]+,[0-9]{2}\s+[A-Z]{2}\s+\*?\S+")
+    item_discount = re.compile(r"(?m)[0-9]+,[0-9]{2}-\s*%\s*Rabatt")
+
+    for pdf_path in pdf_paths:
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+        amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+        line_rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+
+        assert parsed["template"] == "schachermayer"
+        assert [row["line_type"] for row in amount_rows] == ["net_total", "vat", "total"]
+        assert sum((row.get("line_total") or Decimal("0.00") for row in line_rows), Decimal("0.00")) == _decimal_amount(parsed["totals"]["net_total"])
+
+        for item in items:
+            description_long = item["description_long"]
+            assert not row_header.search(description_long)
+            assert not item_discount.search(description_long)
+            assert "Preis/ME" not in description_long
+            assert "Währung EUR" not in description_long
+            assert "Schachermayer GmbH" not in description_long
+
+    text = _read_pdf_text(ROOT / "samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF")
+    parsed = parse_document_text(text)
+    rows = _build_line_item_rows(
+        text,
+        parsed["template"],
+        source_path=ROOT / "samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF",
+        amount_line_rows=_build_amount_line_rows(text, parsed["totals"], template=parsed["template"]),
+    )
+    first = rows[0]
+    first_metadata = json.loads(first["metadata_json"])
+    assert first["unit_price"] == Decimal("110.09")
+    assert first["line_total"] == Decimal("2642.11")
+    assert first_metadata["schachermayer_pricing_applied"] is True
+    assert first_metadata["schachermayer_original_unit_price"] == "200.16"
+    assert first_metadata["schachermayer_adjusted_unit_price"] == "110.09"
+
+
+def test_schachermayer_order_confirmation_is_detected() -> None:
+    pdf_path = ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/schachermayer/SCH Auftragsbestätigung 39160014.PDF"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+
+    assert parsed["template"] == "schachermayer"
+    assert parsed["document_type"] == "auftragsbestaetigung"
+    assert parsed["supplier_name"] == "Schachermayer GmbH"
+    assert parsed["document_number"] == "39160014"
+    assert parsed["document_date"] == "11.11.2025"
+    assert len(items) == 4
+    assert items[0]["description_short"] == "Donau CPL Standard Zarge, Eiche Premium"
 
 
 def test_schlotterer_regression() -> None:

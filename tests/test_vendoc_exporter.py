@@ -630,6 +630,38 @@ def test_vendoc_payload_exports_koch_basis_unit_and_discounted_purchase(tmp_path
     assert payload["positions"][0]["purchase_price"] == 813.04
 
 
+def test_vendoc_payload_exports_schachermayer_basis_unit_and_discounted_purchase(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Schachermayer GmbH"
+    result["document"]["apply_pricing_adjustments"] = True
+    result["line_items"][0]["unit_price"] = "110.09"
+    result["line_items"][0]["line_total"] = "2642.11"
+    result["line_items"][0]["quantity"] = "24"
+    result["line_items"][0]["metadata_json"] = {
+        "pricing_adjustments_applied": True,
+        "pricing_original_unit_price": "200.16",
+        "pricing_original_line_total": "4803.84",
+        "pricing_adjusted_unit_price": "110.09",
+        "pricing_adjusted_line_total": "2642.11",
+        "schachermayer_pricing_applied": True,
+        "schachermayer_original_unit_price": "200.16",
+        "schachermayer_original_line_total": "4803.84",
+        "schachermayer_adjusted_unit_price": "110.09",
+        "schachermayer_adjusted_line_total": "2642.11",
+        "schachermayer_pricing_operations": [
+            {"line_type": "discount", "percent": "45", "label_raw": "Schachermayer Positionsrabatt laut Nettobetrag"}
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is True
+    assert payload["positions"][0]["unit_price"] == 200.16
+    assert payload["positions"][0]["purchase_price"] == 110.09
+
+
 def test_vendoc_payload_can_skip_entholzer_sonderrabatt_for_stored_positions(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)

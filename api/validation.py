@@ -100,12 +100,18 @@ def _item_prices_include_adjustments(item: dict[str, Any]) -> bool:
         metadata.get("pricing_disabled_by_document")
         or metadata.get("rieder_pricing_disabled_by_document")
         or metadata.get("entholzer_pricing_disabled_by_document")
+        or metadata.get("rekord_vomp_pricing_disabled_by_document")
+        or metadata.get("koch_pricing_disabled_by_document")
+        or metadata.get("schachermayer_pricing_disabled_by_document")
     ):
         return False
     return bool(
         metadata.get("pricing_adjustments_applied")
         or metadata.get("rieder_pricing_applied")
         or metadata.get("entholzer_pricing_applied")
+        or metadata.get("rekord_vomp_pricing_applied")
+        or metadata.get("koch_pricing_applied")
+        or metadata.get("schachermayer_pricing_applied")
     )
 
 
@@ -703,6 +709,7 @@ def build_document_validation(
             and unit_price is not None
             and line_total is not None
             and not is_informational_item
+            and provider_key != "schachermayer"
         ):
             expected_line_total = (quantity * unit_price).quantize(SUM_TOLERANCE)
             if abs(line_total - expected_line_total) > SUM_TOLERANCE:

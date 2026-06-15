@@ -17,10 +17,14 @@ ROW_RE = re.compile(
 )
 HEADER_PROJECT_RE = re.compile(r"(?m)^\s*Kom\.\s*([^\n]+)\s*$")
 SECTION_RE = re.compile(r"(?m)^\s*Kommission:\s*([^\n]+)\s*$", flags=re.IGNORECASE)
+DISCOUNT_LABEL_RE = re.compile(r"^(?P<label>.+?)\s+[0-9]+(?:[.,][0-9]+)?-\s*%\s*Rabatt\s*$", flags=re.IGNORECASE)
+SECTION_TOTAL_LINE_RE = re.compile(r"^[0-9]{2}\b.+[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}$")
 
 
 def detect(normalized_lower: str) -> bool:
-    return "schachermayer gmbh" in normalized_lower and "angebots-nr." in normalized_lower
+    return "schachermayer gmbh" in normalized_lower and (
+        "angebots-nr." in normalized_lower or "auftragsnummer" in normalized_lower
+    )
 
 
 def count_positions(text: str) -> int:
@@ -31,11 +35,12 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
     first_page = normalized_text.split("\f", 1)[0]
     document_number = headers.get("document_number") or first_match(
         [
-            r"\b([0-9]{9})\b\s+[0-9]{2}\.[0-9]{2}\.[0-9]{4}\b",
+            r"\b([0-9]{8,9})\b\s+[0-9]{2}\.[0-9]{2}\.[0-9]{4}\b",
             r"Angebots-Nr\.\s*([0-9]+)",
+            r"Auftragsnummer\s+Datum\s+Seite\s+.*?\b([0-9]{8,9})\b",
         ],
         first_page,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE | re.DOTALL,
     )
     project_ref = headers.get("project_ref") or first_match(
         [
@@ -63,15 +68,49 @@ def _is_noise_line(line: str) -> bool:
         return True
     if lower.startswith(("4020 linz", "t. +43", "f. +43", "e. ", "www.schachermayer.at")):
         return True
-    if lower.startswith(("auftraggeber", "angebot", "angebots-nr.", "ihr zuständiger sachbearbeiter")):
+    if lower.startswith(("sch linz", "auftraggeber", "angebot", "angebots-nr.", "auftragsnummer", "ihr zuständiger sachbearbeiter")):
         return True
     if lower.startswith(("tel.:", "fax.:")):
         return True
+    if lower.startswith(("herr ", "frau ")):
+        return True
     if lower.endswith("@schachermayer.at"):
+        return True
+    if any(token in lower for token in ("ara-ln:", "uid-nr.", "landesgericht", "dvr ", "eori:", "steuernummer deutschland", "weee-reg.")):
+        return True
+    if lower.startswith(("sr. schauraum", "archeneo park", "pass-thurn-str.", "6372 ", "6233 ", "österreich")):
+        return True
+    if lower.startswith(("warenempfänger", "bestellangaben-kunde", "kundennummer", "datum", "seite")):
+        return True
+    if "währung eur" in lower:
+        return True
+    if "bezeichnung" in lower and lower.startswith("_"):
+        return True
+    if "angebots-nr." in lower and "datum" in lower and "seite" in lower:
         return True
     if "preis/me" in lower and "nettobetrag" in lower:
         return True
     return False
+
+
+def _clean_description_lines(block_lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for line in block_lines[1:]:
+        normalized = normalize_line(line)
+        if not normalized or _is_noise_line(normalized):
+            continue
+        if normalized.lower().startswith("kommission:"):
+            continue
+        if SECTION_TOTAL_LINE_RE.match(normalized):
+            break
+        if ROW_RE.match(normalized):
+            continue
+        if DISCOUNT_LABEL_RE.match(normalized):
+            continue
+        if cleaned and cleaned[-1].lower() == normalized.lower():
+            continue
+        cleaned.append(normalized)
+    return cleaned
 
 
 def extract_line_items(text: str) -> list[dict[str, Any]]:
@@ -104,7 +143,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         if not block_lines:
             continue
 
-        cleaned_lines = []
+        cleaned_lines: list[str] = []
         for line in block_lines:
             normalized = normalize_line(line)
             if not normalized or _is_noise_line(normalized):
@@ -112,6 +151,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
             if normalized.lower().startswith("kommission:"):
                 continue
             cleaned_lines.append(normalized)
+        description_lines = _clean_description_lines(block_lines)
 
         description_short = extract_first_description(
             cleaned_lines[1:],
@@ -132,7 +172,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "width_raw": None,
                 "height_raw": None,
                 "description_short": description_short,
-                "description_long": "\n".join(cleaned_lines)[:8000],
+                "description_long": "\n".join(description_lines)[:8000],
                 "unit_price_raw": match.group("unit_price"),
                 "line_total_raw": match.group("line_total"),
                 "page_ref": page_ref_from_offset(normalized_text, match.start()),

@@ -52,3 +52,26 @@ def test_document_pricing_mode_can_show_koch_basis_price() -> None:
     assert adjusted["line_total"] == Decimal("8034.00")
     assert adjusted["metadata_json"]["pricing_disabled_by_document"] is True
     assert adjusted["metadata_json"]["koch_pricing_disabled_by_document"] is True
+
+
+def test_document_pricing_mode_can_show_schachermayer_basis_price() -> None:
+    item = {
+        "quantity": "24",
+        "unit_price": "110.09",
+        "line_total": "2642.11",
+        "metadata_json": {
+            "pricing_adjustments_applied": True,
+            "pricing_original_unit_price": "200.16",
+            "pricing_original_line_total": "4803.84",
+            "pricing_adjusted_unit_price": "110.09",
+            "pricing_adjusted_line_total": "2642.11",
+            "schachermayer_pricing_applied": True,
+        },
+    }
+
+    adjusted = _line_item_with_document_pricing_mode(item, apply_pricing_adjustments=False)
+
+    assert adjusted["unit_price"] == Decimal("200.16")
+    assert adjusted["line_total"] == Decimal("4803.84")
+    assert adjusted["metadata_json"]["pricing_disabled_by_document"] is True
+    assert adjusted["metadata_json"]["schachermayer_pricing_disabled_by_document"] is True
