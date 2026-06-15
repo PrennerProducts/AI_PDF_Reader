@@ -783,6 +783,57 @@ def test_koch_regression() -> None:
     assert items[0]["line_total_raw"] == "2.304,00"
 
 
+def test_koch_long_text_strips_position_headers_and_price_tables() -> None:
+    position_header = re.compile(r"(?m)^\s*\d+\s+\d+Stk\.\s+\S+\s+\d+mm\s+\d+mm\s+\d+mm\s+\S+\s+")
+    price_line = re.compile(r"(?m)^\s*\d+\s+.+?\s+€\s*[0-9 .]+,[0-9]{2}\s+€\s*[0-9 .]+,[0-9]{2}\s*$")
+    pdf_paths = [
+        ROOT / "samples/pdfs/regression/offers/koch/1050685_Angebot.pdf",
+        ROOT / "samples/pdfs/candidates/offers/koch/1050211_Angebot.pdf",
+        ROOT / "samples/pdfs/candidates/offers/koch/1050824_Angebot.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/koch/Auftragsbestätigung_KOCH.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/koch/48406_Auftragsbestätigung.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/koch/49440_Auftragsbestätigung.pdf",
+    ]
+
+    for pdf_path in pdf_paths:
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+
+        for item in items:
+            description_long = item["description_long"]
+            assert not position_header.search(description_long)
+            assert "Anzahl Preiselement Einzelpreis Gesamtpreis" not in description_long
+            assert not price_line.search(description_long)
+            assert not re.search(r"(?m)^\s*Summe\s+€", description_long)
+            if description_long:
+                assert description_long.splitlines()[0] != item["description_short"]
+
+
+def test_koch_pricing_adjustments_apply_document_discounts_sequentially() -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/koch/1050211_Angebot.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    line_rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+
+    discount_rows = [row for row in amount_rows if row["line_type"] == "discount"]
+    assert [(row["percent"], row["amount"]) for row in discount_rows] == [
+        (Decimal("34"), Decimal("-38507.04")),
+        (Decimal("8"), Decimal("-35426.48")),
+    ]
+    assert sum((row.get("line_total") or Decimal("0.00") for row in line_rows), Decimal("0.00")) == Decimal("35426.48")
+
+    first = line_rows[0]
+    metadata = json.loads(first["metadata_json"])
+    assert first["unit_price"] == Decimal("813.04")
+    assert first["line_total"] == Decimal("4878.24")
+    assert metadata["koch_pricing_applied"] is True
+    assert metadata["koch_original_unit_price"] == "1339.00"
+    assert metadata["koch_adjusted_unit_price"] == "813.04"
+    assert [operation["percent"] for operation in metadata["koch_pricing_operations"]] == ["34", "8"]
+
+
 def test_muigg_regression() -> None:
     pdf_path = ROOT / "samples/pdfs/regression/offers/muigg/AN 251409.pdf"
     text = _read_pdf_text(pdf_path)

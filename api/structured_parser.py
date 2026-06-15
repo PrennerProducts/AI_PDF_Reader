@@ -51,6 +51,8 @@ def _has_amount_trigger(line: str) -> bool:
         return False
     if "inklusive rabatte" in lower:
         return False
+    if lower.startswith("der sonderrabatt ist"):
+        return False
     return any(
         word in lower
         for word in (

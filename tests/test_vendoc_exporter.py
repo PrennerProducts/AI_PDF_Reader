@@ -597,6 +597,39 @@ def test_vendoc_payload_exports_generic_basis_unit_and_discounted_purchase_when_
     assert payload["positions"][0]["purchase_price"] == 676.30
 
 
+def test_vendoc_payload_exports_koch_basis_unit_and_discounted_purchase(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Koch Türen GmbH"
+    result["document"]["apply_pricing_adjustments"] = True
+    result["line_items"][0]["unit_price"] = "813.04"
+    result["line_items"][0]["line_total"] = "4878.24"
+    result["line_items"][0]["quantity"] = "6"
+    result["line_items"][0]["metadata_json"] = {
+        "pricing_adjustments_applied": True,
+        "pricing_original_unit_price": "1339.00",
+        "pricing_original_line_total": "8034.00",
+        "pricing_adjusted_unit_price": "813.04",
+        "pricing_adjusted_line_total": "4878.24",
+        "koch_pricing_applied": True,
+        "koch_original_unit_price": "1339.00",
+        "koch_original_line_total": "8034.00",
+        "koch_adjusted_unit_price": "813.04",
+        "koch_adjusted_line_total": "4878.24",
+        "koch_pricing_operations": [
+            {"line_type": "discount", "percent": "34", "label_raw": "abzüglich 34% Rabatt"},
+            {"line_type": "discount", "percent": "8", "label_raw": "abzüglich 8% Sonderrabatt"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is True
+    assert payload["positions"][0]["unit_price"] == 1339.0
+    assert payload["positions"][0]["purchase_price"] == 813.04
+
+
 def test_vendoc_payload_can_skip_entholzer_sonderrabatt_for_stored_positions(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)

@@ -97,6 +97,35 @@ def _extract_sum_prices(block_lines: list[str]) -> tuple[str | None, str | None]
     return None, None
 
 
+def _clean_description_lines(block_lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    in_price_table = False
+    for raw_line in block_lines[1:]:
+        line = normalize_line(raw_line)
+        if not line:
+            continue
+        lower = line.lower()
+        if POSITION_ROW_RE.match(line):
+            continue
+        if lower.startswith(("summe ", "abzüglich ", "gesamtpreis ohne", "gesamtpreis incl", "gesamtpreis inkl")):
+            break
+        if lower.startswith("anzahl preiselement"):
+            in_price_table = True
+            continue
+        if in_price_table:
+            if SUM_LINE_RE.match(line):
+                in_price_table = False
+            continue
+        if PRICE_LINE_RE.match(line) or SUM_LINE_RE.match(line):
+            continue
+        if lower.startswith(("position stück", "position stuck", "auftragsnummer:", "angebotsnummer:")):
+            continue
+        if cleaned and cleaned[-1].lower() == lower:
+            continue
+        cleaned.append(line)
+    return cleaned
+
+
 def extract_document_notes(text: str) -> str | None:
     normalized_text = normalize_text(text)
     start_match = DOCUMENT_NOTE_START_RE.search(normalized_text)
@@ -156,7 +185,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "width_raw": match.group("width"),
                 "height_raw": match.group("height"),
                 "description_short": description_short,
-                "description_long": "\n".join(normalize_line(line) for line in block_lines if normalize_line(line))[:8000],
+                "description_long": "\n".join(_clean_description_lines(block_lines))[:8000],
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
                 "page_ref": page_ref_from_offset(normalized_text, match.start()),

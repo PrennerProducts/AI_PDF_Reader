@@ -1495,6 +1495,18 @@ def _apply_rekord_vomp_pricing_to_line_item_rows(
     )
 
 
+def _apply_koch_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+) -> None:
+    _apply_sequential_pricing_to_line_item_rows(
+        rows,
+        amount_line_rows,
+        provider_key="koch",
+        target_subtotal=_net_total_from_amount_lines(amount_line_rows),
+    )
+
+
 def _build_line_item_rows(
     extracted_text: str,
     template: str,
@@ -1622,6 +1634,8 @@ def _build_line_item_rows(
         _apply_entholzer_pricing_to_line_item_rows(rows, amount_line_rows)
     elif template == "rekord_vomp":
         _apply_rekord_vomp_pricing_to_line_item_rows(rows, amount_line_rows)
+    elif template == "koch":
+        _apply_koch_pricing_to_line_item_rows(rows, amount_line_rows)
     return rows
 
 

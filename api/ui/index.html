@@ -15281,6 +15281,15 @@
           "rekord_vomp_rounding_delta",
           "rekord_vomp_pricing_effective_applied",
           "rekord_vomp_pricing_disabled_by_document",
+          "koch_original_line_total",
+          "koch_original_unit_price",
+          "koch_adjusted_line_total",
+          "koch_adjusted_unit_price",
+          "koch_pricing_applied",
+          "koch_pricing_operations",
+          "koch_rounding_delta",
+          "koch_pricing_effective_applied",
+          "koch_pricing_disabled_by_document",
           "source",
           "extraction_source",
           "manual_edit",
@@ -16363,7 +16372,7 @@
 
     function pricingProviderKeys(source) {
       const metadata = source && typeof source === "object" ? source : {};
-      return ["rieder", "entholzer", "rekord_vomp"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
+      return ["rieder", "entholzer", "rekord_vomp", "koch"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
     }
 
     function roundedMoneyNumber(value) {
@@ -16481,7 +16490,7 @@
 
     function clearPricingMetadataForUi(metadata) {
       const cleaned = { ...(metadata && typeof metadata === "object" ? metadata : {}) };
-      ["pricing", "rieder", "entholzer", "rekord_vomp"].forEach((provider) => {
+      ["pricing", "rieder", "entholzer", "rekord_vomp", "koch"].forEach((provider) => {
         [
           "original_unit_price",
           "original_line_total",
@@ -16639,6 +16648,7 @@
       if (supplier.includes("rieder")) return "rieder";
       if (supplier.includes("entholzer")) return "entholzer";
       if (supplier.includes("rekord") && supplier.includes("vomp")) return "rekord_vomp";
+      if (supplier.includes("koch")) return "koch";
       if (supplier.includes("alu") && supplier.includes("one")) return "alu_one";
       if (supplier.includes("newo")) return "newo";
       if (supplier.includes("schlotterer")) return "schlotterer";
@@ -16729,18 +16739,21 @@
         || source.rieder_pricing_disabled_by_document
         || source.entholzer_pricing_disabled_by_document
         || source.rekord_vomp_pricing_disabled_by_document
+        || source.koch_pricing_disabled_by_document
       );
       const adjustedTotal = firstMetadataNumber(source, [
         "pricing_adjusted_line_total",
         "rieder_adjusted_line_total",
         "entholzer_adjusted_line_total",
         "rekord_vomp_adjusted_line_total",
+        "koch_adjusted_line_total",
       ]);
       const adjustedUnit = firstMetadataNumber(source, [
         "pricing_adjusted_unit_price",
         "rieder_adjusted_unit_price",
         "entholzer_adjusted_unit_price",
         "rekord_vomp_adjusted_unit_price",
+        "koch_adjusted_unit_price",
       ]);
       if (pricingDisabled) {
         const disabledParts = [];
@@ -16763,12 +16776,14 @@
         "rieder_original_line_total",
         "entholzer_original_line_total",
         "rekord_vomp_original_line_total",
+        "koch_original_line_total",
       ]);
       const originalUnit = firstMetadataNumber(source, [
         "pricing_original_unit_price",
         "rieder_original_unit_price",
         "entholzer_original_unit_price",
         "rekord_vomp_original_unit_price",
+        "koch_original_unit_price",
       ]);
       const parts = [];
       if (originalTotal !== null && (currentTotal === null || Math.abs(originalTotal - currentTotal) > 0.005)) {

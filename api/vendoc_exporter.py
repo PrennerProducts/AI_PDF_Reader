@@ -259,7 +259,7 @@ def _metadata_price_value(metadata: dict[str, Any], keys: tuple[str, ...]) -> fl
 
 
 def _pricing_provider_keys(metadata: dict[str, Any]) -> tuple[str, ...]:
-    provider_keys = ["rieder", "entholzer", "rekord_vomp"]
+    provider_keys = ["rieder", "entholzer", "rekord_vomp", "koch"]
     return tuple(provider for provider in provider_keys if metadata.get(f"{provider}_pricing_applied"))
 
 
@@ -387,7 +387,7 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
         adjusted["purchase_price"] = current_unit_price
     metadata["pricing_effective_applied"] = False
     metadata["pricing_disabled_by_document"] = True
-    for provider_key in ("rieder", "entholzer", "rekord_vomp"):
+    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch"):
         if metadata.get(f"{provider_key}_pricing_applied"):
             metadata[f"{provider_key}_pricing_effective_applied"] = False
             metadata[f"{provider_key}_pricing_disabled_by_document"] = True
@@ -513,7 +513,7 @@ def _money_sum(values: list[float | None]) -> float | None:
 
 def _clear_pricing_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     cleaned = dict(metadata)
-    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp"):
+    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp", "koch"):
         for suffix in (
             "original_unit_price",
             "original_line_total",
