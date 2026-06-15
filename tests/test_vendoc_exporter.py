@@ -295,10 +295,12 @@ def test_vendoc_payload_groups_duplicate_nested_embedded_alternatives_per_parent
     assert douglas["description_long"] == "Gesammelte Alternative: Holzart: Douglas 3-schicht verleimt\nAnzahl Quellpositionen: 2"
     assert "119,90" not in douglas["description_long"]
     assert "119.90" not in douglas["description_long"]
+    assert douglas["source_line_item_id"] == "77:aggregate:nested:1:1:holzart douglas 3 schicht verleimt"
     assert douglas["quantity"] == 12.0
     assert douglas["unit_price"] == 310.8
     assert douglas["purchase_price"] == 167.99
     assert laerche["description_short"] == "Holzart: Lärche 3-schicht verleimt"
+    assert laerche["source_line_item_id"] == "77:aggregate:nested:1:2:holzart lärche 3 schicht verleimt"
     assert laerche["quantity"] == 12.0
     assert laerche["unit_price"] == 365.3
     assert laerche["purchase_price"] == 197.45
@@ -374,6 +376,7 @@ def test_vendoc_payload_groups_duplicate_embedded_alternatives_before_appending(
     assert [position["position_no"] for position in payload["positions"]] == ["1", "2"]
     appended = payload["positions"][1]
     assert appended["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert appended["source_line_item_id"] == "77:aggregate:parent-append:1:1:holzart douglas 3 schicht verleimt"
     assert appended["quantity"] == 12.0
     assert appended["unit_price"] == 310.8
     assert appended["purchase_price"] == 167.99

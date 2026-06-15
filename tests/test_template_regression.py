@@ -13,7 +13,7 @@ from structured_parser import extract_amount_lines, extract_line_items
 from template_common import extract_first_description
 from extractor import extract_pdf_images
 from image_assignment import image_within_item_vertical_window
-from main import _build_amount_line_rows, _build_line_item_rows
+from main import _build_amount_line_rows, _build_line_item_rows, _postprocess_image_rows
 from validation import build_document_validation
 
 
@@ -993,6 +993,9 @@ def test_schachermayer_long_text_and_line_discounts_are_clean() -> None:
     ]
     row_header = re.compile(r"(?m)^\s*[0-9]{2,3}\s+[0-9]+,[0-9]{2}\s+[A-Z]{2}\s+\*?\S+")
     item_discount = re.compile(r"(?m)[0-9]+,[0-9]{2}-\s*%\s*Rabatt")
+    price_pair_at_line_end = re.compile(
+        r"(?m)(?:^|\s)[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}\s+[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}\s*$"
+    )
 
     for pdf_path in pdf_paths:
         text = _read_pdf_text(pdf_path)
@@ -1007,8 +1010,11 @@ def test_schachermayer_long_text_and_line_discounts_are_clean() -> None:
 
         for item in items:
             description_long = item["description_long"]
+            assert item["image_required"] is False
+            assert item["image_auto_match_allowed"] is False
             assert not row_header.search(description_long)
             assert not item_discount.search(description_long)
+            assert not price_pair_at_line_end.search(description_long)
             assert "Preis/ME" not in description_long
             assert "Währung EUR" not in description_long
             assert "Schachermayer GmbH" not in description_long
@@ -1028,6 +1034,48 @@ def test_schachermayer_long_text_and_line_discounts_are_clean() -> None:
     assert first_metadata["schachermayer_pricing_applied"] is True
     assert first_metadata["schachermayer_original_unit_price"] == "200.16"
     assert first_metadata["schachermayer_adjusted_unit_price"] == "110.09"
+
+
+def test_schachermayer_long_text_strips_wrapped_price_header() -> None:
+    text = "\n".join(
+        [
+            "Kom. Musterprojekt",
+            "10 16,00 ST 123456789 2.047,71 1 32.763,36 20",
+            "EI2-30C Tür 1050 x 2100 2.047,71 32.763,36",
+            "Serie: heroal D72",
+            "Ausführung in Alu unisoliert",
+            "Summe Positionen 32.763,36",
+            "Mehrwertsteuer 6.552,67",
+            "Endbetrag 39.316,03",
+        ]
+    )
+
+    items = extract_line_items(text, "schachermayer")
+
+    assert len(items) == 1
+    assert items[0]["description_short"] == "Serie: heroal D72"
+    assert items[0]["image_required"] is False
+    assert "EI2-30C Tür 1050 x 2100" not in items[0]["description_long"]
+    assert "2.047,71" not in items[0]["description_long"]
+    assert "32.763,36" not in items[0]["description_long"]
+
+
+def test_schachermayer_header_logo_images_are_suppressed(tmp_path: Path) -> None:
+    pdf_path = ROOT / "samples/pdfs/regression/offers/schachermayer/SCH Offert 225217709.PDF"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    image_rows = extract_pdf_images(pdf_path, tmp_path / "schachermayer-images")
+
+    filtered = _postprocess_image_rows(
+        image_rows,
+        template=parsed["template"],
+        document_type=parsed["document_type"],
+        extracted_text=text,
+    )
+
+    assert parsed["template"] == "schachermayer"
+    assert image_rows
+    assert filtered == []
 
 
 def test_schachermayer_order_confirmation_is_detected() -> None:

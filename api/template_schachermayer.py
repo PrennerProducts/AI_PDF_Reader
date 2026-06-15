@@ -5,6 +5,10 @@ from template_common import extract_first_description, normalize_line, normalize
 from template_headers import first_match
 
 AMOUNT_PATTERN = r"[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
+PRICE_PAIR_AT_LINE_END_RE = re.compile(
+    rf"(?:^|\s)(?:€\s*)?(?:{AMOUNT_PATTERN})(?:\s*€)?\s+(?:€\s*)?(?:{AMOUNT_PATTERN})(?:\s*€)?\s*$",
+    flags=re.IGNORECASE,
+)
 ROW_RE = re.compile(
     rf"(?m)^\s*(?P<position>[0-9]{{2,3}})\s+"
     rf"(?P<qty>[0-9]+,[0-9]{{2}})\s+"
@@ -107,6 +111,8 @@ def _clean_description_lines(block_lines: list[str]) -> list[str]:
             continue
         if DISCOUNT_LABEL_RE.match(normalized):
             continue
+        if PRICE_PAIR_AT_LINE_END_RE.search(normalized):
+            continue
         if cleaned and cleaned[-1].lower() == normalized.lower():
             continue
         cleaned.append(normalized)
@@ -176,6 +182,8 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "unit_price_raw": match.group("unit_price"),
                 "line_total_raw": match.group("line_total"),
                 "page_ref": page_ref_from_offset(normalized_text, match.start()),
+                "image_required": False,
+                "image_auto_match_allowed": False,
             }
         )
 

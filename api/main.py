@@ -514,6 +514,9 @@ def _postprocess_image_rows(
             if not _is_alu_one_header_logo(row)
         ]
 
+    if template == "schachermayer" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
+        return []
+
     if template == "koch" and str(document_type or "").lower() in {"angebot", "auftragsbestaetigung"}:
         return [
             row
@@ -1634,6 +1637,8 @@ def _build_line_item_rows(
             metadata["next_position_top_ratio"] = float(item.get("next_position_top_ratio"))
         if "image_required" in item:
             metadata["image_required"] = bool(item.get("image_required"))
+        if "image_auto_match_allowed" in item:
+            metadata["image_auto_match_allowed"] = bool(item.get("image_auto_match_allowed"))
         for key in (
             "pricing_source",
             "manual_price_editable",

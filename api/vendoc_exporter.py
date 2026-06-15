@@ -525,10 +525,41 @@ def _clear_pricing_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     return cleaned
 
 
+def _embedded_parent_source_line_item_id(item: dict[str, Any]) -> str | None:
+    metadata = _metadata(item)
+    parent_id = _to_str(metadata.get("main_line_item_id"))
+    if parent_id:
+        return parent_id
+    item_id = _to_str(item.get("id"))
+    if item_id and ":alt:" in item_id:
+        return item_id.split(":alt:", 1)[0] or None
+    return None
+
+
+def _aggregate_source_line_item_id(
+    *,
+    parent_source_line_item_id: str | None,
+    aggregate_kind: str,
+    parent_position_no: str | None = None,
+    group_index: int,
+    label: str,
+) -> str:
+    label_key = " ".join((_normalize_lookup_key(label) or "").split())[:48]
+    aggregate_id = (
+        f"aggregate:{aggregate_kind}:"
+        f"{parent_position_no + ':' if parent_position_no else ''}"
+        f"{group_index}:{label_key}"
+    )
+    if parent_source_line_item_id:
+        return f"{parent_source_line_item_id}:{aggregate_id}"
+    return aggregate_id
+
+
 def _aggregate_nested_alternatives(
     alternatives: list[dict[str, Any]],
     *,
     parent_position_no: str | None,
+    parent_source_line_item_id: str | None = None,
     append_at_end: bool = False,
 ) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
@@ -589,6 +620,13 @@ def _aggregate_nested_alternatives(
 
         aggregate = dict(first)
         aggregate_kind = "parent-append" if append_at_end else "nested"
+        aggregate_source_line_item_id = _aggregate_source_line_item_id(
+            parent_source_line_item_id=parent_source_line_item_id,
+            aggregate_kind=aggregate_kind,
+            parent_position_no=parent_position_no or "parent",
+            group_index=group_index,
+            label=label,
+        )
         aggregate["id"] = f"aggregate:{aggregate_kind}:{parent_position_no or 'parent'}:{group_index}:{_normalize_lookup_key(label)[:48]}"
         aggregate["is_alternative"] = True
         aggregate["alternative_append_at_end"] = append_at_end
@@ -597,6 +635,7 @@ def _aggregate_nested_alternatives(
         aggregate["unit_price"] = unit_price
         aggregate["purchase_price"] = purchase_price
         aggregate["line_total"] = line_total
+        metadata["vendoc_source_line_item_id"] = aggregate_source_line_item_id
         aggregate["metadata_json"] = metadata
         aggregate["image_ids_primary"] = []
         aggregate["image_ids"] = []
@@ -680,6 +719,13 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         ]
 
         aggregate = dict(first)
+        parent_source_line_item_id = _embedded_parent_source_line_item_id(first)
+        aggregate_source_line_item_id = _aggregate_source_line_item_id(
+            parent_source_line_item_id=parent_source_line_item_id,
+            aggregate_kind="alt",
+            group_index=group_index,
+            label=label,
+        )
         aggregate["id"] = f"aggregate:alt:{group_index}:{_normalize_lookup_key(label)[:48]}"
         aggregate["is_alternative"] = True
         aggregate["alternative_append_at_end"] = True
@@ -689,6 +735,7 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         aggregate["unit_price"] = unit_price
         aggregate["purchase_price"] = purchase_price
         aggregate["line_total"] = total_sum if has_total else None
+        metadata["vendoc_source_line_item_id"] = aggregate_source_line_item_id
         aggregate["metadata_json"] = metadata
         aggregate["image_ids_primary"] = []
         aggregate["image_ids"] = []
@@ -732,6 +779,7 @@ def _prepare_line_items_for_export(
             item["description_long"] = main_description
             parent_index += 1
             parent_position_no = str(parent_index)
+            parent_source_line_item_id = _to_str(item.get("id")) or _to_str(raw_item.get("id")) or parent_position_no
             item["position_no"] = parent_position_no
             prepared.append(item)
             nested_alternatives: list[dict[str, Any]] = []
@@ -754,6 +802,7 @@ def _prepare_line_items_for_export(
             for alt_item in _aggregate_nested_alternatives(
                 nested_alternatives,
                 parent_position_no=parent_position_no,
+                parent_source_line_item_id=parent_source_line_item_id,
             ):
                 parent_key = parent_position_no or str(parent_index)
                 parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
@@ -763,6 +812,7 @@ def _prepare_line_items_for_export(
                 _aggregate_nested_alternatives(
                     parent_append_alternatives,
                     parent_position_no=parent_position_no,
+                    parent_source_line_item_id=parent_source_line_item_id,
                     append_at_end=True,
                 )
             )
@@ -1025,8 +1075,12 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         if not isinstance(raw_item, dict):
             continue
         ext_line_item_id = external_line_item_id(document_id, raw_item, index)
-        source_line_item_id = _to_str(raw_item.get("id")) or f"idx:{index}"
         metadata = _metadata(raw_item)
+        source_line_item_id = (
+            _to_str(metadata.get("vendoc_source_line_item_id"))
+            or _to_str(raw_item.get("id"))
+            or f"idx:{index}"
+        )
         image_payload = _image_payload(
             document_id=document_id,
             line_item=raw_item,
