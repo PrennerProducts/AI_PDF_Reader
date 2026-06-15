@@ -1162,6 +1162,30 @@ def test_schlotterer_long_text_images_alternatives_and_pricing_are_clean(tmp_pat
     assert all(item_by_pos[position]["alternative_append_at_end"] is True for position in ["15", "16", "17", "18", "19"])
 
     amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    relevant_amount_rows = [
+        (row["line_type"], row["label_raw"], row["percent"], row["base_amount"], row["amount"])
+        for row in amount_rows
+        if row["line_type"] in {"subtotal", "discount", "net_total"}
+    ]
+    assert relevant_amount_rows == [
+        (
+            "subtotal",
+            "Gesamtpreis Positionen EUR 8 904,30Rabatte: Gesamtwert Rabattsatz Rabattwert",
+            None,
+            None,
+            Decimal("8904.30"),
+        ),
+        ("discount", "IGI Rahmen 2.488,00 48,00% -1.194,24", Decimal("48.00"), Decimal("2488.00"), Decimal("-1194.24")),
+        ("discount", "Raff S 5.484,50 48,00% -2.632,57", Decimal("48.00"), Decimal("5484.50"), Decimal("-2632.57")),
+        (
+            "discount",
+            "Raffstorenmotor eingebaut 925,00 50,00% -462,50",
+            Decimal("50.00"),
+            Decimal("925.00"),
+            Decimal("-462.50"),
+        ),
+        ("net_total", "Gesamt Nettosumme EUR 4 614,99", None, None, Decimal("4614.99")),
+    ]
     rows = _build_line_item_rows(
         text,
         parsed["template"],

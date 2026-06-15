@@ -1129,24 +1129,63 @@ def _build_amount_line_rows(
     *,
     template: str | None = None,
 ) -> list[dict]:
+    def _format_amount_line_decimal(value: Decimal) -> str:
+        return f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
     rows: list[dict] = []
+    schlotterer_discount_groups = _parse_schlotterer_discount_groups(extracted_text) if template == "schlotterer" else []
+    schlotterer_discount_insert_order: Decimal | None = None
     for item in extract_amount_lines(extracted_text):
         line_type = item.get("line_type", "other")
         if template == "alu_one" and line_type not in {"net_total", "vat", "total"}:
             continue
+        label_raw = item.get("label_raw", "")
+        normalized_label = str(label_raw or "").strip().lower()
+        if schlotterer_discount_groups:
+            if "gesamtpreis positionen" in normalized_label:
+                line_type = "subtotal"
+            if line_type == "discount" and normalized_label.startswith("rabatte"):
+                schlotterer_discount_insert_order = Decimal(str(item.get("sort_order", len(rows)))) + Decimal("0.10")
+                continue
+            if normalized_label.startswith("summe:"):
+                continue
         amount = _parse_eu_decimal(item.get("amount_raw"))
         if amount is None:
             continue
         rows.append(
             {
                 "line_type": line_type,
-                "label_raw": item.get("label_raw", ""),
+                "label_raw": label_raw,
                 "percent": _parse_eu_decimal(item.get("percent_raw")),
                 "base_amount": _parse_eu_decimal(item.get("base_amount_raw")),
                 "amount": amount,
                 "sort_order": item.get("sort_order", 0),
             }
         )
+
+    if schlotterer_discount_groups:
+        if schlotterer_discount_insert_order is None:
+            subtotal_orders = [
+                Decimal(str(row.get("sort_order", 0)))
+                for row in rows
+                if row.get("line_type") == "subtotal"
+            ]
+            schlotterer_discount_insert_order = (max(subtotal_orders) if subtotal_orders else Decimal("0")) + Decimal("0.10")
+        for offset, group in enumerate(schlotterer_discount_groups):
+            rows.append(
+                {
+                    "line_type": "discount",
+                    "label_raw": (
+                        f"{group['label']} {_format_amount_line_decimal(group['base_amount'])} "
+                        f"{_format_amount_line_decimal(group['percent'])}% "
+                        f"{_format_amount_line_decimal(group['discount_amount'])}"
+                    ),
+                    "percent": group["percent"],
+                    "base_amount": group["base_amount"],
+                    "amount": group["discount_amount"],
+                    "sort_order": schlotterer_discount_insert_order + Decimal(offset + 1) / Decimal("100"),
+                }
+            )
 
     def _upsert_total_line(
         *,
