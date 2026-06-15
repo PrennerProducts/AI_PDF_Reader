@@ -222,6 +222,88 @@ def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_pat
     assert payload["positions"][1]["purchase_price"] == 31.33
 
 
+def test_vendoc_payload_embedded_alternative_purchase_ignores_parent_adjusted_price(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["alternative_position_mode"] = "nested"
+    result["line_items"][0]["description_long"] = "\n".join(
+        [
+            "Fenster 2flg DLS DKR",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 119,90 GP: € 1.438,80",
+        ]
+    )
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_original_unit_price": "1385.02",
+        "rieder_adjusted_unit_price": "748.62",
+        "rieder_original_line_total": "16620.24",
+        "rieder_adjusted_line_total": "8983.44",
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["positions"][0]["unit_price"] == 1385.02
+    assert payload["positions"][0]["purchase_price"] == 748.62
+    assert payload["positions"][1]["unit_price"] == 119.9
+    assert payload["positions"][1]["purchase_price"] == 64.81
+
+
+def test_vendoc_payload_groups_duplicate_nested_embedded_alternatives_per_parent(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["alternative_position_mode"] = "nested"
+    result["line_items"][0]["quantity"] = "12"
+    result["line_items"][0]["description_long"] = "\n".join(
+        [
+            "Fenster 2flg DLS DKR",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 119,90 GP: € 1.438,80",
+            "Alternativ: Holzart: Douglas 3-schicht verleimt EP: € 190,90 GP: € 2.290,80",
+            "Alternativ: Holzart: Lärche 3-schicht verleimt EP: € 147,15 GP: € 1.765,80",
+            "Alternativ: Holzart: Lärche 3-schicht verleimt EP: € 218,15 GP: € 2.617,80",
+        ]
+    )
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_original_unit_price": "1385.02",
+        "rieder_adjusted_unit_price": "748.62",
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["position_count"] == 3
+    assert payload["summary"]["alternative_position_count"] == 4
+    assert [position["position_no"] for position in payload["positions"]] == ["1", "1.1", "1.2"]
+    douglas = payload["positions"][1]
+    laerche = payload["positions"][2]
+    assert douglas["description_short"] == "Holzart: Douglas 3-schicht verleimt"
+    assert douglas["description_long"] == "Gesammelte Alternative: Holzart: Douglas 3-schicht verleimt\nAnzahl Quellpositionen: 2"
+    assert "119,90" not in douglas["description_long"]
+    assert "119.90" not in douglas["description_long"]
+    assert douglas["quantity"] == 12.0
+    assert douglas["unit_price"] == 310.8
+    assert douglas["purchase_price"] == 167.99
+    assert laerche["description_short"] == "Holzart: Lärche 3-schicht verleimt"
+    assert laerche["quantity"] == 12.0
+    assert laerche["unit_price"] == 365.3
+    assert laerche["purchase_price"] == 197.45
+
+
 def test_vendoc_payload_can_skip_rieder_sequence_for_embedded_alternatives(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
@@ -582,8 +664,10 @@ def test_vendoc_payload_groups_appended_alternatives_by_description(tmp_path: Pa
     grouped = payload["positions"][2]
     assert grouped["is_alternative"] is True
     assert grouped["description_short"] == "Holzart: Fichte 3-schicht verleimt"
+    assert grouped["description_long"] == "Gesammelte Alternative: Holzart: Fichte 3-schicht verleimt\nAnzahl Quellpositionen: 2"
     assert grouped["quantity"] == 10.0
     assert grouped["unit_price"] == 16.0
+    assert grouped["purchase_price"] == 16.0
     assert grouped["image_is_primary"] is False
 
 

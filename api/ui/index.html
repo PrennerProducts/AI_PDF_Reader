@@ -2167,7 +2167,8 @@
     }
 
     .price-stack .price-original,
-    .price-stack .price-purchase {
+    .price-stack .price-purchase,
+    .price-stack .price-aggregation-note {
       color: #8a817c;
       font-size: 10px;
       line-height: 1.25;
@@ -2176,6 +2177,52 @@
     .price-stack .price-purchase {
       color: #0b6f4a;
       font-weight: 720;
+    }
+
+    .price-stack .price-aggregation-note {
+      max-width: 180px;
+      color: #665d59;
+      word-break: break-word;
+    }
+
+    .price-aggregation-detail {
+      display: grid;
+      gap: 7px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 32, 32, 0.08);
+      background: rgba(255, 255, 255, 0.82);
+      color: #4c4543;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .price-aggregation-detail > strong {
+      color: #262223;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .price-aggregation-sources {
+      display: grid;
+      gap: 5px;
+      margin-top: 2px;
+    }
+
+    .price-aggregation-source {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+      padding-top: 5px;
+      border-top: 1px solid rgba(35, 32, 32, 0.06);
+      color: #655d59;
+      font-size: 11px;
+    }
+
+    .price-aggregation-source strong {
+      color: #383231;
+      min-width: 0;
     }
 
     .position-detail-card {
@@ -7702,7 +7749,8 @@
     }
 
     .app-v3 .price-stack .price-original,
-    .app-v3 .price-stack .price-purchase {
+    .app-v3 .price-stack .price-purchase,
+    .app-v3 .price-stack .price-aggregation-note {
       color: rgba(29, 29, 31, 0.42);
       font-size: 10px;
       line-height: 1.25;
@@ -7711,6 +7759,10 @@
     .app-v3 .price-stack .price-purchase {
       color: #0b6f4a;
       font-weight: 720;
+    }
+
+    .app-v3 .price-stack .price-aggregation-note {
+      color: rgba(29, 29, 31, 0.52);
     }
 
     .app-v3 .position-meta-chips {
@@ -15236,6 +15288,13 @@
           "manual_edit_actor",
           "manual_edit_updated_at",
           "manual_edit_fields",
+          "alternative_group_source_count",
+          "alternative_group_source_ids",
+          "alternative_group_source_positions",
+          "alternative_group_parent_position_no",
+          "alternative_group_unit_price",
+          "alternative_group_purchase_price",
+          "alternative_group_price_components",
         ]);
         const pageEndRef = itemMetadata.page_end_ref;
         const pageRange = pageEndRef && String(pageEndRef) !== String(item.page_ref)
@@ -15247,6 +15306,8 @@
           : detailValue(itemMetadata.image_required);
         const alternativeAppendControl = alternativeAppendControlHtml(item, lineItemId, alternativeMode);
         const lineTotalOverrideControl = lineTotalOverrideControlHtml(item, lineItemId);
+        const priceAggregationInline = priceAggregationInlineHtml(item, itemMetadata);
+        const priceAggregationDetail = priceAggregationDetailHtml(item, itemMetadata);
         const alternativeExportNote = alternativeExportNoteHtml(item, exportMeta, alternativeMode);
         const displayLineTotal = lineTotalForDisplayItem(item);
         const exportPriceStack = exportPriceStackHtml(item, itemMetadata);
@@ -15304,6 +15365,7 @@
             <div class="price-stack">
               <strong>${escapeHtml(displayLineTotal === null ? "-" : euro(displayLineTotal))}</strong>
               ${exportPriceStack.html}
+              ${priceAggregationInline}
               ${originalPriceNote}
             </div>
           </td>
@@ -15350,9 +15412,10 @@
                     ${alternativeAppendControl}
                   </div>
                 ` : ""}
-                ${lineTotalOverrideControl ? `
+                ${(lineTotalOverrideControl || priceAggregationDetail) ? `
                   <div class="position-detail-block">
                     <h3>Preis</h3>
+                    ${priceAggregationDetail}
                     ${lineTotalOverrideControl}
                   </div>
                 ` : ""}
@@ -16320,6 +16383,12 @@
 
     function pricingAdjustedUnitPrice(item, metadata) {
       const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
+      if (source.alternative_source === "embedded_long_text") {
+        const explicitPurchase = uiNumberValue(item && item.purchase_price);
+        if (explicitPurchase !== null) return explicitPurchase;
+        return applyPricingOperations(pricingOriginalUnitPrice(item, source), source.rieder_pricing_operations);
+      }
+
       const unitKeys = ["pricing_adjusted_unit_price"];
       const totalKeys = ["pricing_adjusted_line_total"];
       for (const provider of pricingProviderKeys(source)) {
@@ -16368,6 +16437,106 @@
         purchasePrice,
         hasSplit: unitPrice !== null && purchasePrice !== null && Math.abs(unitPrice - purchasePrice) > 0.005,
       };
+    }
+
+    function moneySumForUi(values) {
+      const sum = (Array.isArray(values) ? values : [])
+        .reduce((total, value) => {
+          const number = uiNumberValue(value);
+          return number === null ? total : total + number;
+        }, 0);
+      const hasValue = (Array.isArray(values) ? values : []).some((value) => uiNumberValue(value) !== null);
+      return hasValue ? roundedMoneyNumber(sum) : null;
+    }
+
+    function clearPricingMetadataForUi(metadata) {
+      const cleaned = { ...(metadata && typeof metadata === "object" ? metadata : {}) };
+      ["pricing", "rieder", "entholzer", "rekord_vomp"].forEach((provider) => {
+        [
+          "original_unit_price",
+          "original_line_total",
+          "adjusted_unit_price",
+          "adjusted_line_total",
+        ].forEach((suffix) => {
+          delete cleaned[`${provider}_${suffix}`];
+        });
+      });
+      delete cleaned.rieder_original_embedded_unit_price;
+      return cleaned;
+    }
+
+    function aggregateSourcePriceComponents(groupItems) {
+      return (Array.isArray(groupItems) ? groupItems : []).map((item, index) => {
+        const info = exportPriceInfoForUi(item, metadataObject(item));
+        return {
+          source_id: fmt(item && item.id, `Quelle ${index + 1}`),
+          source_position: fmt(item && item.position_no, ""),
+          unit_price: info.unitPrice,
+          purchase_price: info.purchasePrice,
+        };
+      });
+    }
+
+    function aggregatePriceDetailsForUi(item, metadata = null) {
+      const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
+      const sourceItems = Array.isArray(item && item.__aggregate_source_items) ? item.__aggregate_source_items : [];
+      const metadataComponents = Array.isArray(source.alternative_group_price_components)
+        ? source.alternative_group_price_components
+        : [];
+      const components = sourceItems.length ? aggregateSourcePriceComponents(sourceItems) : metadataComponents;
+      if (components.length < 2 && Number(source.alternative_group_source_count || 0) < 2) return null;
+      const unitParts = components.map((part) => uiNumberValue(part && part.unit_price));
+      const purchaseParts = components.map((part) => uiNumberValue(part && part.purchase_price));
+      const unitTotal = uiNumberValue(source.alternative_group_unit_price) ?? moneySumForUi(unitParts);
+      const purchaseTotal = uiNumberValue(source.alternative_group_purchase_price) ?? moneySumForUi(purchaseParts);
+      return {
+        components,
+        unitParts,
+        purchaseParts,
+        unitTotal,
+        purchaseTotal,
+      };
+    }
+
+    function priceAdditionFormula(parts, total) {
+      const values = (Array.isArray(parts) ? parts : []).filter((value) => value !== null && value !== undefined);
+      if (!values.length || total === null || total === undefined) return "";
+      return `${values.map((value) => `${auditMoney(value)} €`).join(" + ")} = ${auditMoney(total)} €`;
+    }
+
+    function priceAggregationInlineHtml(item, metadata) {
+      const details = aggregatePriceDetailsForUi(item, metadata);
+      if (!details) return "";
+      const count = details.components.length || Number((metadata || {}).alternative_group_source_count || 0);
+      const unitFormula = priceAdditionFormula(details.unitParts, details.unitTotal);
+      return `<span class="price-aggregation-note">${escapeHtml(`${count} Preise addiert${unitFormula ? `: ${unitFormula}` : ""}`)}</span>`;
+    }
+
+    function priceAggregationDetailHtml(item, metadata) {
+      const details = aggregatePriceDetailsForUi(item, metadata);
+      if (!details) return "";
+      const unitFormula = priceAdditionFormula(details.unitParts, details.unitTotal);
+      const purchaseFormula = priceAdditionFormula(details.purchaseParts, details.purchaseTotal);
+      const rows = details.components.map((part, index) => {
+        const label = fmt(part && (part.source_position || part.source_id), `Quelle ${index + 1}`);
+        const unit = uiNumberValue(part && part.unit_price);
+        const purchase = uiNumberValue(part && part.purchase_price);
+        return `
+          <div class="price-aggregation-source">
+            <strong>${escapeHtml(label)}</strong>
+            <span>Unit EP ${escapeHtml(unit === null ? "-" : `${auditMoney(unit)} €`)}</span>
+            <span>Purchase EP ${escapeHtml(purchase === null ? "-" : `${auditMoney(purchase)} €`)}</span>
+          </div>
+        `;
+      }).join("");
+      return `
+        <div class="price-aggregation-detail">
+          <strong>Zusammengezählte Alternativpreise</strong>
+          ${unitFormula ? `<span>Unit EP: ${escapeHtml(unitFormula)}</span>` : ""}
+          ${purchaseFormula ? `<span>Purchase EP: ${escapeHtml(purchaseFormula)}</span>` : ""}
+          ${rows ? `<div class="price-aggregation-sources">${rows}</div>` : ""}
+        </div>
+      `;
     }
 
     function exportPriceStackHtml(item, metadata) {
@@ -16590,15 +16759,108 @@
       return aggregated.concat(passthrough);
     }
 
+    function aggregateNestedAlternativesForDisplay(alternatives, parentPositionNo = "") {
+      const groups = new Map();
+      const passthrough = [];
+      (Array.isArray(alternatives) ? alternatives : []).forEach((item) => {
+        const key = alternativeGroupKey(item);
+        if (!key) {
+          passthrough.push(item);
+          return;
+        }
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+      });
+
+      const aggregated = [];
+      Array.from(groups.values()).forEach((groupItems, groupIndex) => {
+        if (groupItems.length === 1) {
+          aggregated.push(groupItems[0]);
+          return;
+        }
+        const first = groupItems[0];
+        const label = alternativeGroupLabel(first) || "Alternative";
+        const components = aggregateSourcePriceComponents(groupItems);
+        const unitPrice = moneySumForUi(components.map((part) => part.unit_price));
+        const purchasePrice = moneySumForUi(components.map((part) => part.purchase_price));
+        const displayUnitPrice = pricingAdjustmentsEnabled(state.result) && purchasePrice !== null
+          ? purchasePrice
+          : unitPrice;
+        const quantity = uiNumberValue(first.quantity);
+        const lineTotal = quantity !== null && displayUnitPrice !== null
+          ? roundedMoneyNumber(quantity * displayUnitPrice)
+          : null;
+        const metadata = clearPricingMetadataForUi(metadataObject(first));
+        metadata.alternative_source = "aggregated_nested";
+        metadata.alternative_append_at_end = false;
+        metadata.alternative_group_source_count = groupItems.length;
+        metadata.alternative_group_source_ids = groupItems.map((item) => fmt(item.id, "")).filter(Boolean);
+        metadata.alternative_group_source_positions = groupItems.map((item) => fmt(item.position_no, "")).filter(Boolean);
+        metadata.alternative_group_parent_position_no = parentPositionNo;
+        metadata.alternative_group_unit_price = unitPrice;
+        metadata.alternative_group_purchase_price = purchasePrice;
+        metadata.alternative_group_price_components = components;
+        metadata.pricing_original_unit_price = unitPrice;
+        metadata.pricing_adjusted_unit_price = purchasePrice;
+        aggregated.push({
+          ...first,
+          id: `aggregate:nested:${parentPositionNo || "parent"}:${groupIndex + 1}:${normalizedUiText(label).slice(0, 48)}`,
+          is_alternative: true,
+          alternative_append_at_end: false,
+          description_short: label,
+          description_long: [
+            `Gesammelte Alternative: ${label}`,
+            `Anzahl Quellpositionen: ${groupItems.length}`,
+          ].join("\n"),
+          unit_price: displayUnitPrice,
+          purchase_price: purchasePrice,
+          line_total: lineTotal,
+          metadata_json: metadata,
+          image_ids_primary: [],
+          image_ids: [],
+          image_count: 0,
+          image_candidate_count: 0,
+          validation_issue_count: 0,
+          validation_status: "auto_accept",
+          __aggregated_alternative: true,
+          __aggregated_nested_alternative: true,
+          __aggregate_source_items: groupItems,
+        });
+      });
+      return aggregated.concat(passthrough);
+    }
+
     function buildAlternativeDisplayItems(items, mode) {
       if (mode !== "append") {
         const visible = [];
         const appendAlternatives = [];
+        let nestedAlternatives = [];
+        let parentPositionNo = "";
+        const flushNestedAlternatives = () => {
+          if (!nestedAlternatives.length) return;
+          visible.push(...aggregateNestedAlternativesForDisplay(nestedAlternatives, parentPositionNo));
+          nestedAlternatives = [];
+        };
         (Array.isArray(items) ? items : []).forEach((item) => {
           if (!item || typeof item !== "object") return;
-          if (item.is_alternative && lineItemAlternativeAppendAtEnd(item)) appendAlternatives.push(item);
-          else visible.push(item);
+          if (!item.is_alternative) {
+            flushNestedAlternatives();
+            parentPositionNo = fmt(item.position_no, "");
+            visible.push(item);
+            return;
+          }
+          if (lineItemAlternativeAppendAtEnd(item)) {
+            appendAlternatives.push(item);
+            return;
+          }
+          if (item.__embedded_alternative) {
+            nestedAlternatives.push(item);
+            return;
+          }
+          flushNestedAlternatives();
+          visible.push(item);
         });
+        flushNestedAlternatives();
         return visible.concat(aggregateAppendAlternativesForDisplay(appendAlternatives));
       }
       const mains = [];

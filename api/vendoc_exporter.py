@@ -263,6 +263,13 @@ def _pricing_original_unit_price(item: dict[str, Any], metadata: dict[str, Any])
 
 
 def _pricing_adjusted_unit_price(item: dict[str, Any], metadata: dict[str, Any]) -> float | None:
+    if metadata.get("alternative_source") == "embedded_long_text":
+        purchase_price = _to_float(item.get("purchase_price"))
+        if purchase_price is not None:
+            return purchase_price
+        original_unit = _pricing_original_unit_price(item, metadata)
+        return _apply_rieder_pricing_operations(original_unit, metadata)
+
     unit_keys = ["pricing_adjusted_unit_price"]
     total_keys = ["pricing_adjusted_line_total"]
     for provider_key in _pricing_provider_keys(metadata):
@@ -295,12 +302,6 @@ def _pricing_adjusted_unit_price(item: dict[str, Any], metadata: dict[str, Any])
         )
         if adjusted_from_operations is not None:
             return adjusted_from_operations
-
-    if metadata.get("alternative_source") == "embedded_long_text":
-        purchase_price = _to_float(item.get("purchase_price"))
-        if purchase_price is not None:
-            return purchase_price
-        return _apply_rieder_pricing_operations(original_unit, metadata)
 
     return None
 
@@ -483,6 +484,106 @@ def _line_total_for_item(item: dict[str, Any]) -> float | None:
     return quantity * unit_price
 
 
+def _money_sum(values: list[float | None]) -> float | None:
+    parsed = [Decimal(str(value)) for value in values if value is not None]
+    if not parsed:
+        return None
+    return float(sum(parsed, Decimal("0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _clear_pricing_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    cleaned = dict(metadata)
+    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp"):
+        for suffix in (
+            "original_unit_price",
+            "original_line_total",
+            "adjusted_unit_price",
+            "adjusted_line_total",
+        ):
+            cleaned.pop(f"{provider_key}_{suffix}", None)
+    cleaned.pop("rieder_original_embedded_unit_price", None)
+    return cleaned
+
+
+def _aggregate_nested_alternatives(
+    alternatives: list[dict[str, Any]],
+    *,
+    parent_position_no: str | None,
+) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    order: list[str] = []
+    passthrough: list[dict[str, Any]] = []
+
+    for item in alternatives:
+        key = _alternative_group_key(item)
+        if not key:
+            passthrough.append(item)
+            continue
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(item)
+
+    aggregated: list[dict[str, Any]] = []
+    for group_index, key in enumerate(order, start=1):
+        group_items = groups[key]
+        if len(group_items) == 1:
+            aggregated.append(group_items[0])
+            continue
+
+        first = group_items[0]
+        label = _alternative_group_label(first) or _to_str(first.get("description_short")) or "Alternative"
+        export_prices = [_line_item_export_prices(item, _metadata(item)) for item in group_items]
+        unit_price = _money_sum([price[0] for price in export_prices])
+        purchase_price = _money_sum([price[1] for price in export_prices])
+        quantity = _to_float(first.get("quantity"))
+        line_total = None
+        if quantity is not None and unit_price is not None:
+            line_total = float((Decimal(str(quantity)) * Decimal(str(unit_price))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        source_ids = [_to_str(item.get("id")) for item in group_items if _to_str(item.get("id"))]
+        source_positions = [_to_str(item.get("position_no")) for item in group_items if _to_str(item.get("position_no"))]
+        metadata = _clear_pricing_metadata(_metadata(first))
+        metadata["alternative_source"] = "aggregated_nested"
+        metadata["alternative_append_at_end"] = False
+        metadata["alternative_group_source_count"] = len(group_items)
+        metadata["alternative_group_source_ids"] = source_ids
+        metadata["alternative_group_source_positions"] = source_positions
+        metadata["alternative_group_unit_price"] = unit_price
+        metadata["alternative_group_purchase_price"] = purchase_price
+        metadata["alternative_group_price_components"] = [
+            {
+                "source_id": _to_str(item.get("id")),
+                "unit_price": source_unit,
+                "purchase_price": source_purchase,
+            }
+            for item, (source_unit, source_purchase) in zip(group_items, export_prices, strict=False)
+        ]
+        if parent_position_no:
+            metadata["alternative_group_parent_position_no"] = parent_position_no
+
+        detail_lines = [
+            f"Gesammelte Alternative: {label}",
+            f"Anzahl Quellpositionen: {len(group_items)}",
+        ]
+
+        aggregate = dict(first)
+        aggregate["id"] = f"aggregate:nested:{parent_position_no or 'parent'}:{group_index}:{_normalize_lookup_key(label)[:48]}"
+        aggregate["is_alternative"] = True
+        aggregate["alternative_append_at_end"] = False
+        aggregate["description_short"] = label
+        aggregate["description_long"] = "\n".join(line for line in detail_lines if line)
+        aggregate["unit_price"] = unit_price
+        aggregate["purchase_price"] = purchase_price
+        aggregate["line_total"] = line_total
+        aggregate["metadata_json"] = metadata
+        aggregate["image_ids_primary"] = []
+        aggregate["image_ids"] = []
+        aggregated.append(aggregate)
+
+    aggregated.extend(passthrough)
+    return aggregated
+
+
 def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
     order: list[str] = []
@@ -508,10 +609,28 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         first = group_items[0]
         label = _alternative_group_label(first) or _to_str(first.get("description_short")) or "Alternative"
         quantity_sum = sum((_to_float(item.get("quantity")) or 0.0) for item in group_items)
-        total_values = [_line_total_for_item(item) for item in group_items]
-        total_sum = sum(value for value in total_values if value is not None)
-        has_total = any(value is not None for value in total_values)
-        unit_price = (total_sum / quantity_sum) if has_total and quantity_sum else _to_float(first.get("unit_price"))
+        export_prices = [_line_item_export_prices(item, _metadata(item)) for item in group_items]
+        unit_total_values = [
+            source_unit * quantity
+            if source_unit is not None and (quantity := _to_float(item.get("quantity"))) is not None
+            else None
+            for item, (source_unit, _source_purchase) in zip(group_items, export_prices, strict=False)
+        ]
+        purchase_total_values = [
+            source_purchase * quantity
+            if source_purchase is not None and (quantity := _to_float(item.get("quantity"))) is not None
+            else None
+            for item, (_source_unit, source_purchase) in zip(group_items, export_prices, strict=False)
+        ]
+        total_sum = _money_sum(unit_total_values)
+        purchase_total_sum = _money_sum(purchase_total_values)
+        has_total = total_sum is not None
+        unit_price = _divide_price(total_sum, quantity_sum) if has_total and quantity_sum else _to_float(first.get("unit_price"))
+        purchase_price = (
+            _divide_price(purchase_total_sum, quantity_sum)
+            if purchase_total_sum is not None and quantity_sum
+            else _to_float(first.get("purchase_price"))
+        )
         source_ids = [_to_str(item.get("id")) for item in group_items if _to_str(item.get("id"))]
         source_positions = [_to_str(item.get("position_no")) for item in group_items if _to_str(item.get("position_no"))]
         metadata = dict(_metadata(first))
@@ -520,23 +639,23 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         metadata["alternative_group_source_count"] = len(group_items)
         metadata["alternative_group_source_ids"] = source_ids
         metadata["alternative_group_source_positions"] = source_positions
+        metadata["alternative_group_unit_price"] = unit_price
+        metadata["alternative_group_purchase_price"] = purchase_price
+        metadata["alternative_group_price_components"] = [
+            {
+                "source_id": _to_str(item.get("id")),
+                "source_position": _to_str(item.get("position_no")),
+                "quantity": _to_float(item.get("quantity")),
+                "unit_price": source_unit,
+                "purchase_price": source_purchase,
+            }
+            for item, (source_unit, source_purchase) in zip(group_items, export_prices, strict=False)
+        ]
 
         detail_lines = [
             f"Gesammelte Alternative: {label}",
             f"Anzahl Quellpositionen: {len(group_items)}",
         ]
-        for item in group_items:
-            detail_lines.append(
-                " / ".join(
-                    part
-                    for part in [
-                        f"Quelle Pos. {_to_str(item.get('position_no'))}" if _to_str(item.get("position_no")) else None,
-                        f"Menge {_to_float(item.get('quantity')):g}" if _to_float(item.get("quantity")) is not None else None,
-                        f"EP {_to_float(item.get('unit_price')):.2f}" if _to_float(item.get("unit_price")) is not None else None,
-                    ]
-                    if part
-                )
-            )
 
         aggregate = dict(first)
         aggregate["id"] = f"aggregate:alt:{group_index}:{_normalize_lookup_key(label)[:48]}"
@@ -546,6 +665,7 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
         aggregate["description_short"] = label
         aggregate["description_long"] = "\n".join(line for line in detail_lines if line)
         aggregate["unit_price"] = unit_price
+        aggregate["purchase_price"] = purchase_price
         aggregate["line_total"] = total_sum if has_total else None
         aggregate["metadata_json"] = metadata
         aggregate["image_ids_primary"] = []
@@ -592,6 +712,7 @@ def _prepare_line_items_for_export(
             parent_position_no = str(parent_index)
             item["position_no"] = parent_position_no
             prepared.append(item)
+            nested_alternatives: list[dict[str, Any]] = []
 
             for alt_number, alt_text in enumerate(embedded_alternatives, start=1):
                 alt_item = _embedded_alternative_item(
@@ -605,9 +726,16 @@ def _prepare_line_items_for_export(
                 if _alternative_append_at_end(alt_item, normalized_mode):
                     append_alternatives.append(alt_item)
                 else:
-                    parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
-                    alt_item["position_no"] = _nested_position(parent_position_no, parent_index, parent_alt_counts[parent_key])
-                    prepared.append(alt_item)
+                    nested_alternatives.append(alt_item)
+
+            for alt_item in _aggregate_nested_alternatives(
+                nested_alternatives,
+                parent_position_no=parent_position_no,
+            ):
+                parent_key = parent_position_no or str(parent_index)
+                parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
+                alt_item["position_no"] = _nested_position(parent_position_no, parent_index, parent_alt_counts[parent_key])
+                prepared.append(alt_item)
             continue
 
         existing_alternative_count += 1
