@@ -219,7 +219,7 @@ def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_pat
     payload = build_vendoc_payload(result)
 
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
-    assert payload["positions"][1]["unit_price"] == 57.97
+    assert payload["positions"][1]["unit_price"] == 999999.0
     assert payload["positions"][1]["purchase_price"] == 31.33
 
 
@@ -251,9 +251,9 @@ def test_vendoc_payload_embedded_alternative_purchase_ignores_parent_adjusted_pr
 
     payload = build_vendoc_payload(result)
 
-    assert payload["positions"][0]["unit_price"] == 1385.02
+    assert payload["positions"][0]["unit_price"] == 999999.0
     assert payload["positions"][0]["purchase_price"] == 748.62
-    assert payload["positions"][1]["unit_price"] == 119.9
+    assert payload["positions"][1]["unit_price"] == 999999.0
     assert payload["positions"][1]["purchase_price"] == 64.81
 
 
@@ -298,12 +298,12 @@ def test_vendoc_payload_groups_duplicate_nested_embedded_alternatives_per_parent
     assert "119.90" not in douglas["description_long"]
     assert douglas["source_line_item_id"] == "77:aggregate:nested:1:1:holzart douglas 3 schicht verleimt"
     assert douglas["quantity"] == 12.0
-    assert douglas["unit_price"] == 310.8
+    assert douglas["unit_price"] == 999999.0
     assert douglas["purchase_price"] == 167.99
     assert laerche["description_short"] == "Holzart: Lärche 3-schicht verleimt"
     assert laerche["source_line_item_id"] == "77:aggregate:nested:1:2:holzart lärche 3 schicht verleimt"
     assert laerche["quantity"] == 12.0
-    assert laerche["unit_price"] == 365.3
+    assert laerche["unit_price"] == 999999.0
     assert laerche["purchase_price"] == 197.45
 
 
@@ -441,7 +441,7 @@ def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: 
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
-def test_vendoc_payload_exports_rieder_basis_unit_and_discounted_purchase_when_enabled(tmp_path: Path) -> None:
+def test_vendoc_payload_exports_rieder_sentinel_unit_and_discounted_purchase_when_enabled(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
@@ -464,11 +464,11 @@ def test_vendoc_payload_exports_rieder_basis_unit_and_discounted_purchase_when_e
     payload = build_vendoc_payload(result)
 
     assert payload["summary"]["apply_pricing_adjustments"] is True
-    assert payload["positions"][0]["unit_price"] == 57.97
+    assert payload["positions"][0]["unit_price"] == 999999.0
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
-def test_vendoc_payload_exports_rieder_processed_rows_with_basis_and_purchase_prices() -> None:
+def test_vendoc_payload_exports_rieder_processed_rows_with_sentinel_and_purchase_prices() -> None:
     text = (ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt").read_text(encoding="utf-8")
     parsed = parse_document_text(text)
     amount_rows = _build_amount_line_rows(text, parsed["totals"])
@@ -491,10 +491,10 @@ def test_vendoc_payload_exports_rieder_processed_rows_with_basis_and_purchase_pr
         }
     )
 
-    assert payload["positions"][0]["unit_price"] == 6531.88
+    assert payload["positions"][0]["unit_price"] == 999999.0
     assert payload["positions"][0]["purchase_price"] == 3530.55
     assert payload["positions"][1]["is_alternative"] is True
-    assert payload["positions"][1]["unit_price"] == 3258.05
+    assert payload["positions"][1]["unit_price"] == 999999.0
     assert payload["positions"][1]["purchase_price"] == 1761.01
 
 
@@ -570,7 +570,7 @@ def test_vendoc_payload_reconstructs_rieder_purchase_when_result_is_already_basi
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
-def test_vendoc_payload_exports_generic_basis_unit_and_discounted_purchase_when_enabled(tmp_path: Path) -> None:
+def test_vendoc_payload_exports_generic_sentinel_unit_and_discounted_purchase_when_enabled(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
@@ -597,11 +597,11 @@ def test_vendoc_payload_exports_generic_basis_unit_and_discounted_purchase_when_
     payload = build_vendoc_payload(result)
 
     assert payload["summary"]["apply_pricing_adjustments"] is True
-    assert payload["positions"][0]["unit_price"] == 751.44
+    assert payload["positions"][0]["unit_price"] == 999999.0
     assert payload["positions"][0]["purchase_price"] == 676.30
 
 
-def test_vendoc_payload_exports_koch_basis_unit_and_discounted_purchase(tmp_path: Path) -> None:
+def test_vendoc_payload_exports_koch_sentinel_unit_and_discounted_purchase(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
@@ -630,11 +630,11 @@ def test_vendoc_payload_exports_koch_basis_unit_and_discounted_purchase(tmp_path
     payload = build_vendoc_payload(result)
 
     assert payload["summary"]["apply_pricing_adjustments"] is True
-    assert payload["positions"][0]["unit_price"] == 1339.0
+    assert payload["positions"][0]["unit_price"] == 999999.0
     assert payload["positions"][0]["purchase_price"] == 813.04
 
 
-def test_vendoc_payload_exports_schachermayer_basis_unit_and_discounted_purchase(tmp_path: Path) -> None:
+def test_vendoc_payload_exports_schachermayer_sentinel_unit_and_discounted_purchase(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
@@ -662,11 +662,11 @@ def test_vendoc_payload_exports_schachermayer_basis_unit_and_discounted_purchase
     payload = build_vendoc_payload(result)
 
     assert payload["summary"]["apply_pricing_adjustments"] is True
-    assert payload["positions"][0]["unit_price"] == 200.16
+    assert payload["positions"][0]["unit_price"] == 999999.0
     assert payload["positions"][0]["purchase_price"] == 110.09
 
 
-def test_vendoc_payload_exports_schuchter_basis_unit_and_discounted_purchase() -> None:
+def test_vendoc_payload_exports_schuchter_sentinel_unit_and_discounted_purchase() -> None:
     pdf_path = ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf"
     text = extract_pdf_text(pdf_path)
     parsed = parse_document_text(text)
@@ -694,14 +694,14 @@ def test_vendoc_payload_exports_schuchter_basis_unit_and_discounted_purchase() -
     )
 
     by_position = {position["position_no"]: position for position in payload["positions"]}
-    assert by_position["1"]["unit_price"] == 1998.85
+    assert by_position["1"]["unit_price"] == 999999.0
     assert by_position["1"]["purchase_price"] == 1099.37
-    assert by_position["13"]["unit_price"] == 2698.8
+    assert by_position["13"]["unit_price"] == 999999.0
     assert by_position["13"]["purchase_price"] == 1484.34
     transport = next(position for position in payload["positions"] if position["description_short"] == "Transportkosten")
     assert transport["position_no"] == "14"
     assert transport["unit_code"] == "PA"
-    assert transport["unit_price"] == 600.0
+    assert transport["unit_price"] == 999999.0
     assert transport["purchase_price"] == 329.99
 
 
@@ -735,12 +735,12 @@ def test_vendoc_payload_exports_schlotterer_group_discount_purchase_and_prefixed
     first = payload["positions"][0]
     appended_alternative = payload["positions"][-1]
     assert first["description_short"] == "Raff S"
-    assert first["unit_price"] == 918.04
+    assert first["unit_price"] == 999999.0
     assert first["purchase_price"] == 473.68
     assert payload["summary"]["alternative_position_count"] == 5
     assert appended_alternative["description_short"] == "Vorsatzrollladen"
     assert appended_alternative["is_alternative"] is True
-    assert appended_alternative["unit_price"] == 1049.96
+    assert appended_alternative["unit_price"] == 999999.0
     assert appended_alternative["purchase_price"] == 1049.96
     assert appended_alternative["source_line_item_id"].startswith("15:aggregate:alt:")
 

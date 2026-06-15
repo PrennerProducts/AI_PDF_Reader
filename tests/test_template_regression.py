@@ -164,6 +164,27 @@ def test_rieder_validation_can_skip_sequential_discounts() -> None:
     }.isdisjoint({"rieder_pricing_sequence_mismatch", "net_component_mismatch"})
 
 
+def test_rieder_long_text_strips_non_alternative_price_lines() -> None:
+    pdf_paths = sorted((ROOT / "samples/pdfs/regression/offers/rieder").glob("*.pdf"))
+    pdf_paths += sorted((ROOT / "samples/pdfs/candidates/offers/rieder").glob("*.pdf"))
+    money_pattern = re.compile(r"(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?|(?:€\s*)?\d+,\d{2}(?:\s*€)?")
+    price_label_pattern = re.compile(r"\b(?:EP|GP)\s*:", flags=re.IGNORECASE)
+
+    for pdf_path in pdf_paths:
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+
+        assert parsed["template"] == "rieder"
+        for item in items:
+            for line in item["description_long"].splitlines():
+                normalized = line.strip().lower()
+                if normalized.startswith(("alternativ:", "alternative:", "alternativ ", "alternative ")):
+                    continue
+                assert not price_label_pattern.search(line)
+                assert not money_pattern.search(line)
+
+
 def test_rieder_multiline_inline_kommission_regression() -> None:
     text = """
 Rieder GmbH

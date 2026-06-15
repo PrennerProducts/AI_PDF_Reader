@@ -10,6 +10,8 @@ from vendoc_rtf import build_vendoc_long_text_rtf
 
 
 VENDOC_NAMESPACE = UUID("8f0f8c50-0f58-45d8-b8e5-83a0f7e79a11")
+PRICING_UNIT_PRICE_SENTINEL = 999999.0
+PRICING_PROVIDER_KEYS = ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter")
 PRICE_AMOUNT_PATTERN = re.compile(r"(?:€\s*\d{1,3}(?:[ .]\d{3})*,\d{2}|\d{1,3}(?:[ .]\d{3})*,\d{2}\s*€)")
 PRICE_LABEL_PATTERN = re.compile(r"\b(?:EP|GP|EK|VK)\s*:\s*(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?", re.IGNORECASE)
 ALTERNATIVE_LINE_PATTERN = re.compile(r"^\s*Alternativ(?:e|position)?\s*:\s*(?P<text>.+?)\s*$", re.IGNORECASE)
@@ -336,8 +338,7 @@ def _metadata_price_value(metadata: dict[str, Any], keys: tuple[str, ...]) -> fl
 
 
 def _pricing_provider_keys(metadata: dict[str, Any]) -> tuple[str, ...]:
-    provider_keys = ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"]
-    return tuple(provider for provider in provider_keys if metadata.get(f"{provider}_pricing_applied"))
+    return tuple(provider for provider in PRICING_PROVIDER_KEYS if metadata.get(f"{provider}_pricing_applied"))
 
 
 def _pricing_original_unit_price(item: dict[str, Any], metadata: dict[str, Any]) -> float | None:
@@ -403,7 +404,12 @@ def _pricing_adjusted_unit_price(item: dict[str, Any], metadata: dict[str, Any])
     return None
 
 
-def _line_item_export_prices(item: dict[str, Any], metadata: dict[str, Any]) -> tuple[float | None, float | None]:
+def _line_item_export_prices(
+    item: dict[str, Any],
+    metadata: dict[str, Any],
+    *,
+    use_unit_price_sentinel: bool = False,
+) -> tuple[float | None, float | None]:
     unit_price = _to_float(item.get("unit_price"))
     purchase_price = _to_float(item.get("purchase_price"))
     if purchase_price is None:
@@ -415,7 +421,48 @@ def _line_item_export_prices(item: dict[str, Any], metadata: dict[str, Any]) -> 
         unit_price = original_unit
         purchase_price = adjusted_unit
 
+    if use_unit_price_sentinel and purchase_price is not None:
+        unit_price = PRICING_UNIT_PRICE_SENTINEL
+
     return unit_price, purchase_price
+
+
+def _metadata_has_pricing_adjustment_context(metadata: dict[str, Any]) -> bool:
+    if metadata.get("pricing_adjustments_applied") or metadata.get("pricing_effective_applied"):
+        return True
+    if any(
+        metadata.get(key) is not None
+        for key in (
+            "pricing_original_unit_price",
+            "pricing_original_line_total",
+            "pricing_adjusted_unit_price",
+            "pricing_adjusted_line_total",
+        )
+    ):
+        return True
+    for provider_key in PRICING_PROVIDER_KEYS:
+        if metadata.get(f"{provider_key}_pricing_applied") or metadata.get(f"{provider_key}_pricing_operations"):
+            return True
+        if metadata.get(f"{provider_key}_pricing_effective_applied"):
+            return True
+        if any(
+            metadata.get(f"{provider_key}_{suffix}") is not None
+            for suffix in (
+                "original_unit_price",
+                "original_line_total",
+                "adjusted_unit_price",
+                "adjusted_line_total",
+            )
+        ):
+            return True
+    return False
+
+
+def _line_items_have_pricing_adjustment_context(line_items: list[Any]) -> bool:
+    return any(
+        isinstance(item, dict) and _metadata_has_pricing_adjustment_context(_metadata(item))
+        for item in line_items
+    )
 
 
 def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
@@ -443,14 +490,13 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
             adjusted["purchase_price"] = current_unit_price
         return adjusted
 
-    provider_keys = ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter")
     original_line_total = None
-    for key in ("pricing_original_line_total", *(f"{provider}_original_line_total" for provider in provider_keys)):
+    for key in ("pricing_original_line_total", *(f"{provider}_original_line_total" for provider in PRICING_PROVIDER_KEYS)):
         original_line_total = _to_float(metadata.get(key))
         if original_line_total is not None:
             break
     original_unit_price = None
-    for key in ("pricing_original_unit_price", *(f"{provider}_original_unit_price" for provider in provider_keys)):
+    for key in ("pricing_original_unit_price", *(f"{provider}_original_unit_price" for provider in PRICING_PROVIDER_KEYS)):
         original_unit_price = _to_float(metadata.get(key))
         if original_unit_price is not None:
             break
@@ -465,7 +511,7 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
         adjusted["purchase_price"] = current_unit_price
     metadata["pricing_effective_applied"] = False
     metadata["pricing_disabled_by_document"] = True
-    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"):
+    for provider_key in PRICING_PROVIDER_KEYS:
         if metadata.get(f"{provider_key}_pricing_applied"):
             metadata[f"{provider_key}_pricing_effective_applied"] = False
             metadata[f"{provider_key}_pricing_disabled_by_document"] = True
@@ -1106,6 +1152,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         alternative_position_mode,
         apply_pricing_adjustments=apply_pricing_adjustments,
     )
+    use_unit_price_sentinel = apply_pricing_adjustments and _line_items_have_pricing_adjustment_context(line_items)
     images = result_data.get("images") if isinstance(result_data.get("images"), list) else []
     document_id = document.get("id")
     ext_document_id = external_document_id(document_id)
@@ -1218,7 +1265,11 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             )
             image_payload["image_is_primary"] = False
             image_long_text_rtf = text_only_rtf
-        unit_price, purchase_price = _line_item_export_prices(raw_item, metadata)
+        unit_price, purchase_price = _line_item_export_prices(
+            raw_item,
+            metadata,
+            use_unit_price_sentinel=use_unit_price_sentinel,
+        )
         line_item_ids[source_line_item_id] = ext_line_item_id
         position = {
             "external_line_item_id": ext_line_item_id,

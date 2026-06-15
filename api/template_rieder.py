@@ -13,6 +13,11 @@ from template_headers import (
 )
 
 CUSTOMER_POSITION_LINE_RE = re.compile(r"^\s*Ku\.?\s*Pos\.?\s*:\s*.*$", re.IGNORECASE)
+PRICE_LABEL_LINE_RE = re.compile(r"\b(?:EP|GP)\s*:", re.IGNORECASE)
+INLINE_PRICE_TOKEN_RE = re.compile(
+    r"(?:€\s*)?\d{1,3}(?:[ .]\d{3})*,\d{2}(?:\s*€)?|(?:€\s*)?\d+,\d{2}(?:\s*€)?",
+    re.IGNORECASE,
+)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -67,6 +72,34 @@ def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict
 def _is_embedded_alternative_line(line: str) -> bool:
     normalized = normalize_line(line).lower()
     return normalized.startswith(("alternativ:", "alternative:", "alternativ ", "alternative "))
+
+
+def _strip_inline_price_tokens(line: str) -> str:
+    cleaned = INLINE_PRICE_TOKEN_RE.sub("", line)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip(" .,-_\t")
+
+
+def _clean_description_long(lines: list[str]) -> str:
+    cleaned_lines: list[str] = []
+    for raw_line in lines:
+        line = normalize_line(raw_line)
+        if not line:
+            continue
+        if CUSTOMER_POSITION_LINE_RE.match(line):
+            continue
+        if _is_embedded_alternative_line(line):
+            cleaned_lines.append(line)
+            continue
+        if PRICE_LABEL_LINE_RE.search(line):
+            continue
+        line = _strip_inline_price_tokens(line)
+        if not line:
+            continue
+        if cleaned_lines and cleaned_lines[-1].lower() == line.lower():
+            continue
+        cleaned_lines.append(line)
+    return "\n".join(cleaned_lines)
 
 
 def _main_price_lines(block_lines: list[str]) -> list[str]:
@@ -270,7 +303,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "width_raw": width_raw,
                 "height_raw": height_raw,
                 "description_short": description_short,
-                "description_long": block_text[:8000],
+                "description_long": _clean_description_long(description_lines or block_lines)[:8000],
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
                 "page_ref": page_ref,
