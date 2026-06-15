@@ -26,7 +26,7 @@ from vendoc_mssql import (
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 from parser import parse_document_text
 from structured_parser import extract_line_items
-from main import _build_amount_line_rows, _build_line_item_rows
+from main import _build_amount_line_rows, _build_line_item_rows, _parse_eu_decimal
 
 
 def _write_png(path: Path) -> bytes:
@@ -492,6 +492,51 @@ def test_vendoc_payload_exports_rieder_processed_rows_with_basis_and_purchase_pr
     assert payload["positions"][1]["is_alternative"] is True
     assert payload["positions"][1]["unit_price"] == 3258.05
     assert payload["positions"][1]["purchase_price"] == 1761.01
+
+
+def test_vendoc_payload_exports_newo_without_raw_header_prices() -> None:
+    text = (ROOT / "samples/text/AN_NEWO_BVH_Projekt_353_Achhorner.txt").read_text(encoding="utf-8")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"])
+    rows = _build_line_item_rows(text, parsed["template"], amount_line_rows=amount_rows)
+
+    payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 25002995,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": "2025-09-04",
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "net_total": _parse_eu_decimal(parsed["totals"]["net_total"]),
+                "vat_total": _parse_eu_decimal(parsed["totals"]["vat_total"]),
+                "gross_total": _parse_eu_decimal(parsed["totals"]["gross_total"]),
+            },
+            "line_items": rows,
+            "images": [],
+        }
+    )
+
+    first = payload["positions"][0]
+    zero_note = payload["positions"][1]
+    referenced = payload["positions"][6]
+
+    assert payload["header"]["supplier_id"] == "300877"
+    assert payload["header"]["net_total"] == 9959.3
+    assert payload["summary"]["alternative_position_count"] == 0
+    assert len(payload["positions"]) == 8
+    assert first["description_short"] == "NeWo Raffstore Lite, i80"
+    assert first["unit_price"] == 640.12
+    assert first["purchase_price"] == 640.12
+    assert "640,12" not in first["description_long"]
+    assert "2.560,48" not in first["description_long"]
+    assert first["description_long"].splitlines()[0] == "NeWo Raffstore Lite, i80"
+    assert zero_note["unit_price"] == 0.0
+    assert zero_note["purchase_price"] == 0.0
+    assert "0,00 0,00" not in zero_note["description_long"]
+    assert referenced["main_line_item_id"] == "57.05.21.A"
 
 
 def test_vendoc_payload_reconstructs_rieder_purchase_when_result_is_already_basis_price(tmp_path: Path) -> None:

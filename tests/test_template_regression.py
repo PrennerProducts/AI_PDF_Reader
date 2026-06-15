@@ -299,7 +299,13 @@ def test_newo_regression() -> None:
     _assert_totals(parsed, ("9.959,30", "1.991,86", "11.951,16"))
     assert len(items) == 8
     assert items[0]["description_short"] == "NeWo Raffstore Lite, i80"
+    assert items[0]["description_long"].splitlines()[0] == "NeWo Raffstore Lite, i80"
+    assert "100 4,00 Stk" not in items[0]["description_long"]
+    assert "640,12" not in items[0]["description_long"]
+    assert "2.560,48" not in items[0]["description_long"]
     item_by_pos = {item["position_no"]: item for item in items}
+    assert "110 4,00 Stk" not in item_by_pos["110"]["description_long"]
+    assert "Wolfgang Neumeyer" not in item_by_pos["110"]["description_long"]
     assert item_by_pos["140"]["image_required"] is False
     assert item_by_pos["160"]["referenced_lv_pos"] == "57.05.21.A"
     assert item_by_pos["160"]["image_required"] is False

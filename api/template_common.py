@@ -62,6 +62,8 @@ def is_decorative_or_footer(line: str) -> bool:
         return True
     if lower.startswith(("bankverbindung:", "geschaeftsfuehrer:", "geschäftsführer:", "firmenbuchnr:", "firmengericht:", "uid-nr:")):
         return True
+    if lower.startswith(("wolfgang neumeyer", "michael frauscher", "salzburger sparkasse")):
+        return True
     if lower.startswith(("iban:", "bic:", "blz:", "konto:", "bank:", "kontoinhaber:", "oberbank", "raiba")):
         return True
     if lower.startswith("angebotsnummer:") and "seite" in lower:

@@ -16125,6 +16125,15 @@
         .trim();
     }
 
+    function stripUnlabeledPositionHeaderPrices(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      return raw
+        .replace(/^(\s*(?:\d+[A-Za-z]?\s+)?\d+(?:[.,]\d{1,4})?\s*(?:Stück|Stueck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)\b(?:\s+|$).+?)\s+\d{1,3}(?:[ .]\d{3})*,\d{2}\s+\d{1,3}(?:[ .]\d{3})*,\d{2}\s*$/i, "$1")
+        .replace(/^[-,\s]+|[-,\s:]+$/g, "")
+        .trim();
+    }
+
     function isEmptyAlternativeLabel(value) {
       return /^\s*Alternativ(?:e|position)?\s*:?\s*$/i.test(String(value || ""));
     }
@@ -16139,6 +16148,7 @@
         .toLowerCase()
         .replace(/\./g, "")
         .replace(/ü/g, "ue")
+        .replace(/²/g, "2")
         .replace(/\s+/g, "");
       if (!normalized) return "";
       if (["stueck", "stuck", "stk", "st"].includes(normalized)) return "piece";
@@ -16155,7 +16165,7 @@
 
     function stripLeadingPositionQuantityLine(lines, item) {
       if (!Array.isArray(lines) || !lines.length) return lines;
-      const match = String(lines[0] || "").match(/^\s*([0-9]+(?:[.,][0-9]+)?)\s*(Stück|Stueck|Stk\.?|St\.?|St)(?:\s+|$)(.*)$/i);
+      const match = String(lines[0] || "").match(/^\s*(?:\d+[A-Za-z]?\s+)?([0-9]+(?:[.,][0-9]+)?)\s*(Stück|Stueck|Stk\.?|St\.?|St|LFM|lfm|lfdm|m²|m2|m|Pauschale|Psch|Set|Paar)(?:\s+|$)(.*)$/i);
       if (!match) return lines;
 
       const expectedQuantity = positionQuantityForLongText(item);
@@ -16167,6 +16177,7 @@
       if (expectedUnit && lineUnit !== expectedUnit) return lines;
 
       const rest = normalizePositionTextSpacing(match[3]);
+      if (/^(?:\d{2}\.){3}[A-Z]:?$/i.test(rest)) return lines.slice(1);
       return rest ? [rest, ...lines.slice(1)] : lines.slice(1);
     }
 
@@ -16176,7 +16187,7 @@
       const lines = raw
         .split(/\r?\n/)
         .filter((line) => !isAlternativeTextLine(line))
-        .map((line) => normalizePositionTextSpacing(stripAlternativePriceTokens(line)))
+        .map((line) => normalizePositionTextSpacing(stripUnlabeledPositionHeaderPrices(stripAlternativePriceTokens(line))))
         .filter((line) => line && !isEmptyAlternativeLabel(line));
       return stripLeadingPositionQuantityLine(lines, item)
         .join("\n");

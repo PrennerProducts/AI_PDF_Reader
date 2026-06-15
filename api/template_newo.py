@@ -13,6 +13,7 @@ PRICE_WITH_DISCOUNT_RE = re.compile(
 ROW_START_RE = re.compile(r"^\d{3}\s+[0-9]+,[0-9]{2,4}\s+\w+")
 HEADER_RE = re.compile(r"^(\d{3})\s+([0-9]+,[0-9]{2,4})\s+([A-Za-z]+)\s+(.+)$")
 REFERENCE_POSITION_RE = re.compile(r"\bzu\s+Pos\.\s*([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[A-Z])", flags=re.IGNORECASE)
+LV_ONLY_RE = re.compile(r"^[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[A-Z]:?$", flags=re.IGNORECASE)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -42,6 +43,26 @@ def _clean_header_description(value: str) -> str:
     if newo_idx > 0:
         cleaned = cleaned[newo_idx:].strip()
     return cleaned
+
+
+def _clean_description_long(block_lines: list[str], header_tail: str) -> str | None:
+    cleaned_lines: list[str] = []
+    header_text = normalize_line(header_tail).strip(" :")
+    header_text = re.sub(r"^(?:[0-9]{2}\.){3}[A-Z]:\s*", "", header_text, flags=re.IGNORECASE).strip()
+    if header_text and not LV_ONLY_RE.fullmatch(header_text):
+        cleaned_lines.append(header_text)
+
+    for line in block_lines[1:]:
+        cleaned = normalize_line(line)
+        if not cleaned:
+            continue
+        if LV_ONLY_RE.fullmatch(cleaned):
+            continue
+        if cleaned_lines and cleaned.lower() == cleaned_lines[-1].lower():
+            continue
+        cleaned_lines.append(cleaned)
+
+    return "\n".join(cleaned_lines)[:8000] if cleaned_lines else None
 
 
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
@@ -161,6 +182,7 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
             bool(referenced_lv_pos)
             or description_norm.startswith("diese position")
         )
+        description_long = _clean_description_long(block_lines, header_tail)
 
         items.append(
             {
@@ -174,7 +196,7 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
                 "width_raw": width_raw,
                 "height_raw": height_raw,
                 "description_short": description_short,
-                "description_long": full_block[:8000],
+                "description_long": description_long,
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
                 "page_ref": page_ref,
