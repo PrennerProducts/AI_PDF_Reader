@@ -19,7 +19,6 @@ POSITION_QUANTITY_PREFIX_PATTERN = re.compile(
     r"^\s*(?P<quantity>[0-9]+(?:[.,][0-9]+)?)\s*(?P<unit>St[üu]ck|Stueck|Stk\.?|St\.?|St)(?:\s+|$)(?P<rest>.*)$",
     re.IGNORECASE,
 )
-VENDOC_PURCHASE_PRICE_UNIT_SENTINEL = 999999.0
 
 SUPPLIER_ID_ALIASES: dict[str, str] = {
     "rieder": "300774",
@@ -221,13 +220,6 @@ def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "ja", "y", "on"}
-
-
-def _uses_purchase_price_unit_sentinel(document: dict[str, Any], *, apply_pricing_adjustments: bool) -> bool:
-    if not apply_pricing_adjustments:
-        return False
-    supplier_key = _normalize_lookup_key(document.get("supplier_name"))
-    return "rieder" in supplier_key
 
 
 def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustments: bool) -> dict[str, Any]:
@@ -692,10 +684,6 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
     raw_line_items = result_data.get("line_items") if isinstance(result_data.get("line_items"), list) else []
     alternative_position_mode = "append" if document.get("alternative_position_mode") == "append" else "nested"
     apply_pricing_adjustments = _pricing_adjustments_enabled(document)
-    use_purchase_price_unit_sentinel = _uses_purchase_price_unit_sentinel(
-        document,
-        apply_pricing_adjustments=apply_pricing_adjustments,
-    )
     line_items, alternative_position_count = _prepare_line_items_for_export(
         raw_line_items,
         alternative_position_mode,
@@ -812,11 +800,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         purchase_price = _to_float(raw_item.get("purchase_price"))
         if purchase_price is None:
             purchase_price = _to_float(raw_item.get("unit_price"))
-        unit_price = (
-            VENDOC_PURCHASE_PRICE_UNIT_SENTINEL
-            if use_purchase_price_unit_sentinel and purchase_price is not None
-            else _to_float(raw_item.get("unit_price"))
-        )
+        unit_price = _to_float(raw_item.get("unit_price"))
         line_item_ids[source_line_item_id] = ext_line_item_id
         position = {
             "external_line_item_id": ext_line_item_id,

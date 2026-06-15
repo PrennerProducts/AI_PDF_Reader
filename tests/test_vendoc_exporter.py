@@ -217,7 +217,7 @@ def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_pat
     payload = build_vendoc_payload(result)
 
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
-    assert payload["positions"][1]["unit_price"] == 999999.0
+    assert payload["positions"][1]["unit_price"] == 31.33
     assert payload["positions"][1]["purchase_price"] == 31.33
 
 
@@ -277,7 +277,7 @@ def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: 
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
-def test_vendoc_payload_marks_unit_price_when_rieder_pricing_enabled(tmp_path: Path) -> None:
+def test_vendoc_payload_keeps_computed_unit_price_when_rieder_pricing_enabled(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
@@ -298,7 +298,7 @@ def test_vendoc_payload_marks_unit_price_when_rieder_pricing_enabled(tmp_path: P
     payload = build_vendoc_payload(result)
 
     assert payload["summary"]["apply_pricing_adjustments"] is True
-    assert payload["positions"][0]["unit_price"] == 999999.0
+    assert payload["positions"][0]["unit_price"] == 31.33
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
