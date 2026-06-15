@@ -805,7 +805,7 @@ def test_strip_price_tokens_removes_trailing_short_text_price() -> None:
     assert _strip_price_tokens("Fenster 2flg DLS DKR € 1.090,00 €") == "Fenster 2flg DLS DKR"
 
 
-def test_strip_prices_from_long_text_removes_embedded_price_lines() -> None:
+def test_strip_prices_from_long_text_removes_embedded_price_and_alternative_lines() -> None:
     raw = "\n".join(
         [
             "Fenster 2flg DLS DKR € 1.090,00 €",
@@ -821,7 +821,6 @@ def test_strip_prices_from_long_text_removes_embedded_price_lines() -> None:
     assert cleaned == "\n".join(
         [
             "Fenster 2flg DLS DKR",
-            "Alternativ: Holzart: Douglas 3-schicht verleimt",
             "12 Stück B/H: 950,0 x 1300,0",
         ]
     )

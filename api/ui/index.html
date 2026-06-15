@@ -11795,6 +11795,7 @@
       project_ref: "Projekt",
       net_total: "Netto",
       vat_total: "MwSt",
+      vendoc_prices: "VenDoc Preise",
     };
     const LINE_ITEM_EDIT_FIELD_LABELS = {
       position_no: "Position",
@@ -13632,9 +13633,12 @@
       const statusMeta = reviewStatusMeta(validation.status, validation.approval);
       const sourceSummary = buildSourceBreakdown(result);
       const approvalMeta = documentApprovalMeta(result);
+      const vendocPriceSummary = vendocPriceCheckSummary(result);
 
       const requiredPresent = countPresent(required);
       const requiredTotal = Object.keys(required).length;
+      const requiredPresentUi = requiredPresent + (vendocPriceSummary.ok ? 1 : 0);
+      const requiredTotalUi = requiredTotal + 1;
       const lineTotal = Number(lineSummary.total || (result.line_items || []).length || 0);
       const lineWithIssues = Number(lineSummary.with_issues || 0);
       const resolvedWarningCount = Number(lineSummary.resolved_warning_count || 0);
@@ -13650,8 +13654,9 @@
       const docErrorCount = Number(validation.error_count || 0);
       const docWarningCount = Number(validation.warning_count || 0);
       const requiredMetricClass = validation.missing_required_fields && validation.missing_required_fields.length
+        || !vendocPriceSummary.ok
         ? "metric-err"
-        : requiredTotal
+        : requiredTotalUi
           ? "metric-ok"
           : "";
       const errorMetricClass = docErrorCount > 0 ? "metric-err" : "metric-ok";
@@ -13712,8 +13717,12 @@
       ui.reviewMetrics.innerHTML = `
         <div class="review-metric is-actionable ${requiredMetricClass}" data-review-jump="review" data-review-filter="all">
           <div class="review-metric-label">Pflichtfelder</div>
-          <div class="review-metric-value">${requiredPresent}/${requiredTotal || 0}</div>
-          <div class="review-metric-note">${validation.missing_required_fields && validation.missing_required_fields.length ? `Fehlend: ${validation.missing_required_fields.map((field) => REVIEW_FIELD_LABELS[field] || field).join(", ")}` : "Vollständig"}</div>
+          <div class="review-metric-value">${requiredPresentUi}/${requiredTotalUi || 0}</div>
+          <div class="review-metric-note">${
+            validation.missing_required_fields && validation.missing_required_fields.length
+              ? `Fehlend: ${validation.missing_required_fields.map((field) => REVIEW_FIELD_LABELS[field] || field).join(", ")}`
+              : (!vendocPriceSummary.ok ? "VenDoc Preise prüfen" : "Vollständig")
+          }</div>
         </div>
         <div class="review-metric is-actionable ${totalsMetricClass}" data-review-jump="review" data-review-filter="all">
           <div class="review-metric-label">Summen</div>
@@ -13750,6 +13759,15 @@
             "Empfohlene Felder fehlen",
             missingRecommended.map((field) => REVIEW_FIELD_LABELS[field] || field).join(", "),
             reviewFlagHtml(`${missingRecommended.length} prüfen`, "review")
+          )
+        );
+      }
+      if (!vendocPriceSummary.ok && vendocPriceSummary.checked > 0) {
+        highlights.push(
+          reviewRowHtml(
+            "VenDoc Preise prüfen",
+            vendocPriceSummary.text,
+            reviewFlagHtml("prüfen", "review")
           )
         );
       }
@@ -13851,6 +13869,17 @@
           )
         );
       }
+      fieldRows.push(
+        reviewRowHtml(
+          "VenDoc Preise · Pflicht",
+          vendocPriceSummary.text,
+          reviewFlagHtml(
+            vendocPriceSummary.ok ? "ok" : (vendocPriceSummary.checked ? "prüfen" : "offen"),
+            vendocPriceSummary.ok ? "ok" : (vendocPriceSummary.checked ? "review" : "neutral")
+          ),
+          { required: true }
+        )
+      );
       ui.fieldChecklist.innerHTML = fieldRows.join("");
 
       const grossFlag = validationBooleanFlag(totals.net_plus_vat_matches_gross);
@@ -16037,6 +16066,10 @@
       return /^\s*Alternativ(?:e|position)?\s*:?\s*$/i.test(String(value || ""));
     }
 
+    function isAlternativeTextLine(value) {
+      return /^\s*Alternativ(?:e|position)?\s*:/i.test(String(value || ""));
+    }
+
     function normalizedPositionUnit(value) {
       const normalized = String(value || "")
         .trim()
@@ -16079,6 +16112,7 @@
       if (!raw) return "";
       const lines = raw
         .split(/\r?\n/)
+        .filter((line) => !isAlternativeTextLine(line))
         .map((line) => normalizePositionTextSpacing(stripAlternativePriceTokens(line)))
         .filter((line) => line && !isEmptyAlternativeLabel(line));
       return stripLeadingPositionQuantityLine(lines, item)
@@ -16345,6 +16379,77 @@
         ? ""
         : `<span class="price-purchase" title="VenDoc purchase_price: rabattierter Einkaufspreis">Purchase EP ${escapeHtml(auditMoney(info.purchasePrice))} €</span>`;
       return { ...info, html: `${unitHtml}${purchaseHtml}` };
+    }
+
+    function providerKeyForUi(documentPayload) {
+      const supplier = normalizedUiText(documentPayload && documentPayload.supplier_name);
+      if (supplier.includes("rieder")) return "rieder";
+      if (supplier.includes("entholzer")) return "entholzer";
+      if (supplier.includes("rekord") && supplier.includes("vomp")) return "rekord_vomp";
+      if (supplier.includes("alu") && supplier.includes("one")) return "alu_one";
+      if (supplier.includes("newo")) return "newo";
+      if (supplier.includes("schlotterer")) return "schlotterer";
+      if (supplier.includes("schuchter")) return "schuchter";
+      return supplier || "generic";
+    }
+
+    function itemIsInformationalForPricingUi(providerKey, item) {
+      const description = normalizedUiText(item && item.description_short);
+      const lvPos = normalizedUiText(item && item.lv_pos);
+      const positionNo = normalizedUiText(item && item.position_no);
+      const unitPrice = uiNumberValue(item && item.unit_price);
+      const lineTotal = uiNumberValue(item && item.line_total);
+      if (providerKey === "alu_one") {
+        return description === "vorbemerkungen"
+          || description.startsWith("info ")
+          || (lineTotal === 0 && /^\d{2}\.\d{2}\.\d{2}$/.test(description));
+      }
+      if (providerKey === "entholzer") return lvPos === "system" && unitPrice === null && lineTotal === null;
+      if (providerKey === "newo") return description.startsWith("diese position");
+      if (providerKey === "rekord_vomp") return lvPos === "umfang" || description.includes("summe-umfang") || description.includes("summe-rahmen");
+      if (providerKey === "schlotterer") return description === "auftragsinfo";
+      if (providerKey === "schuchter") return /^\d+[a-z]$/.test(positionNo) && unitPrice === null && lineTotal === null;
+      return false;
+    }
+
+    function vendocPriceCheckSummary(result) {
+      const items = Array.isArray(result && result.line_items) ? result.line_items : [];
+      const providerKey = providerKeyForUi(result && result.document);
+      let checked = 0;
+      let missingUnit = 0;
+      let missingPurchase = 0;
+      let splitCount = 0;
+      for (const item of items) {
+        if (!item || typeof item !== "object") continue;
+        if (itemIsInformationalForPricingUi(providerKey, item)) continue;
+        checked += 1;
+        const info = exportPriceInfoForUi(item, metadataObject(item));
+        if (info.unitPrice === null) missingUnit += 1;
+        if (info.purchasePrice === null) missingPurchase += 1;
+        if (info.hasSplit) splitCount += 1;
+      }
+      const ok = checked > 0 && missingUnit === 0 && missingPurchase === 0;
+      const missingTotal = missingUnit + missingPurchase;
+      let text = checked
+        ? `${checked - Math.max(missingUnit, missingPurchase)}/${checked} Positionen mit Unit/Purchase`
+        : "Keine preisrelevanten Positionen erkannt";
+      if (splitCount > 0) {
+        text += ` · ${splitCount} mit getrenntem Einkaufspreis`;
+      }
+      if (missingTotal > 0) {
+        const parts = [];
+        if (missingUnit) parts.push(`${missingUnit} ohne Unitpreis`);
+        if (missingPurchase) parts.push(`${missingPurchase} ohne Purchasepreis`);
+        text = parts.join(" · ");
+      }
+      return {
+        ok,
+        checked,
+        missingUnit,
+        missingPurchase,
+        splitCount,
+        text,
+      };
     }
 
     function pricePartsHtml(label, parts) {

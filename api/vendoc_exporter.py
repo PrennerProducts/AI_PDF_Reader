@@ -162,6 +162,8 @@ def _strip_prices_from_long_text(
         line = original_line.strip()
         if not line:
             continue
+        if ALTERNATIVE_LINE_PATTERN.match(line):
+            continue
         sanitized = _strip_price_tokens(line)
         if not sanitized:
             continue
