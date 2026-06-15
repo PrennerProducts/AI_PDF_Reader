@@ -2166,10 +2166,16 @@
       line-height: 1.2;
     }
 
-    .price-stack .price-original {
+    .price-stack .price-original,
+    .price-stack .price-purchase {
       color: #8a817c;
       font-size: 10px;
       line-height: 1.25;
+    }
+
+    .price-stack .price-purchase {
+      color: #0b6f4a;
+      font-weight: 720;
     }
 
     .position-detail-card {
@@ -7695,10 +7701,16 @@
       line-height: 1.35;
     }
 
-    .app-v3 .price-stack .price-original {
+    .app-v3 .price-stack .price-original,
+    .app-v3 .price-stack .price-purchase {
       color: rgba(29, 29, 31, 0.42);
       font-size: 10px;
       line-height: 1.25;
+    }
+
+    .app-v3 .price-stack .price-purchase {
+      color: #0b6f4a;
+      font-weight: 720;
     }
 
     .app-v3 .position-meta-chips {
@@ -8759,6 +8771,55 @@
       color: rgba(29, 29, 31, 0.56);
       font-size: 11px;
       line-height: 1.35;
+    }
+
+    .app-v3 .pricing-adjustment-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+      gap: 8px;
+    }
+
+    .app-v3 .pricing-adjustment-summary-item {
+      min-width: 0;
+      padding: 9px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background: #ffffff;
+    }
+
+    .app-v3 .pricing-adjustment-summary-item span {
+      display: block;
+      margin-bottom: 3px;
+      color: rgba(29, 29, 31, 0.54);
+      font-size: 10px;
+      font-weight: 760;
+      line-height: 1.25;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .app-v3 .pricing-adjustment-summary-item strong {
+      display: block;
+      overflow: hidden;
+      color: rgba(29, 29, 31, 0.88);
+      font-size: 13px;
+      font-weight: 780;
+      line-height: 1.2;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-v3 .pricing-adjustment-summary-item small {
+      display: block;
+      margin-top: 3px;
+      color: rgba(29, 29, 31, 0.50);
+      font-size: 10px;
+      line-height: 1.25;
+    }
+
+    .app-v3 .pricing-adjustment-summary-item.is-mode {
+      border-color: rgba(52, 199, 89, 0.18);
+      background: #f6fcf8;
     }
 
     .app-v3 .position-alternative-mode-control {
@@ -11436,6 +11497,7 @@
                   </span>
                 </label>
                 <div class="pricing-adjustment-meta" id="pricingAdjustmentMeta">Noch kein Dokument geladen.</div>
+                <div class="pricing-adjustment-summary" id="pricingAdjustmentSummary" aria-live="polite"></div>
               </div>
               <div class="items-table-wrap">
                 <table class="items-table">
@@ -11616,6 +11678,7 @@
       alternativeModeMetaItems: document.getElementById("alternativeModeMetaItems"),
       pricingAdjustmentToggle: document.getElementById("pricingAdjustmentToggle"),
       pricingAdjustmentMeta: document.getElementById("pricingAdjustmentMeta"),
+      pricingAdjustmentSummary: document.getElementById("pricingAdjustmentSummary"),
       vendocDryRunBtn: document.getElementById("vendocDryRunBtn"),
       vendocSqlPreviewBtn: document.getElementById("vendocSqlPreviewBtn"),
       vendocLiveExportBtn: document.getElementById("vendocLiveExportBtn"),
@@ -13089,15 +13152,24 @@
       }
 
       const appliesAdjustments = totals && totals.apply_pricing_adjustments !== false;
+      const positionPricesIncludeAdjustments = !!(totals && totals.position_prices_include_adjustments);
       return [
         sumAuditLineHtml("Preislogik", appliesAdjustments ? "Zuschläge/Rabatte aktiv" : "Basispreise aktiv"),
-        sumAuditLineHtml("Positionsbasis", auditMoney(totals.component_included_line_item_sum)),
-        sumAuditLineHtml("Rabatte", auditSignedMoney(totals.discount_sum)),
-        sumAuditLineHtml("Zuschläge", auditSignedMoney(totals.surcharge_sum)),
         sumAuditLineHtml(
-          "Berechnetes Netto",
+          "Positionsbasis",
+          auditMoney(totals.component_included_line_item_sum),
+          positionPricesIncludeAdjustments ? "Zu-/Abschläge bereits enthalten" : ""
+        ),
+        sumAuditLineHtml("Rabatte im Dokument", auditSignedMoney(totals.discount_sum)),
+        sumAuditLineHtml("Zuschläge im Dokument", auditSignedMoney(totals.surcharge_sum)),
+        sumAuditLineHtml(
+          appliesAdjustments ? "Berechnetes Netto" : "Basisbetrag",
           auditMoney(totals.computed_net_from_components),
-          appliesAdjustments ? "Positionen + Zu-/Abschläge" : "Basispositionen; Zu-/Abschläge deaktiviert"
+          !appliesAdjustments
+            ? "Positionsansicht/Export ohne Zu-/Abschläge"
+            : positionPricesIncludeAdjustments
+              ? "Positionspreise inkl. Zu-/Abschläge"
+              : "Positionen + Zu-/Abschläge"
         ),
         sumAuditLineHtml("Nettosumme im Dokument", auditMoney(totals.net_total)),
         sumAuditLineHtml("Delta", auditSignedMoney(totals.net_delta_from_components)),
@@ -13593,7 +13665,8 @@
         : "";
       const grossTotalsOk = totals.net_plus_vat_matches_gross !== false;
       const totalsComponentCheckMode = String(totals.component_check_mode || "").trim().toLowerCase();
-      const componentBlocks = totalsComponentCheckMode !== "heuristic" && totals.component_sum_matches_net === false;
+      const componentPricingDisabled = ["pricing_adjustments_disabled", "rieder_adjustments_disabled"].includes(totalsComponentCheckMode);
+      const componentBlocks = !componentPricingDisabled && totalsComponentCheckMode !== "heuristic" && totals.component_sum_matches_net === false;
       const totalsOk = grossTotalsOk && !componentBlocks;
       const totalsMetricClass = totalsOk ? "metric-ok" : "metric-review";
       const imageProblemCount = missingRequiredImages + duplicateImageAssignments;
@@ -13783,20 +13856,29 @@
       const grossFlag = validationBooleanFlag(totals.net_plus_vat_matches_gross);
       const componentCheckMode = String(totals.component_check_mode || "").trim().toLowerCase();
       const componentIsHeuristic = componentCheckMode === "heuristic";
+      const componentIsPricingDisabled = ["pricing_adjustments_disabled", "rieder_adjustments_disabled"].includes(componentCheckMode);
       const componentFlag = componentIsHeuristic
         ? {
             label: totals.component_sum_matches_net === true ? "plausibel" : "nur Hinweis",
             kind: totals.component_sum_matches_net === true ? "ok" : "neutral",
           }
-        : validationBooleanFlag(totals.component_sum_matches_net);
+        : componentIsPricingDisabled
+          ? { label: "Basispreise", kind: "neutral" }
+          : validationBooleanFlag(totals.component_sum_matches_net);
       const componentTitle = componentIsHeuristic
         ? "Positionssumme als Plausibilitätswert"
-        : "Positionen und Zu-/Abschläge = Netto";
+        : componentIsPricingDisabled
+          ? "Basispreise ohne Zu-/Abschläge"
+          : "Positionen und Zu-/Abschläge = Netto";
       const componentDescription = componentIsHeuristic
         ? `${euro(totals.computed_net_from_components)} Positionsbasis · Netto-Delta ${euro(totals.net_delta_from_components)} · nicht freigabeblockierend`
+        : componentIsPricingDisabled
+          ? `${euro(totals.computed_net_from_components)} Basispreis · Dokumentnetto ${euro(totals.net_total)} · nicht freigabeblockierend`
         : `${euro(totals.computed_net_from_components)} erwartet · Delta ${euro(totals.net_delta_from_components)}`;
       const componentModeLabel = componentIsHeuristic
         ? "heuristik · nicht blockierend"
+        : componentIsPricingDisabled
+          ? "nicht blockierend"
         : (totals.component_check_mode || "-");
       ui.totalsAudit.innerHTML = [
         sumAuditDetailsHtml(
@@ -15080,9 +15162,44 @@
           "embedded_alternative_append_at_end_source",
           "embedded_alternative_append_at_end_updated_at",
           "referenced_lv_pos",
+          "pricing_adjustment_source",
+          "pricing_adjustments_applied",
+          "pricing_original_line_total",
+          "pricing_original_unit_price",
+          "pricing_adjusted_line_total",
+          "pricing_adjusted_unit_price",
+          "pricing_operations",
+          "pricing_rounding_delta",
+          "pricing_effective_applied",
+          "pricing_disabled_by_document",
           "rieder_original_line_total",
           "rieder_original_unit_price",
+          "rieder_adjusted_line_total",
+          "rieder_adjusted_unit_price",
           "rieder_original_embedded_unit_price",
+          "rieder_pricing_applied",
+          "rieder_pricing_operations",
+          "rieder_rounding_delta",
+          "rieder_pricing_effective_applied",
+          "rieder_pricing_disabled_by_document",
+          "entholzer_original_line_total",
+          "entholzer_original_unit_price",
+          "entholzer_adjusted_line_total",
+          "entholzer_adjusted_unit_price",
+          "entholzer_pricing_applied",
+          "entholzer_pricing_operations",
+          "entholzer_rounding_delta",
+          "entholzer_pricing_effective_applied",
+          "entholzer_pricing_disabled_by_document",
+          "rekord_vomp_original_line_total",
+          "rekord_vomp_original_unit_price",
+          "rekord_vomp_adjusted_line_total",
+          "rekord_vomp_adjusted_unit_price",
+          "rekord_vomp_pricing_applied",
+          "rekord_vomp_pricing_operations",
+          "rekord_vomp_rounding_delta",
+          "rekord_vomp_pricing_effective_applied",
+          "rekord_vomp_pricing_disabled_by_document",
           "source",
           "extraction_source",
           "manual_edit",
@@ -15103,7 +15220,8 @@
         const lineTotalOverrideControl = lineTotalOverrideControlHtml(item, lineItemId);
         const alternativeExportNote = alternativeExportNoteHtml(item, exportMeta, alternativeMode);
         const displayLineTotal = lineTotalForDisplayItem(item);
-        const originalPriceNote = originalPriceNoteHtml(item, itemMetadata);
+        const exportPriceStack = exportPriceStackHtml(item, itemMetadata);
+        const originalPriceNote = exportPriceStack.hasSplit ? "" : originalPriceNoteHtml(item, itemMetadata);
         const extractedFieldHtml = detailMetaCellsHtml([
           ["Datensatz-ID", item.id],
           ["Position", item.position_no],
@@ -15123,6 +15241,8 @@
           ["Höhe", item.height_mm ? `${fmt(item.height_mm)} mm` : "-"],
           ["Höhe roh", itemMetadata.height_raw],
           ["Einzelpreis extrahiert", euro(item.unit_price)],
+          ["Unitpreis VenDoc", euro(exportPriceStack.unitPrice)],
+          ["Purchasepreis VenDoc", euro(exportPriceStack.purchasePrice)],
           ["Einzelpreis roh", itemMetadata.unit_price_raw],
           ["Gesamtpreis extrahiert", euro(item.line_total)],
           ["Gesamtpreis roh", itemMetadata.line_total_raw],
@@ -15154,7 +15274,7 @@
           <td>
             <div class="price-stack">
               <strong>${escapeHtml(displayLineTotal === null ? "-" : euro(displayLineTotal))}</strong>
-              <span>EP ${escapeHtml(euro(item.unit_price))}</span>
+              ${exportPriceStack.html}
               ${originalPriceNote}
             </div>
           </td>
@@ -16106,6 +16226,133 @@
       return quantity * unitPrice;
     }
 
+    function firstMetadataNumber(source, keys) {
+      for (const key of keys) {
+        const value = uiNumberValue(source && source[key]);
+        if (value !== null) return value;
+      }
+      return null;
+    }
+
+    function pricingProviderKeys(source) {
+      const metadata = source && typeof source === "object" ? source : {};
+      return ["rieder", "entholzer", "rekord_vomp"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
+    }
+
+    function roundedMoneyNumber(value) {
+      const number = uiNumberValue(value);
+      if (number === null) return null;
+      return Math.round((number + Number.EPSILON) * 100) / 100;
+    }
+
+    function dividedUnitPrice(total, quantity) {
+      const totalNumber = uiNumberValue(total);
+      if (totalNumber === null) return null;
+      const quantityNumber = uiNumberValue(quantity);
+      if (quantityNumber === null || Math.abs(quantityNumber) < 0.000001) return roundedMoneyNumber(totalNumber);
+      return roundedMoneyNumber(totalNumber / quantityNumber);
+    }
+
+    function applyPricingOperations(value, operations) {
+      let current = uiNumberValue(value);
+      if (current === null || !Array.isArray(operations) || !operations.length) return current;
+      for (const operation of operations) {
+        if (!operation || typeof operation !== "object") continue;
+        const lineType = String(operation.line_type || "").trim().toLowerCase();
+        if (!["discount", "surcharge"].includes(lineType)) continue;
+        const percent = uiNumberValue(operation.percent);
+        if (percent === null) continue;
+        const factor = lineType === "surcharge" ? 1 + percent / 100 : 1 - percent / 100;
+        current *= factor;
+      }
+      return roundedMoneyNumber(current);
+    }
+
+    function pricingOriginalUnitPrice(item, metadata) {
+      const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
+      const embeddedOriginal = uiNumberValue(source.rieder_original_embedded_unit_price);
+      if (embeddedOriginal !== null) return embeddedOriginal;
+
+      const unitKeys = ["pricing_original_unit_price"];
+      const totalKeys = ["pricing_original_line_total"];
+      for (const provider of pricingProviderKeys(source)) {
+        unitKeys.push(`${provider}_original_unit_price`);
+        totalKeys.push(`${provider}_original_line_total`);
+      }
+      const originalUnit = firstMetadataNumber(source, unitKeys);
+      if (originalUnit !== null) return originalUnit;
+      return dividedUnitPrice(firstMetadataNumber(source, totalKeys), item && item.quantity);
+    }
+
+    function pricingAdjustedUnitPrice(item, metadata) {
+      const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
+      const unitKeys = ["pricing_adjusted_unit_price"];
+      const totalKeys = ["pricing_adjusted_line_total"];
+      for (const provider of pricingProviderKeys(source)) {
+        unitKeys.push(`${provider}_adjusted_unit_price`);
+        totalKeys.push(`${provider}_adjusted_line_total`);
+      }
+      const adjustedUnit = firstMetadataNumber(source, unitKeys);
+      if (adjustedUnit !== null) return adjustedUnit;
+
+      const adjustedTotal = firstMetadataNumber(source, totalKeys);
+      if (adjustedTotal !== null) return dividedUnitPrice(adjustedTotal, item && item.quantity);
+
+      const riederOriginalTotal = uiNumberValue(source.rieder_original_line_total);
+      if (riederOriginalTotal !== null) {
+        let total = applyPricingOperations(riederOriginalTotal, source.rieder_pricing_operations);
+        const roundingDelta = uiNumberValue(source.rieder_rounding_delta);
+        if (total !== null && roundingDelta !== null) total = roundedMoneyNumber(total + roundingDelta);
+        const divided = dividedUnitPrice(total, item && item.quantity);
+        if (divided !== null) return divided;
+      }
+
+      const originalUnit = pricingOriginalUnitPrice(item, source);
+      for (const provider of pricingProviderKeys(source)) {
+        const adjustedFromOperations = applyPricingOperations(originalUnit, source[`${provider}_pricing_operations`]);
+        if (adjustedFromOperations !== null) return adjustedFromOperations;
+      }
+
+      const explicitPurchase = uiNumberValue(item && item.purchase_price);
+      return explicitPurchase;
+    }
+
+    function exportPriceInfoForUi(item, metadata) {
+      const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
+      let unitPrice = uiNumberValue(item && item.unit_price);
+      let purchasePrice = uiNumberValue(item && item.purchase_price);
+      const originalUnit = pricingOriginalUnitPrice(item, source);
+      const adjustedUnit = pricingAdjustedUnitPrice(item, source);
+      if (originalUnit !== null && adjustedUnit !== null) {
+        unitPrice = originalUnit;
+        purchasePrice = adjustedUnit;
+      } else if (purchasePrice === null) {
+        purchasePrice = adjustedUnit !== null ? adjustedUnit : unitPrice;
+      }
+      return {
+        unitPrice,
+        purchasePrice,
+        hasSplit: unitPrice !== null && purchasePrice !== null && Math.abs(unitPrice - purchasePrice) > 0.005,
+      };
+    }
+
+    function exportPriceStackHtml(item, metadata) {
+      const info = exportPriceInfoForUi(item, metadata);
+      const unitHtml = info.unitPrice === null
+        ? `<span>Unit EP -</span>`
+        : `<span title="VenDoc unit_price: Basis- bzw. Listenpreis">Unit EP ${escapeHtml(auditMoney(info.unitPrice))} €</span>`;
+      const purchaseHtml = info.purchasePrice === null
+        ? ""
+        : `<span class="price-purchase" title="VenDoc purchase_price: rabattierter Einkaufspreis">Purchase EP ${escapeHtml(auditMoney(info.purchasePrice))} €</span>`;
+      return { ...info, html: `${unitHtml}${purchaseHtml}` };
+    }
+
+    function pricePartsHtml(label, parts) {
+      const filtered = parts.filter(Boolean);
+      if (!filtered.length) return "";
+      return `<span class="price-original">(${escapeHtml(`${label} ${filtered.join(" / ")}`)})</span>`;
+    }
+
     function originalPriceNoteHtml(item, metadata) {
       const source = metadata && typeof metadata === "object" ? metadata : metadataObject(item);
       const currentTotal = lineTotalForDisplayItem(item);
@@ -16119,8 +16366,52 @@
         return `<span class="price-original">(Original EP ${escapeHtml(auditMoney(originalEmbeddedUnit))} €)</span>`;
       }
 
-      const originalTotal = uiNumberValue(source.rieder_original_line_total);
-      const originalUnit = uiNumberValue(source.rieder_original_unit_price);
+      const pricingDisabled = !!(
+        source.pricing_disabled_by_document
+        || source.rieder_pricing_disabled_by_document
+        || source.entholzer_pricing_disabled_by_document
+        || source.rekord_vomp_pricing_disabled_by_document
+      );
+      const adjustedTotal = firstMetadataNumber(source, [
+        "pricing_adjusted_line_total",
+        "rieder_adjusted_line_total",
+        "entholzer_adjusted_line_total",
+        "rekord_vomp_adjusted_line_total",
+      ]);
+      const adjustedUnit = firstMetadataNumber(source, [
+        "pricing_adjusted_unit_price",
+        "rieder_adjusted_unit_price",
+        "entholzer_adjusted_unit_price",
+        "rekord_vomp_adjusted_unit_price",
+      ]);
+      if (pricingDisabled) {
+        const disabledParts = [];
+        if (adjustedTotal !== null && (currentTotal === null || Math.abs(adjustedTotal - currentTotal) > 0.005)) {
+          const sameAsUnit = adjustedUnit !== null && Math.abs(adjustedTotal - adjustedUnit) <= 0.005;
+          disabledParts.push(`${sameAsUnit ? "" : "GP "}${auditMoney(adjustedTotal)} €`);
+        }
+        if (
+          adjustedUnit !== null
+          && (currentUnit === null || Math.abs(adjustedUnit - currentUnit) > 0.005)
+          && (adjustedTotal === null || Math.abs(adjustedTotal - adjustedUnit) > 0.005)
+        ) {
+          disabledParts.push(`EP ${auditMoney(adjustedUnit)} €`);
+        }
+        return pricePartsHtml("Rabattiert", disabledParts);
+      }
+
+      const originalTotal = firstMetadataNumber(source, [
+        "pricing_original_line_total",
+        "rieder_original_line_total",
+        "entholzer_original_line_total",
+        "rekord_vomp_original_line_total",
+      ]);
+      const originalUnit = firstMetadataNumber(source, [
+        "pricing_original_unit_price",
+        "rieder_original_unit_price",
+        "entholzer_original_unit_price",
+        "rekord_vomp_original_unit_price",
+      ]);
       const parts = [];
       if (originalTotal !== null && (currentTotal === null || Math.abs(originalTotal - currentTotal) > 0.005)) {
         const sameAsUnit = originalUnit !== null && Math.abs(originalTotal - originalUnit) <= 0.005;
@@ -16133,8 +16424,7 @@
       ) {
         parts.push(`EP ${auditMoney(originalUnit)} €`);
       }
-      if (!parts.length) return "";
-      return `<span class="price-original">(Original ${escapeHtml(parts.join(" / "))})</span>`;
+      return pricePartsHtml("Original", parts);
     }
 
     function aggregateAppendAlternativesForDisplay(alternatives) {
@@ -16276,6 +16566,64 @@
         : "Basispreise ohne Zuschläge/Rabatte";
     }
 
+    function pricingAdjustmentSummaryHtml(result, enabled) {
+      const documentPayload = result && result.document ? result.document : null;
+      const validation = result && result.validation && typeof result.validation === "object" ? result.validation : {};
+      const totals = validation.totals && typeof validation.totals === "object" ? validation.totals : {};
+      if (!documentPayload || !Object.keys(totals).length) {
+        return `
+          <div class="pricing-adjustment-summary-item is-mode">
+            <span>Preislogik</span>
+            <strong>Noch keine Daten</strong>
+            <small>Dokument laden oder neu verarbeiten</small>
+          </div>
+        `;
+      }
+
+      const currentPositions = totals.component_included_line_item_sum ?? totals.non_alternative_line_item_sum;
+      const documentNet = totals.net_total ?? documentPayload.net_total;
+      const discount = totals.discount_sum;
+      const surcharge = totals.surcharge_sum;
+      const delta = totals.net_delta_from_components;
+      const modeNote = enabled
+        ? "Positionen verwenden rabattierte Werte"
+        : "Positionen verwenden Basiswerte";
+      const positionLabel = enabled ? "Aktuelle Summe" : "Basis-Positionssumme";
+      const deltaNote = enabled
+        ? "Soll nahe 0,00 sein"
+        : "erwartet, weil Zu-/Abschläge aus sind";
+      return [
+        `
+          <div class="pricing-adjustment-summary-item is-mode">
+            <span>Modus</span>
+            <strong>${escapeHtml(enabled ? "Mit Zu-/Abschlägen" : "Basispreise")}</strong>
+            <small>${escapeHtml(modeNote)}</small>
+          </div>
+        `,
+        `
+          <div class="pricing-adjustment-summary-item">
+            <span>${escapeHtml(positionLabel)}</span>
+            <strong>${escapeHtml(auditMoney(currentPositions))} €</strong>
+            <small>Summe der berücksichtigten Positionen</small>
+          </div>
+        `,
+        `
+          <div class="pricing-adjustment-summary-item">
+            <span>Dokumentwerte</span>
+            <strong>${escapeHtml(auditMoney(documentNet))} €</strong>
+            <small>Rabatt ${escapeHtml(auditSignedMoney(discount))} · Zuschlag ${escapeHtml(auditSignedMoney(surcharge))}</small>
+          </div>
+        `,
+        `
+          <div class="pricing-adjustment-summary-item">
+            <span>Delta zu Netto</span>
+            <strong>${escapeHtml(auditSignedMoney(delta))} €</strong>
+            <small>${escapeHtml(deltaNote)}</small>
+          </div>
+        `,
+      ].join("");
+    }
+
     function alternativeModeSegments() {
       return [ui.alternativeModeSegment, ui.alternativeModeSegmentItems].filter(Boolean);
     }
@@ -16317,6 +16665,9 @@
         ui.pricingAdjustmentMeta.textContent = documentPayload
           ? pricingAdjustmentModeLabel(applyPricingAdjustments)
           : "Noch kein Dokument geladen.";
+      }
+      if (ui.pricingAdjustmentSummary) {
+        ui.pricingAdjustmentSummary.innerHTML = pricingAdjustmentSummaryHtml(result, applyPricingAdjustments);
       }
     }
 

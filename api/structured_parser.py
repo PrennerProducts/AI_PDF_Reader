@@ -93,6 +93,8 @@ def _candidate_amount_for_trigger(lines: list[str], idx: int, line: str) -> tupl
         if idx + step >= len(lines):
             break
         next_line = lines[idx + step]
+        if _has_amount_trigger(next_line):
+            break
         if next_line:
             merged.append(next_line)
     if merged:
@@ -113,7 +115,7 @@ def _candidate_amount_for_trigger(lines: list[str], idx: int, line: str) -> tupl
         probe = lines[idx + step]
         if not probe:
             continue
-        if step > 1 and _has_amount_trigger(probe) and lookahead_tokens:
+        if _has_amount_trigger(probe):
             break
         tokens = _extract_amount_tokens(probe)
         if tokens:

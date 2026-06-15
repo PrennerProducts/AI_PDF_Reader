@@ -15,6 +15,7 @@ PRICE_PAIR_RE = re.compile(
     r"([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})\s*(?:EUR|\u20ac)?\s+"
     r"([0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})\s*(?:EUR|\u20ac)?"
 )
+EMPTY_PRICE_HEADER_RE = re.compile(r"\s*\bEP\s*:\s*GP\s*:\s*$", flags=re.IGNORECASE)
 
 
 def detect(normalized_lower: str) -> bool:
@@ -57,6 +58,20 @@ def _extract_prices(block_lines: list[str]) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _clean_description_lines(block_lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for line in block_lines:
+        normalized = normalize_line(line)
+        if not normalized:
+            continue
+        if normalized.lower() == "(symbolfoto)":
+            continue
+        normalized = EMPTY_PRICE_HEADER_RE.sub("", normalized).strip()
+        if normalized:
+            cleaned.append(normalized)
+    return cleaned
+
+
 def extract_line_items(text: str) -> list[dict[str, Any]]:
     normalized_text = normalize_text(text)
     items: list[dict[str, Any]] = []
@@ -77,6 +92,9 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "zahlungsbedingungen:",
             ),
         )
+        if not block_lines:
+            continue
+        block_lines = _clean_description_lines(block_lines)
         if not block_lines:
             continue
 

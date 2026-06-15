@@ -146,6 +146,25 @@ def _prepare_compact_text(text: str) -> str:
     return prepared
 
 
+def _page_bounds_for_offset(text: str, offset: int) -> tuple[int, int]:
+    page_start = text.rfind("\f", 0, max(0, offset)) + 1
+    page_end = text.find("\f", max(0, offset))
+    if page_end < 0:
+        page_end = len(text)
+    return page_start, page_end
+
+
+def _page_line_top_ratio(text: str, offset: int) -> float | None:
+    page_start, page_end = _page_bounds_for_offset(text, offset)
+    if page_end <= page_start:
+        return None
+    page_text = text[page_start:page_end]
+    relative_offset = max(0, min(offset, page_end) - page_start)
+    line_count = max(1, page_text.count("\n") + 1)
+    line_index = page_text[:relative_offset].count("\n")
+    return min(0.98, max(0.02, line_index / line_count))
+
+
 def _extract_arch_pos(text_before: str) -> tuple[str | None, bool]:
     lines = [normalize_line(line) for line in text_before.splitlines() if normalize_line(line)]
     arch_pos = None
@@ -222,6 +241,13 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         quantity_raw = match.group(2)
         page_ref = page_ref_from_offset(normalized_text, match.start())
         page_end_ref = page_ref_from_offset(normalized_text, max(match.start(), block_end - 1))
+        item_top_ratio = _page_line_top_ratio(normalized_text, match.start())
+        next_position_page_ref = None
+        next_position_top_ratio = None
+        if idx + 1 < len(matches):
+            next_match = matches[idx + 1]
+            next_position_page_ref = page_ref_from_offset(normalized_text, next_match.start())
+            next_position_top_ratio = _page_line_top_ratio(normalized_text, next_match.start())
         block_joined = "\n".join(block_lines)
         width_raw, height_raw = _extract_ram_dimensions(block_joined)
 
@@ -253,6 +279,9 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "page_ref": page_ref,
                 "page_end_ref": page_end_ref,
                 "spans_page_break": page_end_ref > page_ref,
+                "item_top_ratio": item_top_ratio,
+                "next_position_page_ref": next_position_page_ref,
+                "next_position_top_ratio": next_position_top_ratio,
             }
         )
 

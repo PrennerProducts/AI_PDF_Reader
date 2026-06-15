@@ -191,7 +191,7 @@ def metadata_dict(row: dict[str, Any]) -> dict[str, Any]:
 
 def metadata_image_assignment(row: dict[str, Any], valid_ids: set[int]) -> dict[str, Any]:
     metadata = metadata_dict(row)
-    has_decision = any(
+    has_decision_fields = any(
         key in metadata
         for key in (
             "image_assignment_ids",
@@ -211,11 +211,17 @@ def metadata_image_assignment(row: dict[str, Any], valid_ids: set[int]) -> dict[
     values = dedupe_int_list(values)
     source = str(metadata.get("image_assignment_source") or "").strip() or None
     reason = str(metadata.get("image_assignment_reason") or "").strip() or None
+    source_normalized = (source or "").lower()
+    has_empty_manual_decision = bool(
+        not values
+        and has_decision_fields
+        and source_normalized in {"manual", "manual_crop"}
+    )
     return {
         "image_ids": values,
         "source": source,
         "reason": reason,
-        "has_decision": has_decision,
+        "has_decision": bool(values or has_empty_manual_decision),
         "is_final": bool(values),
     }
 

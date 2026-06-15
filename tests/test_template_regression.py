@@ -215,6 +215,74 @@ def test_entholzer_regression() -> None:
     _assert_totals(parsed, ("179 114,17", "35 822,83", "214 937,00"))
     assert len(items) == 22
     assert items[0]["description_short"] == "AluClip 90 (SERIE SMART)"
+    assert items[0]["lv_pos"] == "System"
+    assert items[0].get("image_required", True) is True
+    assert "EP: GP:" not in items[0]["description_long"]
+    assert "(Symbolfoto)" not in items[0]["description_long"]
+    assert all("EP: GP:" not in item["description_long"] for item in items)
+
+
+def test_entholzer_empty_montage_line_does_not_steal_net_total() -> None:
+    text = """
+Summe ohne Montagekosten                                      18 439,42 €
+abzüglich 10%    Sonderrabatt aus     18 439,42                1 843,94 €
+Zwischensumme                                                 16 595,48 €
+zuzüglich Montage/Zustellung gesamt               ______________________
+Nettosumme                                                    16 595,48 €
+zuzüglich 20% Mehrwertsteuer                                   3 319,10 €
+Angebotssumme                                                 19 914,58 €
+""".strip()
+
+    amount_lines = extract_amount_lines(text)
+
+    assert [line["line_type"] for line in amount_lines] == [
+        "subtotal",
+        "discount",
+        "subtotal",
+        "net_total",
+        "vat",
+        "total",
+    ]
+    assert all("Montage/Zustellung" not in line["label_raw"] for line in amount_lines)
+
+
+def test_entholzer_processing_applies_sonderrabatt_to_positions() -> None:
+    text = _read_pdf_text(ROOT / "samples/pdfs/regression/offers/entholzer/Angebot 12600422.00 Bernsteiner.pdf")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"])
+    rows = _build_line_item_rows(text, parsed["template"], amount_line_rows=amount_rows)
+    rows_by_pos = {row["position_no"]: row for row in rows}
+    position_two = rows_by_pos["2"]
+    metadata = json.loads(position_two["metadata_json"])
+
+    assert position_two["unit_price"] == Decimal("676.30")
+    assert position_two["line_total"] == Decimal("676.30")
+    assert metadata["entholzer_original_unit_price"] == "751.44"
+    assert metadata["entholzer_original_line_total"] == "751.44"
+    assert metadata["entholzer_pricing_operations"][0]["percent"] == "10"
+    assert sum((row.get("line_total") or Decimal("0.00") for row in rows if not row.get("is_alternative")), Decimal("0.00")) == Decimal("19635.78")
+
+    validation = build_document_validation(
+        document={
+            "supplier_name": parsed["supplier_name"],
+            "document_type": parsed["document_type"],
+            "document_number": parsed["document_number"],
+            "document_date": parsed["document_date"],
+            "project_ref": parsed["project_ref"],
+            "currency": "EUR",
+            "net_total": parsed["totals"]["net_total"],
+            "vat_total": parsed["totals"]["vat_total"],
+            "gross_total": parsed["totals"]["gross_total"],
+            "apply_pricing_adjustments": True,
+        },
+        amount_lines=amount_rows,
+        line_items=rows,
+        images=[],
+    )
+
+    assert validation["status"] == "auto_accept"
+    assert validation["totals"]["component_check_mode"] == "entholzer_adjusted_positions"
+    assert validation["totals"]["component_sum_matches_net"] is True
 
 
 def test_newo_regression() -> None:
@@ -332,12 +400,64 @@ def test_rekord_vomp_regression() -> None:
     assert item_by_pos["8"]["page_ref"] == 7
     assert item_by_pos["8"]["page_end_ref"] == 8
     assert item_by_pos["8"]["spans_page_break"] is True
+    assert item_by_pos["8"]["item_top_ratio"] > 0.7
+    assert item_by_pos["8"]["next_position_page_ref"] == 8
+    assert 0.45 < item_by_pos["8"]["next_position_top_ratio"] < 0.55
+    assert item_by_pos["9"]["item_top_ratio"] == item_by_pos["8"]["next_position_top_ratio"]
     assert item_by_pos["11"]["page_ref"] == 9
     assert item_by_pos["11"]["page_end_ref"] == 10
     assert item_by_pos["11"]["spans_page_break"] is True
     assert items[-1]["lv_pos"] == "Lieferung"
     assert items[-1]["line_total_raw"] == "578,59"
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
+def test_rekord_vomp_processing_applies_discounts_and_delivery_rules() -> None:
+    cases = [
+        ("Angebot_VAX53456.pdf", Decimal("16174.15"), "1000", Decimal("300.00")),
+        ("Angebot_VAX60326.pdf", Decimal("22473.45"), "13", Decimal("300.01")),
+        ("VAX30295.pdf", Decimal("18015.46"), "100", Decimal("300.00")),
+    ]
+
+    for filename, expected_net, delivery_position, expected_delivery_total in cases:
+        pdf_path = ROOT / "samples/pdfs/regression/offers/rekord_vomp" / filename
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        amount_rows = _build_amount_line_rows(text, parsed["totals"])
+        rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+        normal_sum = sum(
+            (row.get("line_total") or Decimal("0.00") for row in rows if not row.get("is_alternative")),
+            Decimal("0.00"),
+        )
+        delivery_row = next(row for row in rows if row["position_no"] == delivery_position)
+        metadata = json.loads(rows[0]["metadata_json"])
+
+        assert normal_sum == expected_net
+        assert delivery_row["line_total"] == expected_delivery_total
+        assert metadata["rekord_vomp_original_line_total"] is not None
+        assert metadata["rekord_vomp_pricing_operations"][0]["percent"] == "39.00"
+
+        validation = build_document_validation(
+            document={
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": parsed["document_date"],
+                "project_ref": parsed["project_ref"],
+                "currency": "EUR",
+                "net_total": parsed["totals"]["net_total"],
+                "vat_total": parsed["totals"]["vat_total"],
+                "gross_total": parsed["totals"]["gross_total"],
+                "apply_pricing_adjustments": True,
+            },
+            amount_lines=amount_rows,
+            line_items=rows,
+            images=[],
+        )
+
+        assert validation["status"] == "auto_accept"
+        assert validation["totals"]["component_check_mode"] == "rekord_vomp_adjusted_positions"
+        assert validation["totals"]["component_sum_matches_net"] is True
 
 
 def test_sr_schauraum_compact_extractor_regression() -> None:

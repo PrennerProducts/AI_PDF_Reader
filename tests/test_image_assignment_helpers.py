@@ -58,7 +58,7 @@ def test_metadata_image_assignment_reads_generic_assignment_fields() -> None:
     assert assignment["is_final"] is True
 
 
-def test_metadata_image_assignment_keeps_empty_decision() -> None:
+def test_metadata_image_assignment_ignores_empty_automatic_decision() -> None:
     row = {
         "metadata_json": {
             "image_assignment_ids": [],
@@ -72,6 +72,24 @@ def test_metadata_image_assignment_keeps_empty_decision() -> None:
     assert assignment["image_ids"] == []
     assert assignment["source"] == "unmatched"
     assert assignment["reason"] == "no_confident_candidate"
+    assert assignment["has_decision"] is False
+    assert assignment["is_final"] is False
+
+
+def test_metadata_image_assignment_keeps_empty_manual_decision() -> None:
+    row = {
+        "metadata_json": {
+            "image_assignment_ids": [],
+            "image_assignment_source": "manual",
+            "image_assignment_reason": "ui_manual_clear",
+        }
+    }
+
+    assignment = metadata_image_assignment(row, {7, 8, 9})
+
+    assert assignment["image_ids"] == []
+    assert assignment["source"] == "manual"
+    assert assignment["reason"] == "ui_manual_clear"
     assert assignment["has_decision"] is True
     assert assignment["is_final"] is False
 

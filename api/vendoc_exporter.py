@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
+import json
 import re
 
 from vendoc_rtf import build_vendoc_long_text_rtf
@@ -186,10 +187,9 @@ def _parse_euro_amount(value: str | None) -> float | None:
         return None
 
 
-def _apply_rieder_pricing_operations(value: float | None, metadata: dict[str, Any]) -> float | None:
+def _apply_percent_pricing_operations(value: float | None, operations: Any) -> float | None:
     if value is None:
         return None
-    operations = metadata.get("rieder_pricing_operations")
     if not isinstance(operations, list) or not operations:
         return value
     try:
@@ -209,6 +209,113 @@ def _apply_rieder_pricing_operations(value: float | None, metadata: dict[str, An
         factor = Decimal("1") + percent if line_type == "surcharge" else Decimal("1") - percent
         current = current * factor
     return float(current.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _apply_rieder_pricing_operations(value: float | None, metadata: dict[str, Any]) -> float | None:
+    return _apply_percent_pricing_operations(value, metadata.get("rieder_pricing_operations"))
+
+
+def _divide_price(total: float | None, quantity: Any) -> float | None:
+    if total is None:
+        return None
+    parsed_quantity = _to_float(quantity)
+    if parsed_quantity in {None, 0.0}:
+        return total
+    try:
+        value = Decimal(str(total)) / Decimal(str(parsed_quantity))
+    except (InvalidOperation, ValueError, ZeroDivisionError):
+        return total
+    return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _metadata_price_value(metadata: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+    for key in keys:
+        value = _to_float(metadata.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _pricing_provider_keys(metadata: dict[str, Any]) -> tuple[str, ...]:
+    provider_keys = ["rieder", "entholzer", "rekord_vomp"]
+    return tuple(provider for provider in provider_keys if metadata.get(f"{provider}_pricing_applied"))
+
+
+def _pricing_original_unit_price(item: dict[str, Any], metadata: dict[str, Any]) -> float | None:
+    if metadata.get("alternative_source") == "embedded_long_text":
+        embedded_original = _to_float(metadata.get("rieder_original_embedded_unit_price"))
+        if embedded_original is not None:
+            return embedded_original
+
+    unit_keys = ["pricing_original_unit_price"]
+    total_keys = ["pricing_original_line_total"]
+    for provider_key in _pricing_provider_keys(metadata):
+        unit_keys.append(f"{provider_key}_original_unit_price")
+        total_keys.append(f"{provider_key}_original_line_total")
+
+    original_unit = _metadata_price_value(metadata, tuple(unit_keys))
+    if original_unit is not None:
+        return original_unit
+    original_total = _metadata_price_value(metadata, tuple(total_keys))
+    return _divide_price(original_total, item.get("quantity"))
+
+
+def _pricing_adjusted_unit_price(item: dict[str, Any], metadata: dict[str, Any]) -> float | None:
+    unit_keys = ["pricing_adjusted_unit_price"]
+    total_keys = ["pricing_adjusted_line_total"]
+    for provider_key in _pricing_provider_keys(metadata):
+        unit_keys.append(f"{provider_key}_adjusted_unit_price")
+        total_keys.append(f"{provider_key}_adjusted_line_total")
+
+    adjusted_unit = _metadata_price_value(metadata, tuple(unit_keys))
+    if adjusted_unit is not None:
+        return adjusted_unit
+
+    adjusted_total = _metadata_price_value(metadata, tuple(total_keys))
+    if adjusted_total is not None:
+        return _divide_price(adjusted_total, item.get("quantity"))
+
+    original_total = _to_float(metadata.get("rieder_original_line_total"))
+    if original_total is not None:
+        adjusted_total = _apply_rieder_pricing_operations(original_total, metadata)
+        rounding_delta = _to_float(metadata.get("rieder_rounding_delta"))
+        if adjusted_total is not None and rounding_delta is not None:
+            adjusted_total += rounding_delta
+        adjusted_from_total = _divide_price(adjusted_total, item.get("quantity"))
+        if adjusted_from_total is not None:
+            return adjusted_from_total
+
+    original_unit = _pricing_original_unit_price(item, metadata)
+    for provider_key in _pricing_provider_keys(metadata):
+        adjusted_from_operations = _apply_percent_pricing_operations(
+            original_unit,
+            metadata.get(f"{provider_key}_pricing_operations"),
+        )
+        if adjusted_from_operations is not None:
+            return adjusted_from_operations
+
+    if metadata.get("alternative_source") == "embedded_long_text":
+        purchase_price = _to_float(item.get("purchase_price"))
+        if purchase_price is not None:
+            return purchase_price
+        return _apply_rieder_pricing_operations(original_unit, metadata)
+
+    return None
+
+
+def _line_item_export_prices(item: dict[str, Any], metadata: dict[str, Any]) -> tuple[float | None, float | None]:
+    unit_price = _to_float(item.get("unit_price"))
+    purchase_price = _to_float(item.get("purchase_price"))
+    if purchase_price is None:
+        purchase_price = unit_price
+
+    original_unit = _pricing_original_unit_price(item, metadata)
+    adjusted_unit = _pricing_adjusted_unit_price(item, metadata)
+    if original_unit is not None and adjusted_unit is not None:
+        unit_price = original_unit
+        purchase_price = adjusted_unit
+
+    return unit_price, purchase_price
 
 
 def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
@@ -236,8 +343,16 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
             adjusted["purchase_price"] = current_unit_price
         return adjusted
 
-    original_line_total = _to_float(metadata.get("rieder_original_line_total"))
-    original_unit_price = _to_float(metadata.get("rieder_original_unit_price"))
+    original_line_total = None
+    for key in ("pricing_original_line_total", "rieder_original_line_total", "entholzer_original_line_total"):
+        original_line_total = _to_float(metadata.get(key))
+        if original_line_total is not None:
+            break
+    original_unit_price = None
+    for key in ("pricing_original_unit_price", "rieder_original_unit_price", "entholzer_original_unit_price"):
+        original_unit_price = _to_float(metadata.get(key))
+        if original_unit_price is not None:
+            break
     if original_line_total is None and original_unit_price is None:
         adjusted = dict(item)
         if _to_float(adjusted.get("purchase_price")) is None and current_unit_price is not None:
@@ -247,8 +362,12 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
     adjusted = dict(item)
     if _to_float(adjusted.get("purchase_price")) is None and current_unit_price is not None:
         adjusted["purchase_price"] = current_unit_price
-    metadata["rieder_pricing_effective_applied"] = False
-    metadata["rieder_pricing_disabled_by_document"] = True
+    metadata["pricing_effective_applied"] = False
+    metadata["pricing_disabled_by_document"] = True
+    for provider_key in ("rieder", "entholzer", "rekord_vomp"):
+        if metadata.get(f"{provider_key}_pricing_applied"):
+            metadata[f"{provider_key}_pricing_effective_applied"] = False
+            metadata[f"{provider_key}_pricing_disabled_by_document"] = True
     adjusted["metadata_json"] = metadata
     if original_line_total is not None:
         adjusted["line_total"] = original_line_total
@@ -567,6 +686,12 @@ def external_line_item_id(document_id: Any, line_item: dict[str, Any], fallback_
 
 def _metadata(line_item: dict[str, Any]) -> dict[str, Any]:
     metadata = line_item.get("metadata_json")
+    if isinstance(metadata, str):
+        try:
+            parsed = json.loads(metadata)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
     return metadata if isinstance(metadata, dict) else {}
 
 
@@ -797,10 +922,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             )
             image_payload["image_is_primary"] = False
             image_long_text_rtf = text_only_rtf
-        purchase_price = _to_float(raw_item.get("purchase_price"))
-        if purchase_price is None:
-            purchase_price = _to_float(raw_item.get("unit_price"))
-        unit_price = _to_float(raw_item.get("unit_price"))
+        unit_price, purchase_price = _line_item_export_prices(raw_item, metadata)
         line_item_ids[source_line_item_id] = ext_line_item_id
         position = {
             "external_line_item_id": ext_line_item_id,

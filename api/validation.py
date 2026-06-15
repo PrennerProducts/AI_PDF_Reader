@@ -94,6 +94,21 @@ def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "ja", "y", "on"}
 
 
+def _item_prices_include_adjustments(item: dict[str, Any]) -> bool:
+    metadata = _metadata_dict(item)
+    if (
+        metadata.get("pricing_disabled_by_document")
+        or metadata.get("rieder_pricing_disabled_by_document")
+        or metadata.get("entholzer_pricing_disabled_by_document")
+    ):
+        return False
+    return bool(
+        metadata.get("pricing_adjustments_applied")
+        or metadata.get("rieder_pricing_applied")
+        or metadata.get("entholzer_pricing_applied")
+    )
+
+
 def _make_issue(
     *,
     code: str,
@@ -530,6 +545,7 @@ def build_document_validation(
 
     non_alternative_item_sum = Decimal("0.00")
     component_item_sum = Decimal("0.00")
+    component_prices_include_adjustments = False
     discount_sum = Decimal("0.00")
     surcharge_sum = Decimal("0.00")
     image_page_by_id: dict[int, int] = {}
@@ -708,6 +724,8 @@ def build_document_validation(
             non_alternative_item_sum += line_total
         if line_total is not None and counts_towards_component_sum:
             component_item_sum += line_total
+            if _item_prices_include_adjustments(item):
+                component_prices_include_adjustments = True
 
     image_to_positions: dict[int, list[str]] = {}
     for item in line_items:
@@ -864,12 +882,21 @@ def build_document_validation(
         component_check_reason = "rieder_discount_sequence_applied_to_positions"
     elif provider_key == "rieder" and not apply_pricing_adjustments:
         computed_net_from_components = component_item_sum.quantize(SUM_TOLERANCE)
+    elif not apply_pricing_adjustments:
+        computed_net_from_components = component_item_sum.quantize(SUM_TOLERANCE)
+        component_check_mode = "pricing_adjustments_disabled"
+        component_check_reason = "pricing_adjustments_disabled_by_document"
+    elif component_prices_include_adjustments:
+        computed_net_from_components = component_item_sum.quantize(SUM_TOLERANCE)
+        component_check_mode = f"{provider_key}_adjusted_positions"
+        component_check_reason = "position_prices_include_pricing_adjustments"
     else:
         computed_net_from_components = (component_item_sum + discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
     totals_summary["non_alternative_line_item_sum"] = non_alternative_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["component_included_line_item_sum"] = component_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["discount_sum"] = discount_sum.quantize(SUM_TOLERANCE)
     totals_summary["surcharge_sum"] = surcharge_sum.quantize(SUM_TOLERANCE)
+    totals_summary["position_prices_include_adjustments"] = component_prices_include_adjustments
     totals_summary["computed_net_from_components"] = computed_net_from_components
     totals_summary["component_check_mode"] = component_check_mode
     if component_check_reason is not None:

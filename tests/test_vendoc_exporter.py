@@ -26,6 +26,7 @@ from vendoc_mssql import (
 from vendoc_rtf import build_vendoc_long_text_rtf, escape_rtf_text
 from parser import parse_document_text
 from structured_parser import extract_line_items
+from main import _build_amount_line_rows, _build_line_item_rows
 
 
 def _write_png(path: Path) -> bytes:
@@ -217,7 +218,7 @@ def test_vendoc_payload_applies_rieder_sequence_to_embedded_alternatives(tmp_pat
     payload = build_vendoc_payload(result)
 
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
-    assert payload["positions"][1]["unit_price"] == 31.33
+    assert payload["positions"][1]["unit_price"] == 57.97
     assert payload["positions"][1]["purchase_price"] == 31.33
 
 
@@ -267,6 +268,8 @@ def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: 
         "rieder_pricing_operations": [
             {"line_type": "surcharge", "percent": "3"},
             {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
         ],
     }
 
@@ -277,7 +280,7 @@ def test_vendoc_payload_can_skip_rieder_sequence_for_stored_positions(tmp_path: 
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
-def test_vendoc_payload_keeps_computed_unit_price_when_rieder_pricing_enabled(tmp_path: Path) -> None:
+def test_vendoc_payload_exports_rieder_basis_unit_and_discounted_purchase_when_enabled(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
@@ -292,14 +295,131 @@ def test_vendoc_payload_keeps_computed_unit_price_when_rieder_pricing_enabled(tm
         "rieder_pricing_operations": [
             {"line_type": "surcharge", "percent": "3"},
             {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
         ],
     }
 
     payload = build_vendoc_payload(result)
 
     assert payload["summary"]["apply_pricing_adjustments"] is True
-    assert payload["positions"][0]["unit_price"] == 31.33
+    assert payload["positions"][0]["unit_price"] == 57.97
     assert payload["positions"][0]["purchase_price"] == 31.33
+
+
+def test_vendoc_payload_exports_rieder_processed_rows_with_basis_and_purchase_prices() -> None:
+    text = (ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt").read_text(encoding="utf-8")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"])
+    rows = _build_line_item_rows(text, parsed["template"], amount_line_rows=amount_rows)
+
+    payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 20252082,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": "2025-09-05",
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "apply_pricing_adjustments": True,
+            },
+            "line_items": rows,
+            "images": [],
+        }
+    )
+
+    assert payload["positions"][0]["unit_price"] == 6531.88
+    assert payload["positions"][0]["purchase_price"] == 3530.55
+    assert payload["positions"][1]["is_alternative"] is True
+    assert payload["positions"][1]["unit_price"] == 3258.05
+    assert payload["positions"][1]["purchase_price"] == 1761.01
+
+
+def test_vendoc_payload_reconstructs_rieder_purchase_when_result_is_already_basis_price(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["apply_pricing_adjustments"] = False
+    result["line_items"][0]["unit_price"] = "57.97"
+    result["line_items"][0]["line_total"] = "57.97"
+    result["line_items"][0]["metadata_json"] = {
+        "rieder_pricing_applied": True,
+        "rieder_original_unit_price": "57.97",
+        "rieder_original_line_total": "57.97",
+        "rieder_pricing_operations": [
+            {"line_type": "surcharge", "percent": "3"},
+            {"line_type": "discount", "percent": "38"},
+            {"line_type": "discount", "percent": "8"},
+            {"line_type": "discount", "percent": "8"},
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is False
+    assert payload["positions"][0]["unit_price"] == 57.97
+    assert payload["positions"][0]["purchase_price"] == 31.33
+
+
+def test_vendoc_payload_exports_generic_basis_unit_and_discounted_purchase_when_enabled(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Entholzer"
+    result["document"]["apply_pricing_adjustments"] = True
+    result["line_items"][0]["unit_price"] = "676.30"
+    result["line_items"][0]["line_total"] = "676.30"
+    result["line_items"][0]["metadata_json"] = {
+        "pricing_adjustments_applied": True,
+        "pricing_original_unit_price": "751.44",
+        "pricing_original_line_total": "751.44",
+        "pricing_adjusted_unit_price": "676.30",
+        "pricing_adjusted_line_total": "676.30",
+        "entholzer_pricing_applied": True,
+        "entholzer_original_unit_price": "751.44",
+        "entholzer_original_line_total": "751.44",
+        "entholzer_adjusted_unit_price": "676.30",
+        "entholzer_adjusted_line_total": "676.30",
+        "entholzer_pricing_operations": [
+            {"line_type": "discount", "percent": "10", "label_raw": "abzüglich 10% Sonderrabatt"}
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is True
+    assert payload["positions"][0]["unit_price"] == 751.44
+    assert payload["positions"][0]["purchase_price"] == 676.30
+
+
+def test_vendoc_payload_can_skip_entholzer_sonderrabatt_for_stored_positions(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Entholzer"
+    result["document"]["apply_pricing_adjustments"] = False
+    result["line_items"][0]["unit_price"] = "676.30"
+    result["line_items"][0]["line_total"] = "676.30"
+    result["line_items"][0]["metadata_json"] = {
+        "pricing_adjustments_applied": True,
+        "pricing_original_unit_price": "751.44",
+        "pricing_original_line_total": "751.44",
+        "pricing_adjusted_unit_price": "676.30",
+        "pricing_adjusted_line_total": "676.30",
+        "entholzer_pricing_applied": True,
+        "entholzer_pricing_operations": [
+            {"line_type": "discount", "percent": "10", "label_raw": "abzüglich 10% Sonderrabatt"}
+        ],
+    }
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is False
+    assert payload["positions"][0]["unit_price"] == 751.44
+    assert payload["positions"][0]["purchase_price"] == 676.30
 
 
 def test_vendoc_payload_renumbers_nested_alternatives_without_gaps(tmp_path: Path) -> None:

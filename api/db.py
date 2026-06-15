@@ -1660,15 +1660,27 @@ def _line_item_with_document_pricing_mode(item: dict[str, Any], *, apply_pricing
     if metadata.get("pricing_source") == "rieder_delivery_block":
         return item
 
-    original_line_total = _to_decimal(metadata.get("rieder_original_line_total"))
-    original_unit_price = _to_decimal(metadata.get("rieder_original_unit_price"))
+    original_line_total = None
+    for key in ("pricing_original_line_total", "rieder_original_line_total", "entholzer_original_line_total"):
+        original_line_total = _to_decimal(metadata.get(key))
+        if original_line_total is not None:
+            break
+    original_unit_price = None
+    for key in ("pricing_original_unit_price", "rieder_original_unit_price", "entholzer_original_unit_price"):
+        original_unit_price = _to_decimal(metadata.get(key))
+        if original_unit_price is not None:
+            break
     if original_line_total is None and original_unit_price is None:
         return item
 
     adjusted = dict(item)
     adjusted_metadata = dict(metadata)
-    adjusted_metadata["rieder_pricing_effective_applied"] = False
-    adjusted_metadata["rieder_pricing_disabled_by_document"] = True
+    adjusted_metadata["pricing_effective_applied"] = False
+    adjusted_metadata["pricing_disabled_by_document"] = True
+    for provider_key in ("rieder", "entholzer", "rekord_vomp"):
+        if adjusted_metadata.get(f"{provider_key}_pricing_applied"):
+            adjusted_metadata[f"{provider_key}_pricing_effective_applied"] = False
+            adjusted_metadata[f"{provider_key}_pricing_disabled_by_document"] = True
     adjusted["metadata_json"] = adjusted_metadata
     if original_line_total is not None:
         adjusted["line_total"] = original_line_total
@@ -1961,6 +1973,11 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             else []
         )
         own_current_viable_page_ids = current_viable_page_ids[len(incoming_carryover_ids) :]
+        own_current_page_pool_ids = [
+            image_id
+            for image_id in current_page_pool_ids
+            if image_id not in set(incoming_carryover_ids)
+        ]
         current_page_needs_carryover = bool(visual_item_indexes and len(own_current_viable_page_ids) < visual_item_count)
         carryover_neighbor_ids = (
             spare_carryover_image_ids(next_viable_page_ids, next_page_visual_item_count=next_visual_item_count)
@@ -1972,7 +1989,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             visual_item_offset = visual_item_order.get(item_idx)
             item_scoped_current_viable_page_ids = [
                 image_id
-                for image_id in current_page_pool_ids
+                for image_id in own_current_page_pool_ids
                 if is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
             ]
             item_scoped_next_viable_page_ids = [
@@ -2002,7 +2019,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 and item_scoped_next_viable_page_ids
             )
             neighbor_pool_ids = carryover_neighbor_ids
-            if aspect_prefers_next_page or window_prefers_next_page or carryover_window_prefers_next_page:
+            if spans_to_next_page or aspect_prefers_next_page or window_prefers_next_page or carryover_window_prefers_next_page:
                 neighbor_pool_ids = _dedupe_ints(carryover_neighbor_ids + item_scoped_next_viable_page_ids)
             allow_next_page_candidates = bool(
                 neighbor_pool_ids
@@ -2048,7 +2065,7 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
             focused_neighbor = focused_image_ids(
                 neighbor_pool_ids if allow_next_page_candidates else [],
                 item_count=max(1, visual_item_count),
-                item_index=visual_item_offset if visual_item_offset is not None else item_offset,
+                item_index=0 if spans_to_next_page else (visual_item_offset if visual_item_offset is not None else item_offset),
                 max_candidates=3,
             )
             viable_neighbor = [
@@ -2057,7 +2074,9 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 if is_viable_auto_assignment_image_for_item(item, image_by_id.get(image_id, {}))
             ]
             focused_fallback = focused_image_ids(
-                _dedupe_ints(
+                []
+                if (viable_current or viable_neighbor)
+                else _dedupe_ints(
                     all_page_image_ids
                     + (neighbor_pool_ids if allow_next_page_candidates else [])
                 ),
@@ -2069,6 +2088,8 @@ def get_document_result(document_id: int) -> dict[str, Any] | None:
                 allow_next_page_candidates
                 and viable_neighbor
                 and (
+                    spans_to_next_page
+                    or
                     aspect_prefers_next_page
                     or window_prefers_next_page
                     or carryover_window_prefers_next_page

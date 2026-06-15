@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import shutil
 from threading import Lock
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 from uuid import UUID, uuid4
 
 import fitz
@@ -1198,7 +1198,7 @@ def _set_line_item_metadata(row: dict[str, Any], metadata: dict[str, Any]) -> No
     row["metadata_json"] = json.dumps(metadata, ensure_ascii=True)
 
 
-def _rieder_pricing_operations(amount_line_rows: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+def _pricing_operations_from_amount_lines(amount_line_rows: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     operations: list[dict[str, Any]] = []
     for row in sorted(amount_line_rows or [], key=lambda item: int(item.get("sort_order") or 0)):
         line_type = str(row.get("line_type") or "").strip().lower()
@@ -1222,6 +1222,10 @@ def _rieder_pricing_operations(amount_line_rows: list[dict[str, Any]] | None) ->
     return operations
 
 
+def _rieder_pricing_operations(amount_line_rows: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    return _pricing_operations_from_amount_lines(amount_line_rows)
+
+
 def _rieder_last_discount_subtotal(amount_line_rows: list[dict[str, Any]] | None) -> Decimal | None:
     last_subtotal: Decimal | None = None
     for row in sorted(amount_line_rows or [], key=lambda item: int(item.get("sort_order") or 0)):
@@ -1235,13 +1239,43 @@ def _rieder_last_discount_subtotal(amount_line_rows: list[dict[str, Any]] | None
     return last_subtotal
 
 
-def _apply_rieder_operations(value: Decimal, operations: list[dict[str, Any]]) -> Decimal:
+def _last_adjusted_subtotal(amount_line_rows: list[dict[str, Any]] | None) -> Decimal | None:
+    last_subtotal_after_adjustment: Decimal | None = None
+    saw_adjustment = False
+    for row in sorted(amount_line_rows or [], key=lambda item: int(item.get("sort_order") or 0)):
+        line_type = str(row.get("line_type") or "").strip().lower()
+        if line_type == "net_total":
+            break
+        if line_type in {"discount", "surcharge"} and row.get("percent") is not None:
+            saw_adjustment = True
+        if line_type == "subtotal":
+            amount = row.get("amount")
+            if isinstance(amount, Decimal) and saw_adjustment:
+                last_subtotal_after_adjustment = amount
+    return last_subtotal_after_adjustment
+
+
+def _net_total_from_amount_lines(amount_line_rows: list[dict[str, Any]] | None) -> Decimal | None:
+    for row in sorted(amount_line_rows or [], key=lambda item: int(item.get("sort_order") or 0)):
+        if str(row.get("line_type") or "").strip().lower() != "net_total":
+            continue
+        amount = row.get("amount")
+        if isinstance(amount, Decimal):
+            return amount
+    return None
+
+
+def _apply_pricing_operations(value: Decimal, operations: list[dict[str, Any]]) -> Decimal:
     current = value
     for operation in operations:
         percent = operation["percent"] / Decimal("100")
         factor = Decimal("1") + percent if operation["line_type"] == "surcharge" else Decimal("1") - percent
         current = current * factor
     return _money(current)
+
+
+def _apply_rieder_operations(value: Decimal, operations: list[dict[str, Any]]) -> Decimal:
+    return _apply_pricing_operations(value, operations)
 
 
 def _update_row_unit_price_from_total(row: dict[str, Any]) -> None:
@@ -1253,6 +1287,98 @@ def _update_row_unit_price_from_total(row: dict[str, Any]) -> None:
         row["unit_price"] = _money(line_total / quantity)
     else:
         row["unit_price"] = line_total
+
+
+def _operation_metadata(operations: list[dict[str, Any]]) -> list[dict[str, str]]:
+    return [
+        {
+            "line_type": operation["line_type"],
+            "percent": str(operation["percent"]),
+            "label_raw": operation["label_raw"],
+        }
+        for operation in operations
+    ]
+
+
+def _apply_sequential_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+    *,
+    provider_key: str,
+    skip_pricing_sources: set[str] | None = None,
+    skip_row: Callable[[dict[str, Any], dict[str, Any]], bool] | None = None,
+    target_subtotal: Decimal | None = None,
+) -> None:
+    operations = _pricing_operations_from_amount_lines(amount_line_rows)
+    if not operations:
+        return
+
+    skip_pricing_sources = skip_pricing_sources or set()
+    operation_metadata = _operation_metadata(operations)
+    normal_row_indexes: list[int] = []
+    rounding_row_indexes: list[int] = []
+    for index, row in enumerate(rows):
+        line_total = row.get("line_total")
+        if not isinstance(line_total, Decimal):
+            continue
+        metadata = _line_item_metadata_dict(row)
+        if metadata.get("pricing_source") in skip_pricing_sources or (skip_row is not None and skip_row(row, metadata)):
+            if not bool(row.get("is_alternative")):
+                normal_row_indexes.append(index)
+            continue
+
+        original_line_total = line_total
+        original_unit_price = row.get("unit_price")
+        adjusted_line_total = _apply_pricing_operations(original_line_total, operations)
+        row["line_total"] = adjusted_line_total
+        _update_row_unit_price_from_total(row)
+
+        metadata["pricing_adjustment_source"] = f"{provider_key}_amount_lines"
+        metadata["pricing_adjustments_applied"] = True
+        metadata["pricing_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata["pricing_original_unit_price"] = str(original_unit_price)
+        metadata["pricing_adjusted_line_total"] = str(adjusted_line_total)
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata["pricing_adjusted_unit_price"] = str(row["unit_price"])
+        metadata["pricing_operations"] = operation_metadata
+        metadata[f"{provider_key}_pricing_applied"] = True
+        metadata[f"{provider_key}_original_line_total"] = str(original_line_total)
+        if isinstance(original_unit_price, Decimal):
+            metadata[f"{provider_key}_original_unit_price"] = str(original_unit_price)
+        metadata[f"{provider_key}_adjusted_line_total"] = str(adjusted_line_total)
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata[f"{provider_key}_adjusted_unit_price"] = str(row["unit_price"])
+        metadata[f"{provider_key}_pricing_operations"] = operation_metadata
+        _set_line_item_metadata(row, metadata)
+
+        if not bool(row.get("is_alternative")):
+            normal_row_indexes.append(index)
+            rounding_row_indexes.append(index)
+
+    if target_subtotal is None or not normal_row_indexes:
+        return
+    current_subtotal = sum((rows[index].get("line_total") for index in normal_row_indexes), Decimal("0.00"))
+    delta = _money(target_subtotal - current_subtotal)
+    if abs(delta) > Decimal("0.10") or delta == 0:
+        return
+
+    target_index = rounding_row_indexes[-1] if rounding_row_indexes else normal_row_indexes[-1]
+    target_row = rows[target_index]
+    if not isinstance(target_row.get("line_total"), Decimal):
+        return
+    target_row["line_total"] = _money(target_row["line_total"] + delta)
+    _update_row_unit_price_from_total(target_row)
+    metadata = _line_item_metadata_dict(target_row)
+    metadata["pricing_rounding_delta"] = str(delta)
+    metadata[f"{provider_key}_rounding_delta"] = str(delta)
+    metadata["pricing_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata["pricing_adjusted_unit_price"] = str(target_row["unit_price"])
+    metadata[f"{provider_key}_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata[f"{provider_key}_adjusted_unit_price"] = str(target_row["unit_price"])
+    _set_line_item_metadata(target_row, metadata)
 
 
 def _apply_rieder_pricing_to_line_item_rows(rows: list[dict[str, Any]], amount_line_rows: list[dict[str, Any]] | None) -> None:
@@ -1279,6 +1405,9 @@ def _apply_rieder_pricing_to_line_item_rows(rows: list[dict[str, Any]], amount_l
         metadata["rieder_original_line_total"] = str(original_line_total)
         if isinstance(original_unit_price, Decimal):
             metadata["rieder_original_unit_price"] = str(original_unit_price)
+        metadata["rieder_adjusted_line_total"] = str(row["line_total"])
+        if isinstance(row.get("unit_price"), Decimal):
+            metadata["rieder_adjusted_unit_price"] = str(row["unit_price"])
         metadata["rieder_pricing_operations"] = [
             {
                 "line_type": operation["line_type"],
@@ -1308,7 +1437,54 @@ def _apply_rieder_pricing_to_line_item_rows(rows: list[dict[str, Any]], amount_l
     _update_row_unit_price_from_total(target_row)
     metadata = _line_item_metadata_dict(target_row)
     metadata["rieder_rounding_delta"] = str(delta)
+    metadata["rieder_adjusted_line_total"] = str(target_row["line_total"])
+    if isinstance(target_row.get("unit_price"), Decimal):
+        metadata["rieder_adjusted_unit_price"] = str(target_row["unit_price"])
     _set_line_item_metadata(target_row, metadata)
+
+
+def _apply_entholzer_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+) -> None:
+    _apply_sequential_pricing_to_line_item_rows(
+        rows,
+        amount_line_rows,
+        provider_key="entholzer",
+        target_subtotal=_last_adjusted_subtotal(amount_line_rows),
+    )
+
+
+def _is_rekord_vomp_non_discounted_delivery_row(row: dict[str, Any], metadata: dict[str, Any]) -> bool:
+    line_total = row.get("line_total")
+    if not isinstance(line_total, Decimal):
+        return False
+    if line_total > Decimal("300.01"):
+        return False
+    text = " ".join(
+        str(value or "")
+        for value in (
+            row.get("position_no"),
+            row.get("lv_pos"),
+            row.get("description_short"),
+            row.get("description_long"),
+            metadata.get("line_total_raw"),
+        )
+    ).lower()
+    return "xx-lief-baus" in text or ("lieferung" in text and "baustelle" in text)
+
+
+def _apply_rekord_vomp_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+) -> None:
+    _apply_sequential_pricing_to_line_item_rows(
+        rows,
+        amount_line_rows,
+        provider_key="rekord_vomp",
+        skip_row=_is_rekord_vomp_non_discounted_delivery_row,
+        target_subtotal=_net_total_from_amount_lines(amount_line_rows),
+    )
 
 
 def _build_line_item_rows(
@@ -1434,6 +1610,10 @@ def _build_line_item_rows(
         )
     if template == "rieder":
         _apply_rieder_pricing_to_line_item_rows(rows, amount_line_rows)
+    elif template == "entholzer":
+        _apply_entholzer_pricing_to_line_item_rows(rows, amount_line_rows)
+    elif template == "rekord_vomp":
+        _apply_rekord_vomp_pricing_to_line_item_rows(rows, amount_line_rows)
     return rows
 
 
