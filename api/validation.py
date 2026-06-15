@@ -104,6 +104,7 @@ def _item_prices_include_adjustments(item: dict[str, Any]) -> bool:
         or metadata.get("koch_pricing_disabled_by_document")
         or metadata.get("schachermayer_pricing_disabled_by_document")
         or metadata.get("schlotterer_pricing_disabled_by_document")
+        or metadata.get("schuchter_pricing_disabled_by_document")
     ):
         return False
     return bool(
@@ -114,6 +115,7 @@ def _item_prices_include_adjustments(item: dict[str, Any]) -> bool:
         or metadata.get("koch_pricing_applied")
         or metadata.get("schachermayer_pricing_applied")
         or metadata.get("schlotterer_pricing_applied")
+        or metadata.get("schuchter_pricing_applied")
     )
 
 
@@ -244,7 +246,7 @@ def _component_check_mode(provider_key: str, amount_lines: list[dict[str, Any]])
         if line_type not in {"discount", "surcharge"} and any(term in label_raw for term in COMPLEX_PRICING_TERMS):
             embedded_complexity = True
 
-    if provider_key in {"entholzer", "rekord_vomp", "rieder", "schlotterer"}:
+    if provider_key in {"entholzer", "rekord_vomp", "rieder", "schlotterer", "schuchter"}:
         return "heuristic", "provider_complex_pricing"
     if discount_count > 0 or surcharge_count > 0 or subtotal_count > 1 or embedded_complexity:
         return "heuristic", "complex_pricing_breakdown"
@@ -556,6 +558,7 @@ def build_document_validation(
     component_prices_include_adjustments = False
     discount_sum = Decimal("0.00")
     surcharge_sum = Decimal("0.00")
+    subtotal_amounts: list[Decimal] = []
     image_page_by_id: dict[int, int] = {}
     for image in images:
         try:
@@ -879,6 +882,8 @@ def build_document_validation(
             discount_sum += amount
         elif line_type == "surcharge":
             surcharge_sum += amount
+        elif line_type == "subtotal":
+            subtotal_amounts.append(amount)
 
     rieder_sequence_summary = (
         _rieder_sequence_summary(amount_lines, line_items, net_total)
@@ -905,6 +910,9 @@ def build_document_validation(
     totals_summary["component_included_line_item_sum"] = component_item_sum.quantize(SUM_TOLERANCE)
     totals_summary["discount_sum"] = discount_sum.quantize(SUM_TOLERANCE)
     totals_summary["surcharge_sum"] = surcharge_sum.quantize(SUM_TOLERANCE)
+    if subtotal_amounts:
+        totals_summary["document_position_subtotal"] = subtotal_amounts[0].quantize(SUM_TOLERANCE)
+    totals_summary["document_pricing_adjustment_total"] = (discount_sum + surcharge_sum).quantize(SUM_TOLERANCE)
     totals_summary["position_prices_include_adjustments"] = component_prices_include_adjustments
     totals_summary["computed_net_from_components"] = computed_net_from_components
     totals_summary["component_check_mode"] = component_check_mode

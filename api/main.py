@@ -1141,6 +1141,8 @@ def _build_amount_line_rows(
             continue
         label_raw = item.get("label_raw", "")
         normalized_label = str(label_raw or "").strip().lower()
+        if template == "schuchter" and "summe positionen" in normalized_label:
+            line_type = "subtotal"
         if schlotterer_discount_groups:
             if "gesamtpreis positionen" in normalized_label:
                 line_type = "subtotal"
@@ -1969,6 +1971,18 @@ def _apply_schlotterer_pricing_to_line_item_rows(
     _set_line_item_metadata(target_row, metadata)
 
 
+def _apply_schuchter_pricing_to_line_item_rows(
+    rows: list[dict[str, Any]],
+    amount_line_rows: list[dict[str, Any]] | None,
+) -> None:
+    _apply_sequential_pricing_to_line_item_rows(
+        rows,
+        amount_line_rows,
+        provider_key="schuchter",
+        target_subtotal=_net_total_from_amount_lines(amount_line_rows),
+    )
+
+
 def _build_line_item_rows(
     extracted_text: str,
     template: str,
@@ -2107,6 +2121,8 @@ def _build_line_item_rows(
         _apply_schachermayer_line_pricing_to_line_item_rows(rows)
     elif template == "schlotterer":
         _apply_schlotterer_pricing_to_line_item_rows(rows, amount_line_rows, extracted_text=extracted_text)
+    elif template == "schuchter":
+        _apply_schuchter_pricing_to_line_item_rows(rows, amount_line_rows)
     return rows
 
 

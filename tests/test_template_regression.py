@@ -372,6 +372,76 @@ Pos. 1a, Pos. 1b und Pos. 1c
     assert items[0]["image_required"] is False
 
 
+def test_schuchter_discounts_prices_and_long_text_are_clean() -> None:
+    pdf_paths = sorted((ROOT / "samples/pdfs/candidates/offers/schuchter").glob("*.pdf"))
+    money_pattern = re.compile(r"\d{1,3}(?:[ .]\d{3})*,\d{2}")
+
+    for pdf_path in pdf_paths:
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+        amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+        line_rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+
+        assert parsed["template"] == "schuchter"
+        assert sum(
+            (row.get("line_total") or Decimal("0.00") for row in line_rows if not row.get("is_alternative")),
+            Decimal("0.00"),
+        ) == _decimal_amount(parsed["totals"]["net_total"])
+
+        subtotal_rows = [row for row in amount_rows if row["line_type"] == "subtotal"]
+        assert subtotal_rows
+        assert "Summe Positionen" in subtotal_rows[0]["label_raw"]
+        assert [row for row in amount_rows if row["line_type"] == "discount"]
+
+        for item in items:
+            description_long = item["description_long"]
+            assert not money_pattern.search(description_long)
+            assert "Übertrag:" not in description_long
+            assert "E-Preis" not in description_long
+
+    text = _read_pdf_text(ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    line_rows = _build_line_item_rows(
+        text,
+        parsed["template"],
+        source_path=ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf",
+        amount_line_rows=amount_rows,
+    )
+    row_by_pos = {row["position_no"]: row for row in line_rows}
+    pos_13_metadata = json.loads(row_by_pos["13"]["metadata_json"])
+    pos_16_metadata = json.loads(row_by_pos["16"]["metadata_json"])
+    validation = build_document_validation(
+        document={
+            "supplier_name": parsed["supplier_name"],
+            "document_type": parsed["document_type"],
+            "document_number": parsed["document_number"],
+            "document_date": parsed["document_date"],
+            "currency": parsed["currency"],
+            "net_total": _decimal_amount(parsed["totals"]["net_total"]),
+            "vat_total": _decimal_amount(parsed["totals"]["vat_total"]),
+            "gross_total": _decimal_amount(parsed["totals"]["gross_total"]),
+            "apply_pricing_adjustments": True,
+        },
+        amount_lines=amount_rows,
+        line_items=line_rows,
+        images=[],
+    )
+
+    assert len(line_rows) == 14
+    assert row_by_pos["13"]["description_short"] == "1-flg. Nebeneingangstüre, D-Links"
+    assert pos_13_metadata["schuchter_original_unit_price"] == "2698.80"
+    assert pos_13_metadata["schuchter_adjusted_unit_price"] == "1484.34"
+    assert row_by_pos["16"]["description_short"] == "Transportkosten"
+    assert row_by_pos["16"]["unit"] == "PA"
+    assert pos_16_metadata["image_required"] is False
+    assert pos_16_metadata["schuchter_original_unit_price"] == "600.00"
+    assert pos_16_metadata["schuchter_adjusted_unit_price"] == "329.99"
+    assert validation["totals"]["document_position_subtotal"] == Decimal("14853.35")
+    assert validation["totals"]["document_pricing_adjustment_total"] == Decimal("-6684.00")
+
+
 def test_sr_schauraum_regression() -> None:
     pdf_path = ROOT / "samples/pdfs/regression/offers/sr_schauraum/Angebotsnr AN-2025-113 - SR Schauraum GmbH (2).pdf"
     text = _read_pdf_text(pdf_path)
@@ -1194,6 +1264,22 @@ def test_schlotterer_long_text_images_alternatives_and_pricing_are_clean(tmp_pat
     )
     first_metadata = json.loads(rows[0]["metadata_json"])
     packaging = next(row for row in rows if row["description_short"] == "Verpackungsbeitrag")
+    validation = build_document_validation(
+        document={
+            "supplier_name": parsed["supplier_name"],
+            "document_type": parsed["document_type"],
+            "document_number": parsed["document_number"],
+            "document_date": parsed["document_date"],
+            "currency": parsed["currency"],
+            "net_total": _decimal_amount(parsed["totals"]["net_total"]),
+            "vat_total": _decimal_amount(parsed["totals"]["vat_total"]),
+            "gross_total": _decimal_amount(parsed["totals"]["gross_total"]),
+            "apply_pricing_adjustments": True,
+        },
+        amount_lines=amount_rows,
+        line_items=rows,
+        images=[],
+    )
     assert first_metadata["schlotterer_pricing_applied"] is True
     assert first_metadata["pricing_adjustment_source"] == "schlotterer_discount_groups"
     assert first_metadata["schlotterer_original_unit_price"] == "918.04"
@@ -1213,6 +1299,8 @@ def test_schlotterer_long_text_images_alternatives_and_pricing_are_clean(tmp_pat
         },
     ]
     assert json.loads(packaging["metadata_json"]).get("schlotterer_pricing_applied") is None
+    assert validation["totals"]["document_position_subtotal"] == Decimal("8904.30")
+    assert validation["totals"]["document_pricing_adjustment_total"] == Decimal("-4289.31")
 
 
 def test_rieder_ab_reference_regression() -> None:

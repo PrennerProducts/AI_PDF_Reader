@@ -312,7 +312,7 @@ def _metadata_price_value(metadata: dict[str, Any], keys: tuple[str, ...]) -> fl
 
 
 def _pricing_provider_keys(metadata: dict[str, Any]) -> tuple[str, ...]:
-    provider_keys = ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"]
+    provider_keys = ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"]
     return tuple(provider for provider in provider_keys if metadata.get(f"{provider}_pricing_applied"))
 
 
@@ -419,7 +419,7 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
             adjusted["purchase_price"] = current_unit_price
         return adjusted
 
-    provider_keys = ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer")
+    provider_keys = ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter")
     original_line_total = None
     for key in ("pricing_original_line_total", *(f"{provider}_original_line_total" for provider in provider_keys)):
         original_line_total = _to_float(metadata.get(key))
@@ -441,7 +441,7 @@ def _line_item_with_pricing_mode(item: dict[str, Any], *, apply_pricing_adjustme
         adjusted["purchase_price"] = current_unit_price
     metadata["pricing_effective_applied"] = False
     metadata["pricing_disabled_by_document"] = True
-    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"):
+    for provider_key in ("rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"):
         if metadata.get(f"{provider_key}_pricing_applied"):
             metadata[f"{provider_key}_pricing_effective_applied"] = False
             metadata[f"{provider_key}_pricing_disabled_by_document"] = True
@@ -567,7 +567,7 @@ def _money_sum(values: list[float | None]) -> float | None:
 
 def _clear_pricing_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     cleaned = dict(metadata)
-    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"):
+    for provider_key in ("pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"):
         for suffix in (
             "original_unit_price",
             "original_line_total",

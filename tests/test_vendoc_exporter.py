@@ -666,6 +666,45 @@ def test_vendoc_payload_exports_schachermayer_basis_unit_and_discounted_purchase
     assert payload["positions"][0]["purchase_price"] == 110.09
 
 
+def test_vendoc_payload_exports_schuchter_basis_unit_and_discounted_purchase() -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf"
+    text = extract_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    rows = _build_line_item_rows(text, parsed["template"], source_path=pdf_path, amount_line_rows=amount_rows)
+
+    payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 172,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": parsed["document_date"],
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "net_total": _parse_eu_decimal(parsed["totals"]["net_total"]),
+                "vat_total": _parse_eu_decimal(parsed["totals"]["vat_total"]),
+                "gross_total": _parse_eu_decimal(parsed["totals"]["gross_total"]),
+                "apply_pricing_adjustments": True,
+            },
+            "line_items": rows,
+            "images": [],
+        }
+    )
+
+    by_position = {position["position_no"]: position for position in payload["positions"]}
+    assert by_position["1"]["unit_price"] == 1998.85
+    assert by_position["1"]["purchase_price"] == 1099.37
+    assert by_position["13"]["unit_price"] == 2698.8
+    assert by_position["13"]["purchase_price"] == 1484.34
+    transport = next(position for position in payload["positions"] if position["description_short"] == "Transportkosten")
+    assert transport["position_no"] == "14"
+    assert transport["unit_code"] == "PA"
+    assert transport["unit_price"] == 600.0
+    assert transport["purchase_price"] == 329.99
+
+
 def test_vendoc_payload_exports_schlotterer_group_discount_purchase_and_prefixed_aggregate() -> None:
     pdf_path = ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf"
     text = extract_pdf_text(pdf_path)

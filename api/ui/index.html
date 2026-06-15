@@ -13206,15 +13206,20 @@
 
       const appliesAdjustments = totals && totals.apply_pricing_adjustments !== false;
       const positionPricesIncludeAdjustments = !!(totals && totals.position_prices_include_adjustments);
+      const documentBasis = totals && totals.document_position_subtotal;
+      const adjustmentTotal = totals && totals.document_pricing_adjustment_total;
+      const positionBasisLine = documentBasis !== undefined && documentBasis !== null
+        ? sumAuditLineHtml("Positionsbasis lt. Dokument", auditMoney(documentBasis), "vor Zu-/Abschlägen")
+        : "";
       return [
         sumAuditLineHtml("Preislogik", appliesAdjustments ? "Zuschläge/Rabatte aktiv" : "Basispreise aktiv"),
+        positionBasisLine,
+        sumAuditLineHtml("Zu-/Abschläge lt. Dokument", auditSignedMoney(adjustmentTotal)),
         sumAuditLineHtml(
-          "Positionsbasis",
+          positionPricesIncludeAdjustments ? "Aktuelle Positionssumme" : "Positionsbasis",
           auditMoney(totals.component_included_line_item_sum),
           positionPricesIncludeAdjustments ? "Zu-/Abschläge bereits enthalten" : ""
         ),
-        sumAuditLineHtml("Rabatte im Dokument", auditSignedMoney(totals.discount_sum)),
-        sumAuditLineHtml("Zuschläge im Dokument", auditSignedMoney(totals.surcharge_sum)),
         sumAuditLineHtml(
           appliesAdjustments ? "Berechnetes Netto" : "Basisbetrag",
           auditMoney(totals.computed_net_from_components),
@@ -14511,6 +14516,20 @@
       const amountLines = result.amount_lines || [];
       const lineItems = result.line_items || [];
       const images = result.images || [];
+      const subtotalLine = amountLines.find((row) => String(row && row.line_type || "").toLowerCase() === "subtotal");
+      const documentPositionSubtotal = uiNumberValue(subtotalLine && subtotalLine.amount);
+      const documentNetTotal = uiNumberValue(document.net_total);
+      const documentDiscountTotal = amountLines
+        .filter((row) => String(row && row.line_type || "").toLowerCase() === "discount")
+        .reduce((sum, row) => sum + (uiNumberValue(row.amount) || 0), 0);
+      const documentSurchargeTotal = amountLines
+        .filter((row) => String(row && row.line_type || "").toLowerCase() === "surcharge")
+        .reduce((sum, row) => sum + (uiNumberValue(row.amount) || 0), 0);
+      const documentAdjustmentTotal = documentDiscountTotal + documentSurchargeTotal;
+      const showDocumentPriceBasis = documentPositionSubtotal !== null
+        && documentNetTotal !== null
+        && Math.abs(documentPositionSubtotal - documentNetTotal) > 0.005
+        && Math.abs(documentAdjustmentTotal) > 0.005;
       const documentNumberLabel = String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
         ? "AB-Nr"
         : "Angebot-Nr";
@@ -14529,7 +14548,13 @@
         ["Projekt", document.project_ref, "project_ref", false],
         ["Kunde (SRTemp)", document.customer_name, null, false],
         ["Waehrung", document.currency, "currency", true],
-        ["Netto", euro(document.net_total), "totals.net_total", false],
+        ...(showDocumentPriceBasis
+          ? [
+              ["Positionsbasis vor Rabatt", euro(documentPositionSubtotal), null, false],
+              ["Zu-/Abschläge lt. Dokument", euro(documentAdjustmentTotal), null, false],
+            ]
+          : []),
+        ["Netto lt. Dokument", euro(document.net_total), "totals.net_total", false],
         ["MwSt", euro(document.vat_total), "totals.vat_total", false],
         ["Gesamt", euro(document.gross_total), "totals.gross_total", true],
         ["Positionen", lineItems.length, null, false],
@@ -15309,6 +15334,15 @@
           "schlotterer_pricing_effective_applied",
           "schlotterer_pricing_disabled_by_document",
           "schlotterer_effective_discount_factor",
+          "schuchter_original_line_total",
+          "schuchter_original_unit_price",
+          "schuchter_adjusted_line_total",
+          "schuchter_adjusted_unit_price",
+          "schuchter_pricing_applied",
+          "schuchter_pricing_operations",
+          "schuchter_rounding_delta",
+          "schuchter_pricing_effective_applied",
+          "schuchter_pricing_disabled_by_document",
           "source",
           "extraction_source",
           "manual_edit",
@@ -16439,7 +16473,7 @@
 
     function pricingProviderKeys(source) {
       const metadata = source && typeof source === "object" ? source : {};
-      return ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
+      return ["rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"].filter((provider) => boolish(metadata[`${provider}_pricing_applied`]));
     }
 
     function roundedMoneyNumber(value) {
@@ -16557,7 +16591,7 @@
 
     function clearPricingMetadataForUi(metadata) {
       const cleaned = { ...(metadata && typeof metadata === "object" ? metadata : {}) };
-      ["pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer"].forEach((provider) => {
+      ["pricing", "rieder", "entholzer", "rekord_vomp", "koch", "schachermayer", "schlotterer", "schuchter"].forEach((provider) => {
         [
           "original_unit_price",
           "original_line_total",
@@ -16810,6 +16844,7 @@
         || source.koch_pricing_disabled_by_document
         || source.schachermayer_pricing_disabled_by_document
         || source.schlotterer_pricing_disabled_by_document
+        || source.schuchter_pricing_disabled_by_document
       );
       const adjustedTotal = firstMetadataNumber(source, [
         "pricing_adjusted_line_total",
@@ -16819,6 +16854,7 @@
         "koch_adjusted_line_total",
         "schachermayer_adjusted_line_total",
         "schlotterer_adjusted_line_total",
+        "schuchter_adjusted_line_total",
       ]);
       const adjustedUnit = firstMetadataNumber(source, [
         "pricing_adjusted_unit_price",
@@ -16828,6 +16864,7 @@
         "koch_adjusted_unit_price",
         "schachermayer_adjusted_unit_price",
         "schlotterer_adjusted_unit_price",
+        "schuchter_adjusted_unit_price",
       ]);
       if (pricingDisabled) {
         const disabledParts = [];
@@ -16853,6 +16890,7 @@
         "koch_original_line_total",
         "schachermayer_original_line_total",
         "schlotterer_original_line_total",
+        "schuchter_original_line_total",
       ]);
       const originalUnit = firstMetadataNumber(source, [
         "pricing_original_unit_price",
@@ -16862,6 +16900,7 @@
         "koch_original_unit_price",
         "schachermayer_original_unit_price",
         "schlotterer_original_unit_price",
+        "schuchter_original_unit_price",
       ]);
       const parts = [];
       if (originalTotal !== null && (currentTotal === null || Math.abs(originalTotal - currentTotal) > 0.005)) {
@@ -17170,6 +17209,7 @@
       }
 
       const currentPositions = totals.component_included_line_item_sum ?? totals.non_alternative_line_item_sum;
+      const documentBasis = totals.document_position_subtotal;
       const documentNet = totals.net_total ?? documentPayload.net_total;
       const discount = totals.discount_sum;
       const surcharge = totals.surcharge_sum;
@@ -17189,6 +17229,15 @@
             <small>${escapeHtml(modeNote)}</small>
           </div>
         `,
+        documentBasis !== undefined && documentBasis !== null
+          ? `
+            <div class="pricing-adjustment-summary-item">
+              <span>Positionsbasis lt. Dokument</span>
+              <strong>${escapeHtml(auditMoney(documentBasis))} €</strong>
+              <small>Vor Zu-/Abschlägen</small>
+            </div>
+          `
+          : "",
         `
           <div class="pricing-adjustment-summary-item">
             <span>${escapeHtml(positionLabel)}</span>

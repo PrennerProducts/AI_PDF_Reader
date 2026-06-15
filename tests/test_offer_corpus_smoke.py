@@ -289,7 +289,7 @@ GREEN_OFFER_CASES = [
         "document_number": "A260172",
         "document_date": "16.03.2026",
         "project_ref": "SR/Brunner.KU v2",
-        "position_count": 13,
+        "position_count": 14,
     },
     {
         "path": "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260343.pdf",

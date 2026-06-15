@@ -8,7 +8,13 @@ POS_MARKER_RE = re.compile(r"^Pos\.$")
 POS_LINE_RE = re.compile(
     r"^(?P<position>\d+[A-Za-z]?)\s+"
     r"(?P<qty>\d+(?:[,.]\d+)?)\s+"
-    r"(?P<unit>Stck|Stk\.?)(?:\s+(?P<label>.+))?$",
+    r"(?P<unit>Stck|Stk\.?|PA|Pauschale|Psch)(?:\s+(?P<label>.+))?$",
+    flags=re.IGNORECASE,
+)
+POS_BOUNDARY_LINE_RE = re.compile(
+    r"^(?P<position>\d+[A-Za-z]?)\s+"
+    r"(?P<qty>\d+(?:[,.]\d+)?)\s+"
+    r"(?P<unit>Stck|Stk\.?|PA|Pauschale|Psch)(?:\s+(?P<label>.+))?$",
     flags=re.IGNORECASE,
 )
 DIMENSION_RE = re.compile(r"B/H:\s*([0-9]+)\s*x\s*([0-9]+)", flags=re.IGNORECASE)
@@ -16,6 +22,7 @@ PRICE_PAIR_RE = re.compile(
     r"\(?\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})\s*\)?"
     r"\s*\(?\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})\s*\)?$"
 )
+MONEY_TOKEN_RE = re.compile(r"\(?\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})\s*\)?")
 
 
 def detect(normalized_lower: str) -> bool:
@@ -74,6 +81,14 @@ def _is_position_start(lines: list[str], idx: int) -> bool:
     return bool(POS_LINE_RE.match(lines[idx + 1]))
 
 
+def _is_position_boundary(lines: list[str], idx: int) -> bool:
+    if idx >= len(lines) - 1:
+        return False
+    if not POS_MARKER_RE.fullmatch(lines[idx]):
+        return False
+    return bool(POS_BOUNDARY_LINE_RE.match(lines[idx + 1]))
+
+
 def _extract_description_short(block_lines: list[str], fallback: str) -> str:
     for line in block_lines[1:]:
         lower = line.lower()
@@ -95,6 +110,8 @@ def _extract_description_short(block_lines: list[str], fallback: str) -> str:
 def _is_image_required(block_text_normalized: str, width_raw: str | None, height_raw: str | None) -> bool:
     if block_text_normalized.startswith("az auf pos.") or "az auf pos." in block_text_normalized:
         return False
+    if "transportkosten" in block_text_normalized:
+        return False
     if (
         not width_raw
         and not height_raw
@@ -106,6 +123,68 @@ def _is_image_required(block_text_normalized: str, width_raw: str | None, height
     ):
         return False
     return True
+
+
+def _price_pair_from_line(line: str) -> tuple[str | None, str | None, bool]:
+    pair_match = PRICE_PAIR_RE.search(line)
+    if pair_match:
+        return pair_match.group(1), pair_match.group(2), "(" in line and ")" in line
+
+    amount_matches = MONEY_TOKEN_RE.findall(line)
+    if len(amount_matches) < 2:
+        return None, None, False
+    return amount_matches[-2], amount_matches[-1], "(" in line and ")" in line
+
+
+def _strip_price_pair_from_line(line: str) -> str:
+    cleaned = PRICE_PAIR_RE.sub("", line)
+    matches = list(MONEY_TOKEN_RE.finditer(cleaned))
+    if len(matches) >= 2:
+        start = matches[-2].start()
+        end = matches[-1].end()
+        cleaned = f"{cleaned[:start]} {cleaned[end:]}"
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip(" .-_\t")
+
+
+def _is_description_noise_line(line: str) -> bool:
+    lower = line.lower()
+    if not lower:
+        return True
+    if line in {".", "-"}:
+        return True
+    if re.fullmatch(r"[-_—=]{4,}", line):
+        return True
+    if lower.startswith(
+        (
+            "übertrag:",
+            "angebot ",
+            "auftragsbestätigung ",
+            "auftragsbestaetigung ",
+            "pos. menge",
+            "summe positionen",
+            "summe netto",
+            "mwst",
+            "summe brutto",
+        )
+    ):
+        return True
+    return False
+
+
+def _clean_description_lines(block_lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for raw_line in block_lines[1:]:
+        line = normalize_line(raw_line)
+        if _is_description_noise_line(line):
+            continue
+        line = _strip_price_pair_from_line(line)
+        if not line or _is_description_noise_line(line):
+            continue
+        if cleaned and cleaned[-1].lower() == line.lower():
+            continue
+        cleaned.append(line)
+    return cleaned
 
 
 def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dict[str, Any]]:
@@ -125,7 +204,7 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
 
         end = idx + 2
         while end < len(lines):
-            if _is_position_start(lines, end):
+            if _is_position_boundary(lines, end):
                 break
             if lines[end].startswith(("Summe Positionen", "Summe Netto", "MwSt", "Summe Brutto")):
                 break
@@ -137,11 +216,11 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
         line_total_raw = None
         is_alternative = False
         for line in reversed(block_lines):
-            pair_match = PRICE_PAIR_RE.search(line)
-            if pair_match:
-                unit_price_raw = pair_match.group(1)
-                line_total_raw = pair_match.group(2)
-                is_alternative = "(" in line and ")" in line
+            unit_candidate, total_candidate, candidate_is_alternative = _price_pair_from_line(line)
+            if unit_candidate and total_candidate:
+                unit_price_raw = unit_candidate
+                line_total_raw = total_candidate
+                is_alternative = candidate_is_alternative
                 break
         if unit_price_raw is None or line_total_raw is None:
             pricing_text = "\n".join(
@@ -157,6 +236,7 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
         description_short = _extract_description_short(block_lines, fallback=lv_pos)
         block_text_normalized = normalize_line(block_text).lower()
         image_required = _is_image_required(block_text_normalized, width_raw, height_raw)
+        description_lines = _clean_description_lines(block_lines)
 
         items.append(
             {
@@ -169,7 +249,7 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
                 "width_raw": width_raw,
                 "height_raw": height_raw,
                 "description_short": description_short,
-                "description_long": block_text[:8000],
+                "description_long": "\n".join(description_lines)[:8000],
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
                 "page_ref": line_records[idx][1],
