@@ -16489,12 +16489,18 @@
       const purchaseParts = components.map((part) => uiNumberValue(part && part.purchase_price));
       const unitTotal = uiNumberValue(source.alternative_group_unit_price) ?? moneySumForUi(unitParts);
       const purchaseTotal = uiNumberValue(source.alternative_group_purchase_price) ?? moneySumForUi(purchaseParts);
+      const quantity = uiNumberValue(item && item.quantity);
+      const unitLineTotal = quantity !== null && unitTotal !== null ? roundedMoneyNumber(quantity * unitTotal) : null;
+      const purchaseLineTotal = quantity !== null && purchaseTotal !== null ? roundedMoneyNumber(quantity * purchaseTotal) : null;
       return {
         components,
         unitParts,
         purchaseParts,
         unitTotal,
         purchaseTotal,
+        quantity,
+        unitLineTotal,
+        purchaseLineTotal,
       };
     }
 
@@ -16517,6 +16523,12 @@
       if (!details) return "";
       const unitFormula = priceAdditionFormula(details.unitParts, details.unitTotal);
       const purchaseFormula = priceAdditionFormula(details.purchaseParts, details.purchaseTotal);
+      const unitTotalFormula = details.quantity !== null && details.unitLineTotal !== null
+        ? `${auditMoney(details.unitTotal)} € × ${formatQuantity(details.quantity)} = ${auditMoney(details.unitLineTotal)} €`
+        : "";
+      const purchaseTotalFormula = details.quantity !== null && details.purchaseLineTotal !== null
+        ? `${auditMoney(details.purchaseTotal)} € × ${formatQuantity(details.quantity)} = ${auditMoney(details.purchaseLineTotal)} €`
+        : "";
       const rows = details.components.map((part, index) => {
         const label = fmt(part && (part.source_position || part.source_id), `Quelle ${index + 1}`);
         const unit = uiNumberValue(part && part.unit_price);
@@ -16533,7 +16545,9 @@
         <div class="price-aggregation-detail">
           <strong>Zusammengezählte Alternativpreise</strong>
           ${unitFormula ? `<span>Unit EP: ${escapeHtml(unitFormula)}</span>` : ""}
+          ${unitTotalFormula ? `<span>Unit GP: ${escapeHtml(unitTotalFormula)}</span>` : ""}
           ${purchaseFormula ? `<span>Purchase EP: ${escapeHtml(purchaseFormula)}</span>` : ""}
+          ${purchaseTotalFormula ? `<span>Purchase GP: ${escapeHtml(purchaseTotalFormula)}</span>` : ""}
           ${rows ? `<div class="price-aggregation-sources">${rows}</div>` : ""}
         </div>
       `;
@@ -16783,12 +16797,9 @@
         const components = aggregateSourcePriceComponents(groupItems);
         const unitPrice = moneySumForUi(components.map((part) => part.unit_price));
         const purchasePrice = moneySumForUi(components.map((part) => part.purchase_price));
-        const displayUnitPrice = pricingAdjustmentsEnabled(state.result) && purchasePrice !== null
-          ? purchasePrice
-          : unitPrice;
         const quantity = uiNumberValue(first.quantity);
-        const lineTotal = quantity !== null && displayUnitPrice !== null
-          ? roundedMoneyNumber(quantity * displayUnitPrice)
+        const lineTotal = quantity !== null && unitPrice !== null
+          ? roundedMoneyNumber(quantity * unitPrice)
           : null;
         const metadata = clearPricingMetadataForUi(metadataObject(first));
         metadata.alternative_source = "aggregated_nested";
@@ -16812,7 +16823,7 @@
             `Gesammelte Alternative: ${label}`,
             `Anzahl Quellpositionen: ${groupItems.length}`,
           ].join("\n"),
-          unit_price: displayUnitPrice,
+          unit_price: unitPrice,
           purchase_price: purchasePrice,
           line_total: lineTotal,
           metadata_json: metadata,
