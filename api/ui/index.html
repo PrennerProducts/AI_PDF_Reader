@@ -15163,7 +15163,7 @@
         if (item.is_alternative) exportMetaChips.push({ label: "Alternative", css: "" });
         if (item.is_alternative && exportMeta.append_at_end) exportMetaChips.push({ label: "Am Ende", css: "warn" });
         if (item.is_alternative && !exportMeta.append_at_end) exportMetaChips.push({ label: "Unterposition", css: "" });
-        if (exportDiffers) exportMetaChips.push({ label: `Original ${fmt(item.position_no)}`, css: "" });
+        if (exportDiffers) exportMetaChips.push({ label: `PDF Pos. ${fmt(item.position_no)}`, css: "" });
         if (exportDiffers) exportMetaChips.push({ label: "neu nummeriert", css: "warn" });
         const exportMetaHtml = exportMetaChips.length
           ? `<div class="position-meta-chips">${exportMetaChips.map((chip) => `<span class="position-meta-chip ${escapeHtml(chip.css)}">${escapeHtml(chip.label)}</span>`).join("")}</div>`
@@ -15312,9 +15312,19 @@
         const displayLineTotal = lineTotalForDisplayItem(item);
         const exportPriceStack = exportPriceStackHtml(item, itemMetadata);
         const originalPriceNote = exportPriceStack.hasSplit ? "" : originalPriceNoteHtml(item, itemMetadata);
+        const sourcePositionNo = fmt(item.position_no, "");
+        const lvPart = fmt(item.lv_pos, "") && fmt(item.lv_pos, "") !== "-"
+          ? ` · LV ${fmt(item.lv_pos)}`
+          : "";
+        const positionHeading = exportDiffers
+          ? `Export Pos. ${exportPositionNo}`
+          : `Pos. ${exportPositionNo}`;
+        const positionSubline = sourcePositionNo
+          ? `PDF Pos. ${sourcePositionNo}${lvPart} · Seite ${fmt(item.page_ref)}`
+          : `Seite ${fmt(item.page_ref)}`;
         const extractedFieldHtml = detailMetaCellsHtml([
           ["Datensatz-ID", item.id],
-          ["Position", item.position_no],
+          ["PDF-Position", item.position_no],
           ["Export-Position", exportPositionNo],
           ["LV / Arch.-Pos.", item.lv_pos],
           ["Referenz-LV", itemMetadata.referenced_lv_pos],
@@ -15351,9 +15361,9 @@
           </td>
           <td>
             <div class="position-ident">
-              <strong>Pos. ${escapeHtml(exportPositionNo)}</strong>
+              <strong>${escapeHtml(positionHeading)}</strong>
               ${exportMetaHtml}
-              <span>LV ${escapeHtml(fmt(item.lv_pos))} · Seite ${escapeHtml(fmt(item.page_ref))}</span>
+              <span>${escapeHtml(positionSubline)}</span>
             </div>
           </td>
           <td>${escapeHtml(formatQuantity(item.quantity))} ${escapeHtml(fmt(item.unit, ""))}</td>

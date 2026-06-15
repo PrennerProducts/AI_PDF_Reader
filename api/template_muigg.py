@@ -101,6 +101,39 @@ def _image_required(position_no: str, description_short: str, width_raw: str | N
     return True
 
 
+def _clean_description_lines(block_lines: list[str], description_short: str) -> list[str]:
+    cleaned: list[str] = []
+    for line in block_lines[1:]:
+        normalized = normalize_line(line)
+        if not normalized:
+            continue
+        if POSITION_ROW_RE.match(normalized):
+            continue
+        if cleaned and cleaned[-1].lower() == normalized.lower():
+            continue
+        cleaned.append(normalized)
+    return cleaned
+
+
+def _page_bounds_for_offset(text: str, offset: int) -> tuple[int, int]:
+    page_start = text.rfind("\f", 0, max(0, offset)) + 1
+    page_end = text.find("\f", max(0, offset))
+    if page_end < 0:
+        page_end = len(text)
+    return page_start, page_end
+
+
+def _page_line_top_ratio(text: str, offset: int) -> float | None:
+    page_start, page_end = _page_bounds_for_offset(text, offset)
+    if page_end <= page_start:
+        return None
+    page_text = text[page_start:page_end]
+    relative_offset = max(0, min(offset, page_end) - page_start)
+    line_count = max(1, page_text.count("\n") + 1)
+    line_index = page_text[:relative_offset].count("\n")
+    return min(0.98, max(0.02, line_index / line_count))
+
+
 def refine_headers(normalized_text: str, headers: dict[str, str | None]) -> dict[str, str | None]:
     document_number = headers.get("document_number") or _normalize_document_number(
         first_match(
@@ -159,6 +192,10 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         is_alternative = "(" in match.group("line_total") and ")" in match.group("line_total")
 
         position_no = match.group("position").upper()
+        description_lines = _clean_description_lines(block_lines, description_short)
+        page_ref = page_ref_from_offset(normalized_text, match.start())
+        page_end_ref = page_ref_from_offset(normalized_text, max(match.start(), block_end - 1))
+        item_top_ratio = _page_line_top_ratio(normalized_text, match.start())
         items.append(
             {
                 "position_no": position_no,
@@ -169,12 +206,27 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "width_raw": width_raw,
                 "height_raw": height_raw,
                 "description_short": description_short,
-                "description_long": "\n".join(normalize_line(line) for line in block_lines if normalize_line(line))[:8000],
+                "description_long": "\n".join(description_lines)[:8000],
                 "unit_price_raw": _clean_amount(match.group("unit_price")),
                 "line_total_raw": _clean_amount(match.group("line_total")),
-                "page_ref": page_ref_from_offset(normalized_text, match.start()),
+                "page_ref": page_ref,
+                "page_end_ref": page_end_ref,
+                "spans_page_break": page_end_ref > page_ref,
+                "item_top_ratio": item_top_ratio,
+                "next_position_page_ref": None,
+                "next_position_top_ratio": None,
                 "image_required": _image_required(position_no, description_short, width_raw, height_raw),
             }
         )
+
+    visual_items = [
+        item
+        for item in items
+        if item.get("image_required") and item.get("page_ref") is not None and item.get("item_top_ratio") is not None
+    ]
+    for idx, item in enumerate(visual_items[:-1]):
+        next_item = visual_items[idx + 1]
+        item["next_position_page_ref"] = next_item.get("page_ref")
+        item["next_position_top_ratio"] = next_item.get("item_top_ratio")
 
     return items

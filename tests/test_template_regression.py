@@ -11,6 +11,8 @@ sys.path.insert(0, str(ROOT / "api"))
 from parser import parse_document_text
 from structured_parser import extract_amount_lines, extract_line_items
 from template_common import extract_first_description
+from extractor import extract_pdf_images
+from image_assignment import image_within_item_vertical_window
 from main import _build_amount_line_rows, _build_line_item_rows
 from validation import build_document_validation
 
@@ -807,6 +809,100 @@ def test_muigg_regression() -> None:
     assert items[-1]["line_total_raw"] == "75,00"
     assert items[-1]["image_required"] is False
     assert [row["line_type"] for row in amount_lines[-3:]] == ["net_total", "vat", "total"]
+
+
+def test_muigg_long_text_strips_position_headers_and_prices() -> None:
+    position_header = re.compile(
+        r"(?m)^\s*(?:[0-9]{3}(?:\.[0-9]+)?|[A-Za-z]{1,3}[0-9]{2}(?:\.[0-9]+)?)\s+"
+        r"[0-9]+,[0-9]{2}\s+Stk\."
+    )
+    trailing_price_pair = re.compile(
+        r"(?m)\b[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}\s+\(?[0-9]{1,3}(?:[. ][0-9]{3})*,[0-9]{2}\)?\s*$|"
+        r"\b[0-9]+,[0-9]{2}\s+\(?[0-9]+,[0-9]{2}\)?\s*$"
+    )
+    pdf_paths = [
+        ROOT / "samples/pdfs/candidates/offers/muigg/AN 250947.pdf",
+        ROOT / "samples/pdfs/candidates/offers/muigg/AN 251073.pdf",
+        ROOT / "samples/pdfs/regression/offers/muigg/AN 251409.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/muigg/muigg__auftragsbestaetigung__1240238.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/muigg/muigg__auftragsbestaetigung__1250158.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/muigg/muigg__auftragsbestaetigung__1250190.pdf",
+        ROOT / "samples/pdfs/non_offer/auftrag_auftragsbestaetigung/muigg/muigg__auftragsbestaetigung__1250439.pdf",
+    ]
+
+    for pdf_path in pdf_paths:
+        text = _read_pdf_text(pdf_path)
+        parsed = parse_document_text(text)
+        items = extract_line_items(text, parsed["template"])
+
+        for item in items:
+            description_long = item["description_long"]
+            assert not position_header.search(description_long)
+            assert not trailing_price_pair.search(description_long)
+            if description_long:
+                assert description_long.splitlines()[0] != item["description_short"]
+
+    regression_text = _read_pdf_text(ROOT / "samples/pdfs/regression/offers/muigg/AN 251409.pdf")
+    regression_items = extract_line_items(regression_text, "muigg")
+    regression_by_pos = {item["position_no"]: item for item in regression_items}
+    assert regression_by_pos["001"]["description_long"].splitlines()[0] == "Serie: heroal W72 / D72"
+    assert "6.620,28" not in regression_by_pos["001"]["description_long"]
+    assert "001 1,00 Stk." not in regression_by_pos["001"]["description_long"]
+
+
+def test_muigg_image_windows_follow_position_ranges(tmp_path: Path) -> None:
+    pdf_path = ROOT / "samples/pdfs/candidates/offers/muigg/AN 251073.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    items = extract_line_items(text, parsed["template"])
+    images = extract_pdf_images(pdf_path, tmp_path / "muigg_images")
+    for index, image in enumerate(images, start=1):
+        image["id"] = index
+    image_by_id = {image["id"]: image for image in images}
+    item_by_pos = {item["position_no"]: item for item in items}
+
+    def window_item(position_no: str) -> dict[str, object]:
+        item = item_by_pos[position_no]
+        metadata = {
+            key: item[key]
+            for key in ("item_top_ratio", "next_position_page_ref", "next_position_top_ratio")
+            if item.get(key) is not None
+        }
+        return {"page_ref": item["page_ref"], "metadata_json": json.dumps(metadata)}
+
+    assert item_by_pos["001"]["item_top_ratio"] < 0.5
+    assert item_by_pos["001"]["next_position_page_ref"] == 2
+    assert item_by_pos["002"]["next_position_page_ref"] == 3
+    assert image_within_item_vertical_window(window_item("001"), image_by_id[1]) is True
+    assert image_within_item_vertical_window(window_item("001"), image_by_id[2]) is False
+    assert image_within_item_vertical_window(window_item("002"), image_by_id[1]) is False
+    assert image_within_item_vertical_window(window_item("002"), image_by_id[2]) is True
+
+    compact_pdf_path = ROOT / "samples/pdfs/candidates/offers/muigg/AN 250947.pdf"
+    compact_text = _read_pdf_text(compact_pdf_path)
+    compact_parsed = parse_document_text(compact_text)
+    compact_items = extract_line_items(compact_text, compact_parsed["template"])
+    compact_images = extract_pdf_images(compact_pdf_path, tmp_path / "muigg_compact_images")
+    for index, image in enumerate(compact_images, start=1):
+        image["id"] = index
+    compact_image_by_id = {image["id"]: image for image in compact_images}
+    compact_item_by_pos = {item["position_no"]: item for item in compact_items}
+
+    def compact_window_item(position_no: str) -> dict[str, object]:
+        item = compact_item_by_pos[position_no]
+        metadata = {
+            key: item[key]
+            for key in ("item_top_ratio", "next_position_page_ref", "next_position_top_ratio")
+            if item.get(key) is not None
+        }
+        return {"page_ref": item["page_ref"], "metadata_json": json.dumps(metadata)}
+
+    assert compact_item_by_pos["001"]["next_position_page_ref"] == 2
+    assert compact_item_by_pos["002"]["next_position_page_ref"] is None
+    assert compact_item_by_pos["Z01"]["image_required"] is False
+    assert image_within_item_vertical_window(compact_window_item("001"), compact_image_by_id[1]) is True
+    assert image_within_item_vertical_window(compact_window_item("001"), compact_image_by_id[2]) is False
+    assert image_within_item_vertical_window(compact_window_item("002"), compact_image_by_id[2]) is True
 
 
 def test_schachermayer_regression() -> None:
