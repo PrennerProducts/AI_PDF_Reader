@@ -11288,7 +11288,7 @@
             <div class="pdf-crop-toolbar">
               <div>
                 <strong id="pdfCropTitle">Screenshot setzen</strong>
-                <span>Rechteck auf der PDF-Seite ziehen, um einen Screenshot der Position zuzuordnen.</span>
+                <span id="pdfCropHint">Rechteck auf der PDF-Seite ziehen, um einen Screenshot der Position zuzuordnen.</span>
               </div>
               <button class="pdf-crop-cancel" id="pdfCropCancelBtn" type="button">Abbrechen</button>
             </div>
@@ -11688,11 +11688,13 @@
       },
       pdfCrop: {
         active: false,
+        source: "pdf",
         lineItemId: null,
         itemKey: "",
         page: 1,
         pointerId: null,
         start: null,
+        previewObjectUrl: "",
       },
     };
 
@@ -11765,6 +11767,7 @@
       pdfCropPreviewImg: document.getElementById("pdfCropPreviewImg"),
       pdfCropSelection: document.getElementById("pdfCropSelection"),
       pdfCropTitle: document.getElementById("pdfCropTitle"),
+      pdfCropHint: document.getElementById("pdfCropHint"),
       pdfCropCancelBtn: document.getElementById("pdfCropCancelBtn"),
       pdfPrevPageBtn: document.getElementById("pdfPrevPageBtn"),
       pdfNextPageBtn: document.getElementById("pdfNextPageBtn"),
@@ -13315,6 +13318,9 @@
           const actions = [
             reviewTaskActionHtml("Zur Position", "open-item", { item_key: itemKey, primary: true }),
             imageRelated ? reviewTaskActionHtml("Bilder", "open-audit", { item_key: itemKey }) : "",
+            imageRelated && Number.isFinite(lineItemId)
+              ? reviewTaskActionHtml("Bildschirm", "screen-crop-image", { line_item_id: lineItemId, item_key: itemKey, icon: "screenshot" })
+              : "",
             imageRelated && Number.isFinite(lineItemId)
               ? reviewTaskActionHtml("Kein Bild", "clear-image", { line_item_id: lineItemId, warning: true })
               : "",
@@ -14884,10 +14890,15 @@
 
     function cancelPdfCrop({ silent = false } = {}) {
       state.pdfCrop.active = false;
+      state.pdfCrop.source = "pdf";
       state.pdfCrop.lineItemId = null;
       state.pdfCrop.itemKey = "";
       state.pdfCrop.pointerId = null;
       state.pdfCrop.start = null;
+      if (state.pdfCrop.previewObjectUrl) {
+        URL.revokeObjectURL(state.pdfCrop.previewObjectUrl);
+        state.pdfCrop.previewObjectUrl = "";
+      }
       resetPdfCropSelection();
       if (ui.pdfCropOverlay) ui.pdfCropOverlay.setAttribute("hidden", "");
       if (ui.pdfCropPreviewImg) ui.pdfCropPreviewImg.removeAttribute("src");
@@ -14922,8 +14933,79 @@
       return { left, top, width, height, imageWidth: imageRect.width, imageHeight: imageRect.height };
     }
 
+    function screenCropDataUrlFromSelection(selection) {
+      if (!ui.pdfCropPreviewImg || !selection) return "";
+      const image = ui.pdfCropPreviewImg;
+      if (!image.naturalWidth || !image.naturalHeight) return "";
+      const scaleX = image.naturalWidth / selection.imageWidth;
+      const scaleY = image.naturalHeight / selection.imageHeight;
+      const sourceLeft = Math.max(0, Math.round(selection.left * scaleX));
+      const sourceTop = Math.max(0, Math.round(selection.top * scaleY));
+      const sourceWidth = Math.max(1, Math.round(selection.width * scaleX));
+      const sourceHeight = Math.max(1, Math.round(selection.height * scaleY));
+      const canvas = document.createElement("canvas");
+      canvas.width = sourceWidth;
+      canvas.height = sourceHeight;
+      const context = canvas.getContext("2d");
+      if (!context) return "";
+      context.drawImage(
+        image,
+        sourceLeft,
+        sourceTop,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        sourceWidth,
+        sourceHeight
+      );
+      return canvas.toDataURL("image/png");
+    }
+
+    async function submitScreenCropSelection(selection) {
+      if (!state.documentId || !state.pdfCrop.active || !Number.isFinite(Number(state.pdfCrop.lineItemId))) return;
+      if (!selection || selection.width < 12 || selection.height < 12) {
+        resetPdfCropSelection();
+        setStatus("Der ausgewählte Bildschirm-Ausschnitt ist zu klein.", "warn");
+        return;
+      }
+      const lineItemId = Number(state.pdfCrop.lineItemId);
+      const itemKey = state.pdfCrop.itemKey;
+      const imageDataUrl = screenCropDataUrlFromSelection(selection);
+      if (!imageDataUrl) {
+        setStatus("Bildschirm-Ausschnitt konnte nicht erstellt werden.", "err");
+        return;
+      }
+      const payload = {
+        page_ref: clampPdfPage(state.pdfCrop.page || state.pdf.page || 1),
+        image_data_url: imageDataUrl,
+      };
+      setStatus(`Bildschirm-Ausschnitt wird als Bild für Position ${lineItemId} gespeichert ...`);
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/screen-crop-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        if (itemKey) expandedSnapshot.add(itemKey);
+        cancelPdfCrop({ silent: true });
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setExtractTab("items");
+        setStatus(`Bildschirm-Ausschnitt wurde als Bild #${response.image_id} zugeordnet.`, "ok");
+      } catch (error) {
+        setStatus(`Bildschirm-Ausschnitt konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
     async function submitPdfCropSelection(selection) {
       if (!state.documentId || !state.pdfCrop.active || !Number.isFinite(Number(state.pdfCrop.lineItemId))) return;
+      if (state.pdfCrop.source === "screen") {
+        await submitScreenCropSelection(selection);
+        return;
+      }
       if (!selection || selection.width < 12 || selection.height < 12) {
         resetPdfCropSelection();
         setStatus("Der ausgewählte Screenshot-Ausschnitt ist zu klein.", "warn");
@@ -14968,7 +15050,12 @@
       const page = clampPdfPage(item.page_ref || state.pdf.page || 1);
       state.pdf.page = page;
       refreshPdfFrame({ forceReload: true });
+      if (state.pdfCrop.previewObjectUrl) {
+        URL.revokeObjectURL(state.pdfCrop.previewObjectUrl);
+        state.pdfCrop.previewObjectUrl = "";
+      }
       state.pdfCrop.active = true;
+      state.pdfCrop.source = "pdf";
       state.pdfCrop.lineItemId = Number(lineItemId);
       state.pdfCrop.itemKey = String(itemKey || "");
       state.pdfCrop.page = page;
@@ -14976,10 +15063,91 @@
       state.pdfCrop.start = null;
       resetPdfCropSelection();
       if (ui.pdfCropTitle) ui.pdfCropTitle.textContent = `Bildbereich für Pos. ${fmt(item.position_no)} · Seite ${fmt(page)}`;
+      if (ui.pdfCropHint) ui.pdfCropHint.textContent = "Rechteck auf der PDF-Seite ziehen, um den Ausschnitt als Positionsbild zu speichern.";
       ui.pdfCropPreviewImg.src = `/document/${state.documentId}/page/${page}/preview?scale=2&crop_preview=${Date.now()}`;
       ui.pdfCropOverlay.removeAttribute("hidden");
       setStatus("Ziehe im PDF ein Rechteck um das gewünschte Bild.");
       if (button instanceof HTMLElement) button.blur();
+    }
+
+    async function startScreenCropForLineItem(lineItemId, itemKey, button) {
+      if (!state.documentId || !ui.pdfCropOverlay || !ui.pdfCropPreviewImg) return;
+      const item = lineItemById(lineItemId);
+      if (!item) {
+        setStatus(`Position ${lineItemId} wurde nicht gefunden.`, "warn");
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        setStatus("Bildschirm-Screenshot wird von diesem Browser oder dieser Verbindung nicht unterstützt.", "err");
+        return;
+      }
+      const page = clampPdfPage(item.page_ref || state.pdf.page || 1);
+      setStatus("Wähle im Browser den Bildschirm, das Fenster oder den Tab für den Screenshot aus.");
+      if (button instanceof HTMLElement) button.blur();
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: "always",
+          },
+          audio: false,
+        });
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = resolve;
+          video.onerror = reject;
+        });
+        await video.play();
+        const width = Math.max(1, video.videoWidth || 0);
+        const height = Math.max(1, video.videoHeight || 0);
+        if (!width || !height) {
+          throw new Error("Screenshot-Bild hat keine gültige Größe.");
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          throw new Error("Screenshot konnte nicht gerendert werden.");
+        }
+        context.drawImage(video, 0, 0, width, height);
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) {
+          throw new Error("Screenshot konnte nicht vorbereitet werden.");
+        }
+
+        if (state.pdfCrop.previewObjectUrl) {
+          URL.revokeObjectURL(state.pdfCrop.previewObjectUrl);
+        }
+        state.pdfCrop.previewObjectUrl = URL.createObjectURL(blob);
+        state.pdf.page = page;
+        state.pdfCrop.active = true;
+        state.pdfCrop.source = "screen";
+        state.pdfCrop.lineItemId = Number(lineItemId);
+        state.pdfCrop.itemKey = String(itemKey || "");
+        state.pdfCrop.page = page;
+        state.pdfCrop.pointerId = null;
+        state.pdfCrop.start = null;
+        resetPdfCropSelection();
+        if (ui.pdfCropTitle) ui.pdfCropTitle.textContent = `Bildschirmbereich für Pos. ${fmt(item.position_no)}`;
+        if (ui.pdfCropHint) ui.pdfCropHint.textContent = "Rechteck im Bildschirmfoto ziehen, um den Ausschnitt als Positionsbild zu speichern.";
+        ui.pdfCropPreviewImg.src = state.pdfCrop.previewObjectUrl;
+        ui.pdfCropOverlay.removeAttribute("hidden");
+        setStatus("Ziehe im Screenshot ein Rechteck um das gewünschte Bild.");
+      } catch (error) {
+        const message = error && error.name === "NotAllowedError"
+          ? "Bildschirmfreigabe wurde abgebrochen."
+          : `Bildschirm-Screenshot konnte nicht gestartet werden: ${String(error.message || error).slice(0, 220)}`;
+        setStatus(message, error && error.name === "NotAllowedError" ? "warn" : "err");
+      } finally {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      }
     }
 
     async function setLineItemReviewChecked(lineItemId, checked, button) {
@@ -15246,7 +15414,10 @@
         ].filter(Boolean).join("");
         const imageActionButtons = [
           !isNonVisual && Number.isFinite(lineItemId)
-            ? reviewTaskActionHtml("Screenshot setzen", "crop-image", { line_item_id: lineItemId, item_key: itemKey, primary: true, icon: "screenshot" })
+            ? reviewTaskActionHtml("PDF-Ausschnitt", "crop-image", { line_item_id: lineItemId, item_key: itemKey, primary: true, icon: "screenshot" })
+            : "",
+          !isNonVisual && Number.isFinite(lineItemId)
+            ? reviewTaskActionHtml("Bildschirm", "screen-crop-image", { line_item_id: lineItemId, item_key: itemKey, icon: "screenshot" })
             : "",
           !isNonVisual && Number.isFinite(lineItemId)
             ? reviewTaskActionHtml("Kein Bild setzen", "clear-image", { line_item_id: lineItemId, warning: true })
@@ -18150,6 +18321,10 @@
         startPdfCropForLineItem(lineItemId, itemKey, actionButton);
         return;
       }
+      if (action === "screen-crop-image" && Number.isFinite(lineItemId)) {
+        void startScreenCropForLineItem(lineItemId, itemKey, actionButton);
+        return;
+      }
       if (action === "mark-reviewed" && Number.isFinite(lineItemId)) {
         void setLineItemReviewChecked(lineItemId, true, actionButton);
         return;
@@ -18186,6 +18361,11 @@
         if (action === "crop-image") {
           const itemKey = String(reviewAction.getAttribute("data-item_key") || "");
           startPdfCropForLineItem(lineItemId, itemKey, reviewAction);
+          return;
+        }
+        if (action === "screen-crop-image") {
+          const itemKey = String(reviewAction.getAttribute("data-item_key") || "");
+          void startScreenCropForLineItem(lineItemId, itemKey, reviewAction);
           return;
         }
         if (action === "mark-reviewed") {

@@ -136,6 +136,10 @@ Markiert bewusst, dass eine Position kein finales Bild hat.
 
 Speichert einen manuellen PDF-Crop als finales Positionsbild.
 
+### `POST /documents/{document_id}/line-items/{line_item_id}/screen-crop-image`
+
+Speichert einen vom Browser freigegebenen Bildschirm-Ausschnitt als finales Positionsbild.
+
 ### `POST /documents/{document_id}/line-items/{line_item_id}/review-check`
 
 Markiert offene Warnungen einer Position als manuell geprueft.

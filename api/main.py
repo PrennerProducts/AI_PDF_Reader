@@ -1,3 +1,6 @@
+import base64
+import binascii
+from io import BytesIO
 import re
 import hmac
 import secrets
@@ -15,6 +18,7 @@ from uuid import UUID, uuid4
 import fitz
 from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
 from db import (
@@ -95,6 +99,7 @@ IMAGE_DUMP_DIR = Path("/data/logs/extracted_images")
 UI_DIR = Path(__file__).resolve().parent / "ui"
 UI_INDEX_PATH = UI_DIR / "index.html"
 SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+SCREEN_CROP_MAX_BYTES = 12 * 1024 * 1024
 PROCESS_MODES = ("parser_only",)
 AI_DISABLED_DETAIL = (
     "KI-/Modellverarbeitung ist im Produktbetrieb deaktiviert. "
@@ -136,6 +141,11 @@ class PdfCropImageRequest(BaseModel):
     top_ratio: float = Field(ge=0, le=1, description="Selection top edge relative to rendered page height.")
     width_ratio: float = Field(gt=0, le=1, description="Selection width relative to rendered page width.")
     height_ratio: float = Field(gt=0, le=1, description="Selection height relative to rendered page height.")
+
+
+class ScreenCropImageRequest(BaseModel):
+    page_ref: int = Field(ge=1, description="Reference PDF page for sorting/manual review.")
+    image_data_url: str = Field(min_length=1, description="Browser-captured crop as image data URL.")
 
 
 class DocumentApprovalRequest(BaseModel):
@@ -808,6 +818,40 @@ def _crop_pdf_region_to_png(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"PDF area could not be cropped: {exc}") from exc
+
+
+def _screen_crop_data_url_to_png(payload: ScreenCropImageRequest) -> tuple[bytes, int, int, str]:
+    data_url = payload.image_data_url.strip()
+    if "," not in data_url:
+        raise HTTPException(status_code=400, detail="Screenshot payload must be an image data URL.")
+    header, encoded = data_url.split(",", 1)
+    header = header.lower()
+    if not header.startswith("data:image/") or ";base64" not in header:
+        raise HTTPException(status_code=400, detail="Screenshot payload must be a base64 image data URL.")
+    mime_type = header[5:].split(";", 1)[0]
+    if mime_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(status_code=400, detail="Screenshot payload must be PNG, JPEG or WebP.")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Screenshot payload is not valid base64.") from exc
+    if not raw or len(raw) > SCREEN_CROP_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Screenshot payload is empty or too large.")
+
+    try:
+        with Image.open(BytesIO(raw)) as image:
+            image.load()
+            width, height = int(image.width), int(image.height)
+            if width < 24 or height < 24:
+                raise HTTPException(status_code=400, detail="Selected screenshot area is too small.")
+            normalized = image.convert("RGB")
+            buffer = BytesIO()
+            normalized.save(buffer, format="PNG", optimize=True)
+            return buffer.getvalue(), width, height, mime_type
+    except HTTPException:
+        raise
+    except (UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(status_code=400, detail="Screenshot payload is not a readable image.") from exc
 
 
 def _dedupe_int_list(values: list[int]) -> list[int]:
@@ -2472,6 +2516,91 @@ def crop_line_item_image(document_id: int, line_item_id: int, payload: PdfCropIm
         "height": height,
         "selection_source": "manual_crop",
         "selection_reason": "ui_pdf_crop",
+        "review_checked": True,
+    }
+
+
+@app.post("/documents/{document_id}/line-items/{line_item_id}/screen-crop-image")
+def crop_line_item_screen_image(document_id: int, line_item_id: int, payload: ScreenCropImageRequest, request: Request):
+    result_data = get_document_result(document_id)
+    if not result_data:
+        raise HTTPException(status_code=404, detail=f"Result for document {document_id} not found.")
+
+    line_items_raw = result_data.get("line_items")
+    line_items = list(line_items_raw) if isinstance(line_items_raw, list) else []
+    line_item = next((item for item in line_items if _to_int_safe(item.get("id")) == line_item_id), None)
+    if not line_item:
+        raise HTTPException(status_code=404, detail=f"Line item {line_item_id} for document {document_id} not found.")
+
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    image_bytes, width, height, original_mime_type = _screen_crop_data_url_to_png(payload)
+    metadata = {
+        "source": "ui_screen_crop",
+        "layout_source": "manual_screen_crop",
+        "crop_page_ref": payload.page_ref,
+        "original_mime_type": original_mime_type,
+        "line_item_id": line_item_id,
+        "position_no": line_item.get("position_no"),
+        "lv_pos": line_item.get("lv_pos"),
+    }
+
+    digest = sha256(image_bytes).hexdigest()
+    output_dir = IMAGE_DUMP_DIR / f"document_{document_id}" / "manual_crops"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"manual_screen_crop_line_{line_item_id}_page_{payload.page_ref}_{uuid4().hex[:10]}.png"
+    output_path.write_bytes(image_bytes)
+
+    image = insert_document_image(
+        document_id,
+        {
+            "page_ref": payload.page_ref,
+            "mime_type": "image/png",
+            "storage_path": str(output_path),
+            "sha256": digest,
+            "width": width,
+            "height": height,
+            "bytes_size": len(image_bytes),
+            "metadata_json": metadata,
+        },
+    )
+
+    image_id = int(image["id"])
+    updated = update_line_item_image_assignments(
+        document_id,
+        {
+            line_item_id: {
+                "image_ids": [image_id],
+                "selection_source": "manual_crop",
+                "selection_reason": "ui_screen_crop",
+                "strategy_requested": "manual_crop",
+                "review_checked": True,
+                "review_checked_reason": "ui_screen_crop",
+            }
+        },
+    )
+    if updated <= 0:
+        raise HTTPException(status_code=500, detail="Manual screen crop could not be assigned to the line item.")
+
+    _audit(
+        request,
+        "line_item_screen_image_cropped",
+        document_id=document_id,
+        line_item_id=line_item_id,
+        details={"image_id": image_id, "page_ref": payload.page_ref, "width": width, "height": height},
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "line_item_id": line_item_id,
+        "image_id": image_id,
+        "page_ref": payload.page_ref,
+        "width": width,
+        "height": height,
+        "selection_source": "manual_crop",
+        "selection_reason": "ui_screen_crop",
         "review_checked": True,
     }
 
