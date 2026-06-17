@@ -653,6 +653,9 @@ def _aggregate_nested_alternatives(
     passthrough: list[dict[str, Any]] = []
 
     for item in alternatives:
+        if not _should_aggregate_alternative(item):
+            passthrough.append(item)
+            continue
         key = _alternative_group_key(item)
         if not key:
             passthrough.append(item)
@@ -737,6 +740,9 @@ def _aggregate_append_alternatives(alternatives: list[dict[str, Any]]) -> list[d
     passthrough: list[dict[str, Any]] = []
 
     for item in alternatives:
+        if not _should_aggregate_alternative(item):
+            passthrough.append(item)
+            continue
         key = _alternative_group_key(item)
         if not key:
             passthrough.append(item)
@@ -842,6 +848,22 @@ def _alternative_append_at_end(item: dict[str, Any], mode: str) -> bool:
     return _to_bool(item.get("alternative_append_at_end")) or _to_bool(metadata.get("alternative_append_at_end"))
 
 
+def _alternative_parent_position_no(item: dict[str, Any]) -> str | None:
+    metadata = _metadata(item)
+    return (
+        _to_str(item.get("alternative_parent_position_no"))
+        or _to_str(metadata.get("alternative_parent_position_no"))
+        or _to_str(metadata.get("alternative_group_parent_position_no"))
+    )
+
+
+def _should_aggregate_alternative(item: dict[str, Any]) -> bool:
+    metadata = _metadata(item)
+    if any(str(key).startswith("schlotterer_") for key in metadata):
+        return False
+    return True
+
+
 def _prepare_line_items_for_export(
     line_items: list[Any],
     mode: str,
@@ -852,6 +874,9 @@ def _prepare_line_items_for_export(
     prepared: list[dict[str, Any]] = []
     append_alternatives: list[dict[str, Any]] = []
     parent_alt_counts: dict[str, int] = {}
+    deferred_nested_alternatives: dict[str, list[dict[str, Any]]] = {}
+    parent_export_by_source_position: dict[str, str] = {}
+    parent_source_id_by_export_position: dict[str, str] = {}
     parent_position_no: str | None = None
     parent_index = 0
     embedded_alternative_count = 0
@@ -865,12 +890,17 @@ def _prepare_line_items_for_export(
         is_alternative = _to_bool(item.get("is_alternative"))
 
         if not is_alternative:
+            source_position_no = _to_str(raw_item.get("position_no")) or _to_str(item.get("position_no"))
             main_description, embedded_alternatives = _split_embedded_alternatives(item.get("description_long"))
             item["description_long"] = main_description
             parent_index += 1
             parent_position_no = str(parent_index)
             parent_source_line_item_id = _to_str(item.get("id")) or _to_str(raw_item.get("id")) or parent_position_no
             item["position_no"] = parent_position_no
+            if source_position_no:
+                parent_export_by_source_position[source_position_no] = parent_position_no
+            parent_export_by_source_position[parent_position_no] = parent_position_no
+            parent_source_id_by_export_position[parent_position_no] = parent_source_line_item_id
             prepared.append(item)
             nested_alternatives: list[dict[str, Any]] = []
             parent_append_alternatives: list[dict[str, Any]] = []
@@ -913,9 +943,46 @@ def _prepare_line_items_for_export(
         if _alternative_append_at_end(item, normalized_mode):
             append_alternatives.append(item)
         else:
+            explicit_parent_position_no = _alternative_parent_position_no(item)
+            explicit_parent_key = (
+                parent_export_by_source_position.get(explicit_parent_position_no or "")
+                if explicit_parent_position_no
+                else None
+            )
+            if explicit_parent_key:
+                deferred_nested_alternatives.setdefault(explicit_parent_key, []).append(item)
+                continue
             parent_alt_counts[parent_key] = parent_alt_counts.get(parent_key, 0) + 1
             item["position_no"] = _nested_position(parent_position_no, parent_index, parent_alt_counts[parent_key])
             prepared.append(item)
+
+    if deferred_nested_alternatives:
+        rebuilt: list[dict[str, Any]] = []
+        for item in prepared:
+            rebuilt.append(item)
+            if _to_bool(item.get("is_alternative")):
+                continue
+            item_position_no = _to_str(item.get("position_no"))
+            if not item_position_no:
+                continue
+            nested_items = deferred_nested_alternatives.pop(item_position_no, [])
+            if not nested_items:
+                continue
+            for alt_item in _aggregate_nested_alternatives(
+                nested_items,
+                parent_position_no=item_position_no,
+                parent_source_line_item_id=parent_source_id_by_export_position.get(item_position_no),
+            ):
+                parent_alt_counts[item_position_no] = parent_alt_counts.get(item_position_no, 0) + 1
+                alt_item["position_no"] = _nested_position(
+                    item_position_no,
+                    parent_index,
+                    parent_alt_counts[item_position_no],
+                )
+                rebuilt.append(alt_item)
+        for leftover_items in deferred_nested_alternatives.values():
+            append_alternatives.extend(leftover_items)
+        prepared = rebuilt
 
     if append_alternatives:
         append_alternatives = _aggregate_append_alternatives(append_alternatives)

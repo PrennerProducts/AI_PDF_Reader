@@ -723,7 +723,7 @@ def test_vendoc_payload_exports_schuchter_sentinel_unit_and_discounted_purchase(
     assert transport["purchase_price"] == 329.99
 
 
-def test_vendoc_payload_exports_schlotterer_group_discount_purchase_and_prefixed_aggregate() -> None:
+def test_vendoc_payload_exports_schlotterer_alternatives_without_grouping() -> None:
     pdf_path = ROOT / "samples/pdfs/candidates/offers/schlotterer/Angebot_Schlotterer2.pdf"
     text = extract_pdf_text(pdf_path)
     parsed = parse_document_text(text)
@@ -751,16 +751,51 @@ def test_vendoc_payload_exports_schlotterer_group_discount_purchase_and_prefixed
     )
 
     first = payload["positions"][0]
-    appended_alternative = payload["positions"][-1]
+    nested_alternatives = [position for position in payload["positions"] if position["is_alternative"]]
     assert first["description_short"] == "Raff S"
     assert first["unit_price"] == 999999.0
     assert first["purchase_price"] == 473.68
     assert payload["summary"]["alternative_position_count"] == 5
-    assert appended_alternative["description_short"] == "Vorsatzrollladen"
-    assert appended_alternative["is_alternative"] is True
-    assert appended_alternative["unit_price"] == 999999.0
-    assert appended_alternative["purchase_price"] == 1049.96
-    assert appended_alternative["source_line_item_id"].startswith("15:aggregate:alt:")
+    assert [(position["position_no"], position["purchase_price"]) for position in nested_alternatives] == [
+        ("1.1", 720.18),
+        ("2.1", 1180.67),
+        ("3.1", 1324.42),
+        ("4.1", 1189.3),
+        ("5.1", 835.24),
+    ]
+    assert all(position["description_short"] == "Vorsatzrollladen" for position in nested_alternatives)
+    assert all(position["unit_price"] == 999999.0 for position in nested_alternatives)
+    assert all(":aggregate:" not in position["source_line_item_id"] for position in nested_alternatives)
+
+    appended_payload = build_vendoc_payload(
+        {
+            "document": {
+                "id": 681,
+                "supplier_name": parsed["supplier_name"],
+                "document_type": parsed["document_type"],
+                "document_number": parsed["document_number"],
+                "document_date": parsed["document_date"],
+                "project_ref": parsed["project_ref"],
+                "currency": parsed["currency"],
+                "net_total": _parse_eu_decimal(parsed["totals"]["net_total"]),
+                "vat_total": _parse_eu_decimal(parsed["totals"]["vat_total"]),
+                "gross_total": _parse_eu_decimal(parsed["totals"]["gross_total"]),
+                "apply_pricing_adjustments": True,
+                "alternative_position_mode": "append",
+            },
+            "line_items": rows,
+            "images": [],
+        }
+    )
+    appended_alternatives = [position for position in appended_payload["positions"] if position["is_alternative"]]
+    assert [(position["position_no"], position["purchase_price"]) for position in appended_alternatives] == [
+        ("17", 720.18),
+        ("18", 1180.67),
+        ("19", 1324.42),
+        ("20", 1189.3),
+        ("21", 835.24),
+    ]
+    assert all(":aggregate:" not in position["source_line_item_id"] for position in appended_alternatives)
 
     payload_without_adjustments = build_vendoc_payload(
         {

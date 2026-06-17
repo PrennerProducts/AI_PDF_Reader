@@ -12548,6 +12548,25 @@
       return boolish(parseLineItemMetadata(item).alternative_append_at_end);
     }
 
+    function lineItemAlternativeParentPositionNo(item) {
+      if (!item || typeof item !== "object") return "";
+      const metadata = parseLineItemMetadata(item);
+      return fmt(
+        item.alternative_parent_position_no
+          || metadata.alternative_parent_position_no
+          || metadata.alternative_group_parent_position_no,
+        ""
+      );
+    }
+
+    function shouldAggregateAlternativeForDisplay(item) {
+      const metadata = metadataObject(item);
+      if (Object.keys(metadata).some((key) => String(key).startsWith("schlotterer_"))) {
+        return false;
+      }
+      return true;
+    }
+
     function detailValue(value) {
       if (value === true) return "ja";
       if (value === false) return "nein";
@@ -17110,6 +17129,10 @@
       const groups = new Map();
       const passthrough = [];
       (Array.isArray(alternatives) ? alternatives : []).forEach((item) => {
+        if (!shouldAggregateAlternativeForDisplay(item)) {
+          passthrough.push(item);
+          return;
+        }
         const key = alternativeGroupKey(item);
         if (!key) {
           passthrough.push(item);
@@ -17185,6 +17208,10 @@
       const groups = new Map();
       const passthrough = [];
       (Array.isArray(alternatives) ? alternatives : []).forEach((item) => {
+        if (!shouldAggregateAlternativeForDisplay(item)) {
+          passthrough.push(item);
+          return;
+        }
         const key = alternativeGroupKey(item);
         if (!key) {
           passthrough.push(item);
@@ -17252,6 +17279,18 @@
 
     function buildAlternativeDisplayItems(items, mode) {
       if (mode !== "append") {
+        const sourceItems = Array.isArray(items) ? items : [];
+        const explicitNestedByParent = new Map();
+        const explicitNestedItems = new Set();
+        sourceItems.forEach((item) => {
+          if (!item || typeof item !== "object" || !item.is_alternative) return;
+          if (item.__embedded_alternative || lineItemAlternativeAppendAtEnd(item)) return;
+          const parentPositionNo = lineItemAlternativeParentPositionNo(item);
+          if (!parentPositionNo) return;
+          if (!explicitNestedByParent.has(parentPositionNo)) explicitNestedByParent.set(parentPositionNo, []);
+          explicitNestedByParent.get(parentPositionNo).push(item);
+          explicitNestedItems.add(item);
+        });
         const visible = [];
         const appendAlternatives = [];
         let nestedAlternatives = [];
@@ -17267,12 +17306,18 @@
           nestedAlternatives = [];
           parentAppendAlternatives = [];
         };
-        (Array.isArray(items) ? items : []).forEach((item) => {
+        sourceItems.forEach((item) => {
           if (!item || typeof item !== "object") return;
+          if (explicitNestedItems.has(item)) return;
           if (!item.is_alternative) {
             flushParentAlternatives();
             parentPositionNo = fmt(item.position_no, "");
             visible.push(item);
+            const explicitNested = explicitNestedByParent.get(parentPositionNo) || [];
+            if (explicitNested.length) {
+              visible.push(...aggregateNestedAlternativesForDisplay(explicitNested, parentPositionNo));
+              explicitNestedByParent.delete(parentPositionNo);
+            }
             return;
           }
           if (lineItemAlternativeAppendAtEnd(item)) {
@@ -17292,6 +17337,9 @@
           visible.push(item);
         });
         flushParentAlternatives();
+        explicitNestedByParent.forEach((leftoverItems) => {
+          appendAlternatives.push(...leftoverItems);
+        });
         return visible.concat(aggregateAppendAlternativesForDisplay(appendAlternatives));
       }
       const mains = [];

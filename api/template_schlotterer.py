@@ -247,6 +247,69 @@ def _is_alternative_block(block_lines: list[str]) -> bool:
     return any(normalize_line(line).lower().startswith("alternative") for line in block_lines[1:])
 
 
+def _customer_position_key(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", "", normalize_line(value or "").lower())
+
+
+def _near_customer_position_key(left: str, right: str) -> bool:
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    if abs(len(left) - len(right)) > 1:
+        return False
+    if len(left) == len(right):
+        max_mismatches = 2 if len(left) <= 6 else 1
+        return sum(1 for a, b in zip(left, right, strict=False) if a != b) <= max_mismatches
+    shorter, longer = (left, right) if len(left) < len(right) else (right, left)
+    for idx in range(len(longer)):
+        if longer[:idx] + longer[idx + 1 :] == shorter:
+            return True
+    return False
+
+
+def _assign_alternative_parent_positions(items: list[dict[str, Any]]) -> None:
+    mains_by_customer_position: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        if item.get("is_alternative"):
+            continue
+        key = _customer_position_key(item.get("lv_pos"))
+        if not key:
+            continue
+        mains_by_customer_position.setdefault(key, []).append(item)
+
+    cursors: dict[str, int] = {}
+    for item in items:
+        if not item.get("is_alternative"):
+            continue
+        key = _customer_position_key(item.get("lv_pos"))
+        if not key:
+            continue
+
+        target_key = key if key in mains_by_customer_position else ""
+        if not target_key:
+            candidates = [
+                candidate_key
+                for candidate_key in mains_by_customer_position
+                if _near_customer_position_key(key, candidate_key)
+            ]
+            if len(candidates) == 1:
+                target_key = candidates[0]
+        if not target_key:
+            continue
+
+        cursor = cursors.get(target_key, 0)
+        candidates = mains_by_customer_position.get(target_key) or []
+        if cursor >= len(candidates):
+            continue
+        parent = candidates[cursor]
+        cursors[target_key] = cursor + 1
+        parent_position_no = normalize_line(parent.get("position_no"))
+        if parent_position_no:
+            item["alternative_parent_position_no"] = parent_position_no
+            item["alternative_parent_lv_pos"] = parent.get("lv_pos")
+
+
 def _extract_page_items(page_text: str, page_ref: int) -> list[dict[str, Any]]:
     lines = [normalize_line(raw) for raw in page_text.splitlines() if normalize_line(raw)]
     items: list[dict[str, Any]] = []
@@ -308,7 +371,6 @@ def _extract_page_items(page_text: str, page_ref: int) -> list[dict[str, Any]]:
                 "page_ref": page_ref,
                 "image_required": False,
                 "image_auto_match_allowed": False,
-                "alternative_append_at_end": is_alternative,
                 "schlotterer_pricing_components": pricing_components,
             }
         )
@@ -335,6 +397,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         if leading_components and items:
             items[-1].setdefault("schlotterer_pricing_components", []).extend(leading_components)
         items.extend(_extract_page_items(page_text, page_idx))
+    _assign_alternative_parent_positions(items)
     return items
 
 

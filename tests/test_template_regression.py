@@ -1257,7 +1257,14 @@ def test_schlotterer_long_text_images_alternatives_and_pricing_are_clean(tmp_pat
     items = extract_line_items(text, parsed["template"])
     item_by_pos = {item["position_no"]: item for item in items}
     assert [position for position, item in item_by_pos.items() if item["is_alternative"]] == ["15", "16", "17", "18", "19"]
-    assert all(item_by_pos[position]["alternative_append_at_end"] is True for position in ["15", "16", "17", "18", "19"])
+    assert [item_by_pos[position].get("alternative_parent_position_no") for position in ["15", "16", "17", "18", "19"]] == [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+    ]
+    assert all(not item_by_pos[position].get("alternative_append_at_end") for position in ["15", "16", "17", "18", "19"])
 
     amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
     relevant_amount_rows = [

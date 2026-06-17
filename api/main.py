@@ -2119,6 +2119,12 @@ def _build_line_item_rows(
             metadata["image_auto_match_allowed"] = bool(item.get("image_auto_match_allowed"))
         if "alternative_append_at_end" in item:
             metadata["alternative_append_at_end"] = bool(item.get("alternative_append_at_end"))
+        alternative_parent_position_no = _clean_optional_str(item.get("alternative_parent_position_no"))
+        if alternative_parent_position_no:
+            metadata["alternative_parent_position_no"] = alternative_parent_position_no
+        alternative_parent_lv_pos = _clean_optional_str(item.get("alternative_parent_lv_pos"))
+        if alternative_parent_lv_pos:
+            metadata["alternative_parent_lv_pos"] = alternative_parent_lv_pos
         for key in (
             "pricing_source",
             "manual_price_editable",
