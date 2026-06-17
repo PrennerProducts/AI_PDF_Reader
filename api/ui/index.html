@@ -12567,6 +12567,11 @@
       return true;
     }
 
+    function alternativeForcesMainNumberForDisplay(item) {
+      const metadata = metadataObject(item);
+      return Object.keys(metadata).some((key) => String(key).startsWith("schlotterer_"));
+    }
+
     function detailValue(value) {
       if (value === true) return "ja";
       if (value === false) return "nein";
@@ -12594,6 +12599,15 @@
 
     function alternativeExportNoteHtml(item, exportMeta, mode) {
       if (!item || !item.is_alternative) return "";
+      if (alternativeForcesMainNumberForDisplay(item)) {
+        const exportPosition = fmt(exportMeta && exportMeta.position_no, fmt(item.position_no));
+        return `
+          <div class="position-export-note append">
+            <strong>Export</strong>
+            <span>${escapeHtml(`Eigene Hauptposition · Exportposition ${exportPosition}; Schlotterer-Alternativen werden separat nummeriert.`)}</span>
+          </div>
+        `;
+      }
       const appendAtEnd = !!(exportMeta && exportMeta.append_at_end);
       const exportPosition = fmt(exportMeta && exportMeta.position_no, fmt(item.position_no));
       const label = appendAtEnd ? "Am Ende angehängt" : "Unter Hauptposition";
@@ -12664,6 +12678,15 @@
         });
       }
       const checked = lineItemAlternativeAppendAtEnd(item);
+      if (alternativeForcesMainNumberForDisplay(item)) {
+        return alternativeAppendToggleHtml({
+          checked: true,
+          attributes: "",
+          title: "Eigene Hauptposition",
+          detail: "Schlotterer-Alternativen werden immer separat als Hauptposition exportiert.",
+          disabled: true,
+        });
+      }
       if (item.__aggregated_alternative) {
         const sourceItems = Array.isArray(item.__aggregate_source_items) ? item.__aggregate_source_items : [];
         const sourceControls = sourceItems
@@ -15373,8 +15396,13 @@
         const exportDiffers = String(exportPositionNo || "") !== String(fmt(item.position_no));
         const exportMetaChips = [];
         if (item.is_alternative) exportMetaChips.push({ label: "Alternative", css: "" });
-        if (item.is_alternative && exportMeta.append_at_end) exportMetaChips.push({ label: "Am Ende", css: "warn" });
-        if (item.is_alternative && !exportMeta.append_at_end) exportMetaChips.push({ label: "Unterposition", css: "" });
+        if (item.is_alternative && alternativeForcesMainNumberForDisplay(item)) {
+          exportMetaChips.push({ label: "Hauptposition", css: "warn" });
+        } else if (item.is_alternative && exportMeta.append_at_end) {
+          exportMetaChips.push({ label: "Am Ende", css: "warn" });
+        } else if (item.is_alternative && !exportMeta.append_at_end) {
+          exportMetaChips.push({ label: "Unterposition", css: "" });
+        }
         if (exportDiffers) exportMetaChips.push({ label: `PDF Pos. ${fmt(item.position_no)}`, css: "" });
         if (exportDiffers) exportMetaChips.push({ label: "neu nummeriert", css: "warn" });
         const exportMetaHtml = exportMetaChips.length
@@ -17284,7 +17312,7 @@
         const explicitNestedItems = new Set();
         sourceItems.forEach((item) => {
           if (!item || typeof item !== "object" || !item.is_alternative) return;
-          if (item.__embedded_alternative || lineItemAlternativeAppendAtEnd(item)) return;
+          if (item.__embedded_alternative || lineItemAlternativeAppendAtEnd(item) || alternativeForcesMainNumberForDisplay(item)) return;
           const parentPositionNo = lineItemAlternativeParentPositionNo(item);
           if (!parentPositionNo) return;
           if (!explicitNestedByParent.has(parentPositionNo)) explicitNestedByParent.set(parentPositionNo, []);
@@ -17318,6 +17346,11 @@
               visible.push(...aggregateNestedAlternativesForDisplay(explicitNested, parentPositionNo));
               explicitNestedByParent.delete(parentPositionNo);
             }
+            return;
+          }
+          if (alternativeForcesMainNumberForDisplay(item)) {
+            flushParentAlternatives();
+            appendAlternatives.push(item);
             return;
           }
           if (lineItemAlternativeAppendAtEnd(item)) {
@@ -17391,7 +17424,11 @@
         }
 
         const parentKey = parentExportNo || String(Math.max(1, parentIndex));
-        if (normalizedMode === "nested" && !lineItemAlternativeAppendAtEnd(item)) {
+        if (
+          normalizedMode === "nested"
+          && !lineItemAlternativeAppendAtEnd(item)
+          && !alternativeForcesMainNumberForDisplay(item)
+        ) {
           const nextAltNo = Number(parentAltCounts.get(parentKey) || 0) + 1;
           parentAltCounts.set(parentKey, nextAltNo);
           orderIndex += 1;

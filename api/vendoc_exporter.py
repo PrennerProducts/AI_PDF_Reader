@@ -864,6 +864,11 @@ def _should_aggregate_alternative(item: dict[str, Any]) -> bool:
     return True
 
 
+def _alternative_forces_main_number(item: dict[str, Any]) -> bool:
+    metadata = _metadata(item)
+    return any(str(key).startswith("schlotterer_") for key in metadata)
+
+
 def _prepare_line_items_for_export(
     line_items: list[Any],
     mode: str,
@@ -943,6 +948,9 @@ def _prepare_line_items_for_export(
         if _alternative_append_at_end(item, normalized_mode):
             append_alternatives.append(item)
         else:
+            if _alternative_forces_main_number(item):
+                append_alternatives.append(item)
+                continue
             explicit_parent_position_no = _alternative_parent_position_no(item)
             explicit_parent_key = (
                 parent_export_by_source_position.get(explicit_parent_position_no or "")

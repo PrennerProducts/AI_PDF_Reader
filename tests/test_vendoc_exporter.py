@@ -757,11 +757,11 @@ def test_vendoc_payload_exports_schlotterer_alternatives_without_grouping() -> N
     assert first["purchase_price"] == 473.68
     assert payload["summary"]["alternative_position_count"] == 5
     assert [(position["position_no"], position["purchase_price"]) for position in nested_alternatives] == [
-        ("1.1", 720.18),
-        ("2.1", 1180.67),
-        ("3.1", 1324.42),
-        ("4.1", 1189.3),
-        ("5.1", 835.24),
+        ("17", 720.18),
+        ("18", 1180.67),
+        ("19", 1324.42),
+        ("20", 1189.3),
+        ("21", 835.24),
     ]
     assert all(position["description_short"] == "Vorsatzrollladen" for position in nested_alternatives)
     assert all(position["unit_price"] == 999999.0 for position in nested_alternatives)
