@@ -427,44 +427,6 @@ def _line_item_export_prices(
     return unit_price, purchase_price
 
 
-def _metadata_has_pricing_adjustment_context(metadata: dict[str, Any]) -> bool:
-    if metadata.get("pricing_adjustments_applied") or metadata.get("pricing_effective_applied"):
-        return True
-    if any(
-        metadata.get(key) is not None
-        for key in (
-            "pricing_original_unit_price",
-            "pricing_original_line_total",
-            "pricing_adjusted_unit_price",
-            "pricing_adjusted_line_total",
-        )
-    ):
-        return True
-    for provider_key in PRICING_PROVIDER_KEYS:
-        if metadata.get(f"{provider_key}_pricing_applied") or metadata.get(f"{provider_key}_pricing_operations"):
-            return True
-        if metadata.get(f"{provider_key}_pricing_effective_applied"):
-            return True
-        if any(
-            metadata.get(f"{provider_key}_{suffix}") is not None
-            for suffix in (
-                "original_unit_price",
-                "original_line_total",
-                "adjusted_unit_price",
-                "adjusted_line_total",
-            )
-        ):
-            return True
-    return False
-
-
-def _line_items_have_pricing_adjustment_context(line_items: list[Any]) -> bool:
-    return any(
-        isinstance(item, dict) and _metadata_has_pricing_adjustment_context(_metadata(item))
-        for item in line_items
-    )
-
-
 def _pricing_adjustments_enabled(document: dict[str, Any] | None) -> bool:
     if not document:
         return True
@@ -1152,7 +1114,7 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         alternative_position_mode,
         apply_pricing_adjustments=apply_pricing_adjustments,
     )
-    use_unit_price_sentinel = apply_pricing_adjustments and _line_items_have_pricing_adjustment_context(line_items)
+    use_unit_price_sentinel = apply_pricing_adjustments
     images = result_data.get("images") if isinstance(result_data.get("images"), list) else []
     document_id = document.get("id")
     ext_document_id = external_document_id(document_id)

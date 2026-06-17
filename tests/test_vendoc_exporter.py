@@ -109,7 +109,7 @@ def test_vendoc_payload_maps_header_positions_and_primary_image(tmp_path: Path) 
     assert position["quantity"] == 1.0
     assert position["unit_code"] == "Stk"
     assert position["description_long"] == "Tuerelement mit Seitenteil"
-    assert position["unit_price"] == 1900.59
+    assert position["unit_price"] == 999999.0
     assert position["purchase_price"] == 1900.59
     assert position["text_only_rtf"].startswith("{\\rtf1")
     assert "\\pngblip" not in position["text_only_rtf"]
@@ -164,7 +164,7 @@ def test_vendoc_payload_exports_embedded_alternatives_nested(tmp_path: Path) -> 
     assert "Alternativ:" not in payload["positions"][0]["description_long"]
     assert payload["positions"][1]["is_alternative"] is True
     assert payload["positions"][1]["description_short"] == "Holzart: Douglas 3-schicht verleimt"
-    assert payload["positions"][1]["unit_price"] == 119.9
+    assert payload["positions"][1]["unit_price"] == 999999.0
     assert payload["positions"][1]["purchase_price"] == 119.9
     assert payload["positions"][1]["image_is_primary"] is False
     assert payload["positions"][2]["description_short"] == "Holzart: Lärche 3-schicht verleimt"
@@ -468,6 +468,24 @@ def test_vendoc_payload_exports_rieder_sentinel_unit_and_discounted_purchase_whe
     assert payload["positions"][0]["purchase_price"] == 31.33
 
 
+def test_vendoc_payload_uses_sentinel_for_stored_purchase_without_pricing_metadata(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["supplier_name"] = "Rieder"
+    result["document"]["apply_pricing_adjustments"] = True
+    result["line_items"][0]["unit_price"] = "6531.88"
+    result["line_items"][0]["purchase_price"] = "3530.55"
+    result["line_items"][0]["line_total"] = "3530.55"
+    result["line_items"][0]["metadata_json"] = {}
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["summary"]["apply_pricing_adjustments"] is True
+    assert payload["positions"][0]["unit_price"] == 999999.0
+    assert payload["positions"][0]["purchase_price"] == 3530.55
+
+
 def test_vendoc_payload_exports_rieder_processed_rows_with_sentinel_and_purchase_prices() -> None:
     text = (ROOT / "samples/text/AN_Rieder_F_20252082_BV_Achhorner.txt").read_text(encoding="utf-8")
     parsed = parse_document_text(text)
@@ -532,12 +550,12 @@ def test_vendoc_payload_exports_newo_without_raw_header_prices() -> None:
     assert payload["summary"]["alternative_position_count"] == 0
     assert len(payload["positions"]) == 8
     assert first["description_short"] == "NeWo Raffstore Lite, i80"
-    assert first["unit_price"] == 640.12
+    assert first["unit_price"] == 999999.0
     assert first["purchase_price"] == 640.12
     assert "640,12" not in first["description_long"]
     assert "2.560,48" not in first["description_long"]
     assert first["description_long"].splitlines()[0] == "NeWo Raffstore Lite, i80"
-    assert zero_note["unit_price"] == 0.0
+    assert zero_note["unit_price"] == 999999.0
     assert zero_note["purchase_price"] == 0.0
     assert "0,00 0,00" not in zero_note["description_long"]
     assert referenced["main_line_item_id"] == "57.05.21.A"
@@ -953,7 +971,7 @@ def test_vendoc_payload_groups_appended_alternatives_by_description(tmp_path: Pa
     assert grouped["description_short"] == "Holzart: Fichte 3-schicht verleimt"
     assert grouped["description_long"] == "Gesammelte Alternative: Holzart: Fichte 3-schicht verleimt\nAnzahl Quellpositionen: 2"
     assert grouped["quantity"] == 10.0
-    assert grouped["unit_price"] == 16.0
+    assert grouped["unit_price"] == 999999.0
     assert grouped["purchase_price"] == 16.0
     assert grouped["source_line_item_id"] == "77:aggregate:alt:1:holzart fichte 3 schicht verleimt"
     assert grouped["image_is_primary"] is False
