@@ -39,7 +39,14 @@ gespeicherte Belege werden einmalig neu verarbeitet.
 
 ## Implementation Decisions
 
-- **Pro Template, Parse-Zeit** (ADR 0002). Kein gemeinsamer Export-Sanitizer.
+- **Ziel-Architektur: spaltenbasierte Extraktion** (ADR 0003) — den Langtext nur
+  aus dem Band der Spalte „Bezeichnung" lesen, sodass Maße (links) und Preise
+  (rechts) gar nicht erst hineinkommen. Teilt die Tabellen-/Spaltenerkennung mit
+  dem Bild-Crop (PRD 0002). Bevorzugter Zielzustand; wird als eigener Slice
+  umgesetzt.
+- **Zwischenstand: Regex-Bereinigung pro Template, Parse-Zeit** (ADR 0002) —
+  funktioniert und ist für SCHUCHTER ausgeliefert. Kein gemeinsamer
+  Export-Sanitizer.
 - **Geteilte Helfer**, die jedes Template aufruft: führende Zahl-Tokens
   entfernen, B/H-Zeile normalisieren (heute in `template_schuchter` als
   `_strip_leading_numeric_tokens` / `_normalize_bh_line` — Kandidaten für

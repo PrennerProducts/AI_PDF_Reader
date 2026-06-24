@@ -1,5 +1,10 @@
 # PRD 0002 — Positionsbilder: optimalen Bildbereich je Bild erkennen (Bemaßung nicht abschneiden)
 
+> **Status:** Erste Stufe umgesetzt — rechte Crop-Grenze folgt der Spalte
+> „Bezeichnung" (`_description_column_left_pt` in `api/extractor.py`), an #585
+> verifiziert (`2200`-Höhe nicht mehr abgeschnitten). Offen: inhaltsbasierte
+> Bounding-Box + Clipping-Wächter + anbieterübergreifende Verifikation.
+
 Verwandt: CONTEXT.md, `api/extractor.py` (Crop-Logik), PRD
 `docs/prds/0001-position-text-sanitization.md` (anderer SCHUCHTER-Befund von Dragan).
 
