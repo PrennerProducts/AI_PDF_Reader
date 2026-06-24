@@ -103,7 +103,7 @@ def _extract_description_short(block_lines: list[str], fallback: str) -> str:
             keyword in candidate.lower()
             for keyword in ("fenster", "tür", "tür", "fixteil", "fixelement", "portaltür", "schiebetür")
         ):
-            return candidate
+            return _strip_trailing_drawing_numbers(candidate)
     return fallback
 
 
@@ -180,6 +180,60 @@ def _is_description_noise_line(line: str) -> bool:
     return False
 
 
+LEADING_NUMERIC_TOKEN_RE = re.compile(r"^(?:\d[\d.,:]*\s+)+")
+BH_DIMENSION_RE = re.compile(r"B/H:\s*\d+\s*x\s*\d+", flags=re.IGNORECASE)
+NUMERIC_LAYOUT_TAIL_RE = re.compile(r"[0-9.,/\sxX*+\-]*")
+
+
+def _strip_leading_numeric_tokens(line: str) -> str:
+    """Remove a run of leading number-only tokens before the real description.
+
+    The PDF layout interleaves sash/flap numbers, coupling coordinates and
+    reference codes (e.g. ``11.22.23``, ``22:``, ``1 600``) in front of the
+    actual text. Each leading token that is purely numeric (digits plus
+    ``. , :``) is dropped; the run stops at the first token containing a letter
+    (so ``1-flg``, ``2x``, ``3xEsg``, ``B/H:`` and ``+unten`` are preserved).
+    """
+    stripped = LEADING_NUMERIC_TOKEN_RE.sub("", line)
+    return stripped or line
+
+
+def _normalize_bh_line(line: str) -> str:
+    """Reduce a B/H line to the bare dimension ``B/H: <width>x <height>``.
+
+    Only trailing tokens that are pure layout numbers (appended coordinates) are
+    cut, so real words after a B/H mention are never dropped.
+    """
+    match = BH_DIMENSION_RE.search(line)
+    if not match:
+        return line
+    tail = line[match.end():].strip()
+    if tail and not NUMERIC_LAYOUT_TAIL_RE.fullmatch(tail):
+        return line
+    head = line[: match.start()].strip()
+    dimension = match.group(0)
+    return f"{head} {dimension}".strip() if head else dimension
+
+
+def _strip_trailing_drawing_numbers(text: str) -> str:
+    """Remove a trailing run of two or more bare numbers (drawing dimensions).
+
+    Window drawings put dimension pairs like ``965 1000`` / ``685 720`` next to
+    the type label; these bleed into the position text and are pure noise (the
+    element size is stored separately as ``width_mm``/``height_mm``). Only runs
+    of 2+ space-separated bare numbers (plus trailing dots/dashes) are cut, as
+    well as a single trailing one-digit number (a sash/flap number like the
+    ``1`` in ``DK-Rechts 1``). Multi-digit single numbers are spec values and
+    are kept, so ``bis 110``, ``Aufdopplung 200`` and a B/H height
+    (``B/H: 1500x 1000``) survive.
+    """
+    cleaned = re.sub(r"(?:\s+\d+(?:[.,]\d+)?){2,}\s*[.\-]*\s*$", "", text)
+    cleaned = re.sub(r"\s+\d\s*[.\-]*\s*$", "", cleaned)
+    if cleaned == text:
+        return text.strip()
+    return cleaned.rstrip(" .-").strip() or text
+
+
 def _clean_description_lines(block_lines: list[str]) -> list[str]:
     cleaned: list[str] = []
     for raw_line in block_lines[1:]:
@@ -187,6 +241,9 @@ def _clean_description_lines(block_lines: list[str]) -> list[str]:
         if _is_description_noise_line(line):
             continue
         line = _strip_price_pair_from_line(line)
+        line = _strip_leading_numeric_tokens(line)
+        line = _normalize_bh_line(line)
+        line = _strip_trailing_drawing_numbers(line)
         if not line or _is_description_noise_line(line):
             continue
         if cleaned and cleaned[-1].lower() == line.lower():

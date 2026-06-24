@@ -118,6 +118,13 @@ Mehrere gleichartige Alternativen, die zu einer Position zusammengefasst werden
 ("Gesammelte Alternative …"). Schlotterer-Alternativen werden **nicht**
 aggregiert.
 
+**Positionstext**:
+Kurztext (`description_short`) und Langtext (`description_long`) einer Position.
+Müssen frei von Layout-Artefakten sein — keine Positions-/Flügelnummern,
+Koordinaten, Referenzcodes oder Preise; legitime Maße bleiben. Bereinigt pro
+Lieferanten-Template zur Parse-Zeit (siehe `docs/adr/0002-position-text-sanitization-per-template.md`).
+_Avoid_: "Beschreibung" unqualifiziert (Kurz- vs. Langtext unterscheiden)
+
 ---
 
 ## Preise
