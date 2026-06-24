@@ -31,6 +31,10 @@ VECTOR_STRIP_MIN_NONWHITE_RATIO = 0.34
 VECTOR_STRIP_MAX_DARK_RATIO = 0.22
 POSITION_LINE_ART_LEFT_PT = 26.0
 POSITION_LINE_ART_RIGHT_PT = 220.0
+# Margin (pt) between the drawing crop and the start of the description column.
+# 0 = crop up to the column boundary (text glyphs begin at the column x, so they
+# are still excluded); the drawing dimensions sit just left of it.
+POSITION_LINE_ART_DESC_MARGIN_PT = 0.0
 POSITION_LINE_ART_TOP_PAD_PT = 8.0
 POSITION_LINE_ART_BOTTOM_PAD_PT = 6.0
 POSITION_LINE_ART_LAST_BLOCK_PT = 170.0
@@ -441,6 +445,39 @@ def _has_position_block_anchor(text: str) -> bool:
     return False
 
 
+def _description_column_left_pt(page: Any, page_width: float) -> float | None:
+    """Left x (pt) of the table's 'Bezeichnung' column, from the page header.
+
+    The position drawing sits left of the description column, so this is the
+    right boundary the image must not cross. Returns None when not found or
+    implausible, so callers fall back to the fixed constant.
+    """
+    if page_width <= 0:
+        return None
+    try:
+        words = page.get_text("words")
+    except Exception:
+        return None
+    candidates: list[float] = []
+    for word in words:
+        if not isinstance(word, (tuple, list)) or len(word) < 5:
+            continue
+        if "bezeichnung" not in str(word[4]).lower():
+            continue
+        try:
+            candidates.append(float(word[0]))
+        except (TypeError, ValueError):
+            continue
+    if not candidates:
+        return None
+    left = min(candidates)
+    # Guard against stray matches: must sit right of the position columns but
+    # well within the left half-ish of the page.
+    if left <= 140.0 or left >= page_width * 0.6:
+        return None
+    return left
+
+
 def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int, int, int, int]]:
     if rendered.width <= 0 or rendered.height <= 0:
         return []
@@ -494,8 +531,17 @@ def _position_line_art_boxes(page: Any, rendered: Image.Image) -> list[tuple[int
 
     scale_x = rendered.width / page_width
     scale_y = rendered.height / page_height
+    # Right boundary = start of the 'Bezeichnung' column (so the rightmost
+    # dimensions are kept and the description text never bleeds in); fall back to
+    # the fixed constant when the header is not detected.
+    desc_left_pt = _description_column_left_pt(page, page_width)
+    right_pt = (
+        desc_left_pt - POSITION_LINE_ART_DESC_MARGIN_PT
+        if desc_left_pt is not None
+        else POSITION_LINE_ART_RIGHT_PT
+    )
     crop_left = int(max(0, POSITION_LINE_ART_LEFT_PT * scale_x))
-    crop_right = int(min(rendered.width, POSITION_LINE_ART_RIGHT_PT * scale_x))
+    crop_right = int(min(rendered.width, right_pt * scale_x))
     if crop_right - crop_left < POSITION_LINE_ART_MIN_WIDTH:
         return []
 
