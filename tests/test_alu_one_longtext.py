@@ -17,8 +17,23 @@ from extractor import extract_pdf_text
 from parser import parse_document_text
 from main import _build_amount_line_rows, _build_line_item_rows
 from vendoc_exporter import build_vendoc_payload
+import template_alu_one
 
 ALU_ONE_DIR = ROOT / "samples/pdfs/candidates/offers/alu_one"
+
+
+def test_alu_one_stored_long_text_does_not_repeat_short_text() -> None:
+    # The de-duplication must happen at parse time so the *stored* long text
+    # (what the app/DB and both exports read) is already clean -- not only the
+    # VenDoc payload.
+    for pdf_name in ("Angebot 2400061DL-1_i.pdf", "Angebot A2506340MC-1.pdf", "Angebot C2308329MK.pdf"):
+        text = extract_pdf_text(ALU_ONE_DIR / pdf_name)
+        for item in template_alu_one.extract_line_items(text):
+            short = (item["description_short"] or "").strip()
+            long_text = item["description_long"] or ""
+            first_line = long_text.splitlines()[0].strip() if long_text.splitlines() else ""
+            if short:
+                assert first_line != short, f"{pdf_name} pos {item['position_no']}: short repeated as long[0]"
 
 
 def _alu_one_positions(pdf_name: str) -> list[dict]:
