@@ -164,7 +164,18 @@ def _schuchter_long_texts(pdf_name: str) -> list[str]:
 
 def test_schuchter_sample_first_position_long_text_is_clean() -> None:
     long_texts = _schuchter_long_texts("schuchter__angebot__A260151.pdf")
-    assert long_texts[0] == "1-flg.Fenster, DK-Links\nB/H: 1000x 600"
+    # The room label (lv_pos, here "KG") is prepended as the first line.
+    assert long_texts[0] == "KG\n1-flg.Fenster, DK-Links\nB/H: 1000x 600"
+
+
+def test_schuchter_room_label_prepended_to_long_text() -> None:
+    # Dragan needs the room/location label in the VenDoc import; SCHUCHTER keeps
+    # it in lv_pos (e.g. "KG", "EG: T1"), which the payload otherwise drops. It
+    # must lead the long text without disturbing the description below it.
+    long_texts = _schuchter_long_texts("schuchter__angebot__A260151.pdf")
+    assert long_texts[0].startswith("KG\n")
+    assert long_texts[1].startswith("EG: T1\n")
+    assert long_texts[1] == "EG: T1\n1-flg.Fenster, DK-Links\nB/H: 800x 1000"
 
 
 def test_schuchter_samples_have_no_leading_number_leaks() -> None:
