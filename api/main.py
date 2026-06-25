@@ -2027,15 +2027,19 @@ def _apply_schuchter_pricing_to_line_item_rows(
     )
 
 
-def _prepend_lv_pos_to_long_text(rows: list[dict[str, Any]]) -> None:
-    """Prepend the position label (``lv_pos``, e.g. a room/location) as the first
-    line of ``description_long`` for every supplier.
+def _prepend_room_label_to_long_text(rows: list[dict[str, Any]], template: str) -> None:
+    """Prepend the SCHUCHTER room label (``lv_pos``, e.g. ``EG: T1 Bad/SZ``) as
+    the first line of ``description_long``.
 
     Done once here, at parse time, so the *stored* long text is the single
-    source of truth: the app, the Postgres export and the VenDoc export all read
-    the same de-/composed text. No-op when ``lv_pos`` is empty or already leads
-    the long text.
+    source of truth: the app, the Postgres export and the VenDoc export all show
+    the same text (no UI-vs-export divergence). Scoped to SCHUCHTER, where the
+    room label is wanted; ``lv_pos`` means different things for other suppliers
+    (LV codes, section headers), so they are left untouched. No-op when
+    ``lv_pos`` is empty or already leads the long text.
     """
+    if template != "schuchter":
+        return
     for row in rows:
         label = (row.get("lv_pos") or "").strip()
         if not label:
@@ -2193,7 +2197,7 @@ def _build_line_item_rows(
         _apply_schlotterer_pricing_to_line_item_rows(rows, amount_line_rows, extracted_text=extracted_text)
     elif template == "schuchter":
         _apply_schuchter_pricing_to_line_item_rows(rows, amount_line_rows)
-    _prepend_lv_pos_to_long_text(rows)
+    _prepend_room_label_to_long_text(rows, template)
     return rows
 
 

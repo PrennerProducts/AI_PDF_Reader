@@ -554,10 +554,7 @@ def test_vendoc_payload_exports_newo_without_raw_header_prices() -> None:
     assert first["purchase_price"] == 640.12
     assert "640,12" not in first["description_long"]
     assert "2.560,48" not in first["description_long"]
-    # The position label (lv_pos) is prepended uniformly as the first long-text
-    # line; for newo that is the LV position number, the product name follows.
-    assert first["description_long"].splitlines()[0] == "57.05.05.A"
-    assert first["description_long"].splitlines()[1] == "NeWo Raffstore Lite, i80"
+    assert first["description_long"].splitlines()[0] == "NeWo Raffstore Lite, i80"
     assert zero_note["unit_price"] == 999999.0
     assert zero_note["purchase_price"] == 0.0
     assert "0,00 0,00" not in zero_note["description_long"]
