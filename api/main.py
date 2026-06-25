@@ -2027,6 +2027,32 @@ def _apply_schuchter_pricing_to_line_item_rows(
     )
 
 
+def _prepend_room_label_to_long_text(rows: list[dict[str, Any]], template: str) -> None:
+    """Prepend the SCHUCHTER room label (``lv_pos``, e.g. ``EG: T1 Bad/SZ``) as
+    the first line of ``description_long``.
+
+    Done once here, at parse time, so the *stored* long text is the single
+    source of truth: the app, the Postgres export and the VenDoc export all show
+    the same text (no UI-vs-export divergence). Scoped to SCHUCHTER, where the
+    room label is wanted; ``lv_pos`` means different things for other suppliers
+    (LV codes, section headers), so they are left untouched. No-op when
+    ``lv_pos`` is empty or already leads the long text.
+    """
+    if template != "schuchter":
+        return
+    for row in rows:
+        label = (row.get("lv_pos") or "").strip()
+        if not label:
+            continue
+        long_text = row.get("description_long") or ""
+        first_line = long_text.split("\n", 1)[0].strip()
+        if first_line == label:
+            continue
+        # Re-apply the templates' 8000-char description_long cap: the label is
+        # prepended after the template already truncated, so cap again here.
+        row["description_long"] = (f"{label}\n{long_text}" if long_text else label)[:8000]
+
+
 def _build_line_item_rows(
     extracted_text: str,
     template: str,
@@ -2173,6 +2199,7 @@ def _build_line_item_rows(
         _apply_schlotterer_pricing_to_line_item_rows(rows, amount_line_rows, extracted_text=extracted_text)
     elif template == "schuchter":
         _apply_schuchter_pricing_to_line_item_rows(rows, amount_line_rows)
+    _prepend_room_label_to_long_text(rows, template)
     return rows
 
 

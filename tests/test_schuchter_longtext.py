@@ -102,6 +102,17 @@ def test_strip_trailing_drawing_numbers_keeps_single_spec_numbers() -> None:
     assert _strip_trailing_drawing_numbers("1-flg.Türe, DK-Rechts") == "1-flg.Türe, DK-Rechts"
 
 
+def test_strip_trailing_drawing_numbers_cuts_glued_dimension_pairs() -> None:
+    # A trailing run of 6+ bare digits is a drawing dimension pair glued without
+    # a space (e.g. "2300"+"2300" -> "23002300"); it bleeds from the sketch and
+    # must go, while real <=4-digit spec/measurement values are kept.
+    assert _strip_trailing_drawing_numbers("+unten Blindaufdopplung 23002300") == "+unten Blindaufdopplung"
+    assert _strip_trailing_drawing_numbers("gekoppelt 23002300") == "gekoppelt"
+    # Guard: 2-4 digit trailing values stay (specs + B/H heights).
+    assert _strip_trailing_drawing_numbers("unten Blindaufdopplung 60") == "unten Blindaufdopplung 60"
+    assert _strip_trailing_drawing_numbers("B/H: 830x 2245") == "B/H: 830x 2245"
+
+
 def test_extract_description_short_drops_trailing_dimensions() -> None:
     block = ["HEADER", "1 2 2-flg.Fenster, D/DK-Stulp 965 1000 ."]
     assert _extract_description_short(block, fallback="x") == "2-flg.Fenster, D/DK-Stulp"
@@ -153,7 +164,18 @@ def _schuchter_long_texts(pdf_name: str) -> list[str]:
 
 def test_schuchter_sample_first_position_long_text_is_clean() -> None:
     long_texts = _schuchter_long_texts("schuchter__angebot__A260151.pdf")
-    assert long_texts[0] == "1-flg.Fenster, DK-Links\nB/H: 1000x 600"
+    # The room label (lv_pos, here "KG") is prepended as the first line.
+    assert long_texts[0] == "KG\n1-flg.Fenster, DK-Links\nB/H: 1000x 600"
+
+
+def test_schuchter_room_label_prepended_to_long_text() -> None:
+    # Dragan needs the room/location label in the VenDoc import; SCHUCHTER keeps
+    # it in lv_pos (e.g. "KG", "EG: T1"), which the payload otherwise drops. It
+    # must lead the long text without disturbing the description below it.
+    long_texts = _schuchter_long_texts("schuchter__angebot__A260151.pdf")
+    assert long_texts[0].startswith("KG\n")
+    assert long_texts[1].startswith("EG: T1\n")
+    assert long_texts[1] == "EG: T1\n1-flg.Fenster, DK-Links\nB/H: 800x 1000"
 
 
 def test_schuchter_samples_have_no_leading_number_leaks() -> None:

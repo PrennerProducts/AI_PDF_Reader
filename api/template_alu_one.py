@@ -329,6 +329,14 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         recent_lines = _recent_non_empty_lines(normalized_text[max(0, match.start() - 300) : match.start()])
         is_alternative = _is_alternative_context(recent_lines[-4:])
         full_block_lines = description_lines
+        # The first block line is the element header that is also extracted as
+        # the short text; don't repeat it as the first line of the long text.
+        if (
+            full_block_lines
+            and description_short
+            and full_block_lines[0].strip().lower() == description_short.strip().lower()
+        ):
+            full_block_lines = full_block_lines[1:]
 
         items.append(
             {
