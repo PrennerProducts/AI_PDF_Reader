@@ -31,8 +31,15 @@ Flügelfarbe` (starts with a letter token) is not caught.
 flagged line is a legit `1 Stk. …` quantity or a `B/H: …,0` decimal that tripped the trailing-single
 heuristic. The content is well-structured `Key: value` data; cleaning would risk corrupting it.
 
-Net lesson: of the audit's top-3 ranked suppliers, only **entholzer** was a real leak; **alu_one** and
-**rieder** were heuristic false positives. Always verify a genuine bleed before cleaning.
+**schlotterer (rank 4) & koch (rank 5) re-examined — FALSE POSITIVES, do NOT clean.** Both are clean,
+well-structured `Key:value` spec text: no ≥3-digit leading dimension, no trailing dimension pair, no price
+token. schlotterer's flags (`10 Einzelkanäle`, `Anzahl Kanalträger:2`) are legit counts; koch's lone
+"price" hit is `U-Wert: 1,44 W/m²K` — a thermal value the money heuristic misread as `n,nn` currency.
+
+Net result: across the whole audit, only **SCHUCHTER** (fixed earlier, see [[schuchter-longtext-filtering]])
+and **entholzer** had real drawing-column bleed. **alu_one, rieder, schlotterer, koch were all heuristic
+false positives** (legit prose, spec tables, quantities, decimals/U-values). Always verify a genuine bleed
+before cleaning; the heuristic ranking below is a list of *candidates to inspect*, not confirmed leaks.
 
 ## Summary
 
