@@ -1177,28 +1177,6 @@ def _validate_required(payload: dict[str, Any], required_fields: list[str], scop
     return errors
 
 
-def _is_schuchter_supplier(supplier_name: Any) -> bool:
-    return (_to_str(supplier_name) or "").strip().lower().startswith("schuchter")
-
-
-def _prepend_room_label(description_long: str, lv_pos: Any, *, supplier_name: Any) -> str:
-    """Prepend the SCHUCHTER room/location label (``lv_pos``) to the long text.
-
-    SCHUCHTER carries the room label (e.g. ``EG: T1 Bad/SZ``) in the position
-    header; it is parsed into ``lv_pos`` and already exported as its own column
-    in the Postgres surface, but the frozen VenDoc contract has no room field,
-    so Dragan asked for it as the first line of the description. Scoped to
-    SCHUCHTER because ``lv_pos`` carries different semantics for other suppliers.
-    """
-    text = description_long or ""
-    if not _is_schuchter_supplier(supplier_name):
-        return text
-    label = (_to_str(lv_pos) or "").strip()
-    if not label or text == label or text.startswith(label + "\n"):
-        return text
-    return f"{label}\n{text}" if text else label
-
-
 def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime | None = None) -> dict[str, Any]:
     exported_at = exported_at or _utc_now()
     created_at = _datetime_value(exported_at)
@@ -1283,11 +1261,6 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
             raw_item.get("description_long"),
             quantity=quantity_for_long_text,
             unit=raw_item.get("unit"),
-        )
-        description_long = _prepend_room_label(
-            description_long,
-            raw_item.get("lv_pos"),
-            supplier_name=document.get("supplier_name"),
         )
         image_bytes = image_payload.pop("image_bytes", None)
         image_name = image_payload.pop("image_name", None)
