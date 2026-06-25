@@ -184,6 +184,15 @@ LEADING_NUMERIC_TOKEN_RE = re.compile(r"^(?:\d[\d.,:]*\s+)+")
 BH_DIMENSION_RE = re.compile(r"B/H:\s*\d+\s*x\s*\d+", flags=re.IGNORECASE)
 NUMERIC_LAYOUT_TAIL_RE = re.compile(r"[0-9.,/\sxX*+\-]*")
 
+# A drawing dimension pair can bleed in glued together without a space (e.g.
+# "2300"+"2300" -> "23002300"). Real SCHUCHTER spec/measurement values are at
+# most 4 digits (specs 60/110/200, B/H heights like 2245), so a trailing run of
+# this many bare digits is treated as a glued drawing artifact and cut. This is
+# an interim heuristic; ADR-0003 (column-aware extraction) is the target that
+# removes the need for it.
+_GLUED_DIMENSION_MIN_DIGITS = 6
+_TRAILING_GLUED_DIMENSION_RE = re.compile(rf"\s+\d{{{_GLUED_DIMENSION_MIN_DIGITS},}}\s*[.\-]*\s*$")
+
 
 def _strip_leading_numeric_tokens(line: str) -> str:
     """Remove a run of leading number-only tokens before the real description.
@@ -228,12 +237,13 @@ def _strip_trailing_drawing_numbers(text: str) -> str:
     (``B/H: 1500x 1000``) survive.
 
     A dimension pair can also bleed in glued together without a space (e.g.
-    ``2300``+``2300`` -> ``23002300``); such a trailing run of 6+ bare digits is
-    a drawing artifact too and is cut, while real spec/measurement values (<=4
-    digits, incl. B/H heights like ``2245``) are kept.
+    ``2300``+``2300`` -> ``23002300``); such a trailing run of
+    ``_GLUED_DIMENSION_MIN_DIGITS``+ bare digits is a drawing artifact too and is
+    cut, while real spec/measurement values (<=4 digits, incl. B/H heights like
+    ``2245``) are kept.
     """
     cleaned = re.sub(r"(?:\s+\d+(?:[.,]\d+)?){2,}\s*[.\-]*\s*$", "", text)
-    cleaned = re.sub(r"\s+\d{6,}\s*[.\-]*\s*$", "", cleaned)
+    cleaned = _TRAILING_GLUED_DIMENSION_RE.sub("", cleaned)
     cleaned = re.sub(r"\s+\d\s*[.\-]*\s*$", "", cleaned)
     if cleaned == text:
         return text.strip()

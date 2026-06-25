@@ -334,7 +334,7 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         if (
             full_block_lines
             and description_short
-            and full_block_lines[0].strip() == description_short.strip()
+            and full_block_lines[0].strip().lower() == description_short.strip().lower()
         ):
             full_block_lines = full_block_lines[1:]
 

@@ -35,10 +35,14 @@ from typing import Any, NamedTuple
 
 import fitz
 
+from template_common import normalize_line
+
 # How close two words' y0 may be and still count as the same visual line (pt).
 _LINE_CLUSTER_TOLERANCE_PT = 3.0
-# Small inset to avoid grabbing the header/price words that sit exactly on a
-# column boundary due to float rounding.
+# Inset (pt) on the RIGHT band boundary so a right-aligned price value whose left
+# edge floats a hair below the price-column x is still excluded; the left
+# boundary keeps a matching tolerance so description tokens that overflow
+# slightly past the Bezeichnung column-left stay included.
 _BAND_EPSILON_PT = 0.5
 
 # Header tokens that mark the relevant columns. SCHUCHTER abbreviates the price
@@ -79,8 +83,11 @@ def _header_left_x(words: list[tuple], tokens: tuple[str, ...]) -> float | None:
     """Smallest x0 of any header word whose text matches one of ``tokens``."""
     candidates: list[float] = []
     for word in words:
-        text = str(word[4]).strip().lower()
-        if any(token == text or token in text for token in tokens):
+        # Exact match (ignoring trailing punctuation like "Bezeichnung:") so a
+        # word merely CONTAINING the token (e.g. "Artikelbezeichnung",
+        # "Gesamt-E-Preis") cannot pull the column boundary left.
+        text = str(word[4]).strip().lower().rstrip(":.")
+        if text in tokens:
             try:
                 candidates.append(float(word[0]))
             except (TypeError, ValueError):
@@ -90,17 +97,19 @@ def _header_left_x(words: list[tuple], tokens: tuple[str, ...]) -> float | None:
     return min(candidates)
 
 
-def _price_column_left(page: Any) -> float | None:
-    """Left edge of the price-value column on this page (from value tokens)."""
+def _price_column_left(words: list[tuple]) -> float | None:
+    """Left edge of the price-value column on a page (from its value tokens)."""
     candidates = [
         float(word[0])
-        for word in _words(page)
+        for word in words
         if _PRICE_VALUE_RE.match(str(word[4]).strip())
     ]
     return min(candidates) if candidates else None
 
 
-def description_band(page: Any, price_column_left: float | None = None) -> ColumnBand | None:
+def description_band(
+    words: list[tuple], page_width: float, price_column_left: float | None = None
+) -> ColumnBand | None:
     """Detect the description band ``[Bezeichnung-left, price-column-left)``.
 
     The right boundary is the left edge of the price column. It is taken as the
@@ -109,15 +118,17 @@ def description_band(page: Any, price_column_left: float | None = None) -> Colum
     caller has measured it document-wide) — because the header word is narrower
     than its widest value, so prices start left of the header.
 
-    Returns ``None`` when the header columns cannot be located or the band is
-    geometrically implausible, so callers can fall back to the flat-text path.
+    ``words`` is the page's pre-parsed ``get_text("words")`` list (parsed once by
+    the caller). Returns ``None`` when the header columns cannot be located or
+    the band is geometrically implausible, so callers fall back to flat text.
+
+    NB: the Bezeichnung-left detection mirrors the production
+    ``extractor._description_column_left_pt`` (used for the image crop); on full
+    ADR-0003 integration the two should share one column-geometry primitive.
     """
-    rect = getattr(page, "rect", None)
-    page_width = float(getattr(rect, "width", 0.0) or 0.0)
     if page_width <= 0:
         return None
 
-    words = _words(page)
     bez_left = _header_left_x(words, _BEZEICHNUNG_TOKENS)
     price_header_left = _header_left_x(words, _PRICE_HEADER_TOKENS)
     if bez_left is None or price_header_left is None:
@@ -125,7 +136,7 @@ def description_band(page: Any, price_column_left: float | None = None) -> Colum
 
     price_value_left = price_column_left
     if price_value_left is None:
-        price_value_left = _price_column_left(page)
+        price_value_left = _price_column_left(words)
     right = min(price_header_left, price_value_left) if price_value_left is not None else price_header_left
 
     # Plausibility: Bezeichnung sits right of the drawing/qty columns and left of
@@ -140,8 +151,8 @@ def description_band(page: Any, price_column_left: float | None = None) -> Colum
     return ColumnBand(left=bez_left, right=right)
 
 
-def _band_words(page: Any, band: ColumnBand) -> list[tuple]:
-    return [word for word in _words(page) if band.contains_left_edge(float(word[0]))]
+def _band_words(words: list[tuple], band: ColumnBand) -> list[tuple]:
+    return [word for word in words if band.contains_left_edge(float(word[0]))]
 
 
 def _group_into_lines(words: list[tuple]) -> list[tuple[float, str]]:
@@ -161,34 +172,22 @@ def _group_into_lines(words: list[tuple]) -> list[tuple[float, str]]:
     rendered: list[tuple[float, str]] = []
     for group in lines:
         group.sort(key=lambda w: float(w[0]))
-        text = " ".join(str(w[4]) for w in group).strip()
+        text = normalize_line(" ".join(str(w[4]) for w in group))
         if text:
             rendered.append((float(group[0][1]), text))
     return rendered
 
 
-def page_description_lines(page: Any) -> list[str]:
-    """All description-band lines on a single page (top-to-bottom).
-
-    Empty list when the header band cannot be detected on this page (e.g. the
-    cover/footer pages without a table header).
-    """
-    band = description_band(page)
-    if band is None:
-        return []
-    return [text for _y, text in _group_into_lines(_band_words(page, band))]
-
-
 # Separator row written by SCHUCHTER between positions (a run of dashes). Used to
 # split the page's band lines into per-position chunks for the spike.
 def _is_separator(line: str) -> bool:
-    stripped = line.strip()
+    stripped = normalize_line(line)
     return len(stripped) >= 8 and set(stripped) <= {"-", "—", "_", "–"}
 
 
 def _is_band_noise(line: str) -> bool:
     """Header/footer band lines that are not part of a position description."""
-    lower = line.strip().lower()
+    lower = normalize_line(line).lower()
     if not lower:
         return True
     if lower in {".", "-"}:
@@ -205,14 +204,13 @@ def _is_band_noise(line: str) -> bool:
     return False
 
 
-def _position_start_ys(page: Any, band: ColumnBand) -> list[float]:
-    """y0 of each position start on this page (the left-column ``Pos.`` marker).
+def _position_start_ys(words: list[tuple]) -> list[float]:
+    """y0 of each position start on a page (the left-column ``Pos.`` marker).
 
     Mirrors the production anchor idea (``_position_line_art_boxes``): a ``Pos.``
     marker in the far-left column. The header row's ``Pos.`` (which sits on the
     same y as the ``Bezeichnung`` header word) is excluded.
     """
-    words = _words(page)
     header_ys = {
         round(float(word[1]), 1)
         for word in words
@@ -229,6 +227,11 @@ def _position_start_ys(page: Any, band: ColumnBand) -> list[float]:
     return sorted(ys)
 
 
+def _page_width(page: Any) -> float:
+    rect = getattr(page, "rect", None)
+    return float(getattr(rect, "width", 0.0) or 0.0)
+
+
 def document_description_blocks(pdf_path: str) -> list[list[str]]:
     """Per-position description blocks across the whole document (spike output).
 
@@ -242,33 +245,35 @@ def document_description_blocks(pdf_path: str) -> list[list[str]]:
     blocks: list[list[str]] = []
     current: list[str] | None = None
     try:
-        # Measure the price-column left edge document-wide so the band boundary is
-        # stable across pages (some pages may have no prices).
-        price_lefts = [
-            value for value in (_price_column_left(page) for page in document) if value is not None
-        ]
-        doc_price_left = min(price_lefts) if price_lefts else None
-        for page in document:
-            band = description_band(page, price_column_left=doc_price_left)
-            if band is None:
-                continue
-            start_ys = _position_start_ys(page, band)
-            lines = _group_into_lines(_band_words(page, band))
-            si = 0
-            for y, line in lines:
-                # Advance to the position whose band starts at/above this line.
-                while si < len(start_ys) and y >= start_ys[si] - _LINE_CLUSTER_TOLERANCE_PT:
-                    if current is not None:
-                        blocks.append(current)
-                    current = []
-                    si += 1
-                if current is None:
-                    continue  # line precedes the first position on the page
-                if _is_band_noise(line):
-                    continue
-                current.append(line)
+        # Parse each page's words ONCE; every downstream helper reuses the list.
+        pages = [(_words(page), _page_width(page)) for page in document]
     finally:
         document.close()
+
+    # Measure the price-column left edge document-wide so the band boundary is
+    # stable across pages (some pages may have no prices).
+    price_lefts = [value for value in (_price_column_left(words) for words, _ in pages) if value is not None]
+    doc_price_left = min(price_lefts) if price_lefts else None
+
+    for words, page_width in pages:
+        band = description_band(words, page_width, price_column_left=doc_price_left)
+        if band is None:
+            continue
+        start_ys = _position_start_ys(words)
+        lines = _group_into_lines(_band_words(words, band))
+        si = 0
+        for y, line in lines:
+            # Advance to the position whose band starts at/above this line.
+            while si < len(start_ys) and y >= start_ys[si] - _LINE_CLUSTER_TOLERANCE_PT:
+                if current is not None:
+                    blocks.append(current)
+                current = []
+                si += 1
+            if current is None:
+                continue  # line precedes the first position on the page
+            if _is_band_noise(line):
+                continue
+            current.append(line)
     if current:
         blocks.append(current)
     return [block for block in blocks if block]

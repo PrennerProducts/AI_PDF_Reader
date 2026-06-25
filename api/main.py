@@ -2048,7 +2048,9 @@ def _prepend_room_label_to_long_text(rows: list[dict[str, Any]], template: str) 
         first_line = long_text.split("\n", 1)[0].strip()
         if first_line == label:
             continue
-        row["description_long"] = f"{label}\n{long_text}" if long_text else label
+        # Re-apply the templates' 8000-char description_long cap: the label is
+        # prepended after the template already truncated, so cap again here.
+        row["description_long"] = (f"{label}\n{long_text}" if long_text else label)[:8000]
 
 
 def _build_line_item_rows(
