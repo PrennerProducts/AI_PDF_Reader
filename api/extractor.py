@@ -613,6 +613,51 @@ def _crop_content_metrics(crop: Image.Image) -> dict[str, float]:
     }
 
 
+def _edge_content_ratios(crop: Image.Image, margin_px: int) -> dict[str, float]:
+    """Fraction of non-white pixels in each ``margin_px``-wide edge band.
+
+    Clipping watchdog (PRD 0002 stage 2): a high ratio at an edge means the
+    drawing runs right up to that edge, i.e. the crop box probably cut through
+    the figure. Measure the RAW crop box (``rendered.crop(box)`` before
+    trim/pad) — the final padded crop always has white margins by construction,
+    so it would read clean trivially.
+    """
+    width, height = crop.size
+    if width <= 0 or height <= 0:
+        return {"left": 0.0, "right": 0.0, "top": 0.0, "bottom": 0.0}
+    margin = max(1, min(margin_px, width // 2, height // 2))
+    pixels = crop.load()
+
+    def _is_nonwhite(x: int, y: int) -> bool:
+        red, green, blue = pixels[x, y]
+        return min(red, green, blue) < 248
+
+    left = right = top = bottom = 0
+    for y in range(height):
+        for x in range(margin):
+            if _is_nonwhite(x, y):
+                left += 1
+        for x in range(width - margin, width):
+            if _is_nonwhite(x, y):
+                right += 1
+    for x in range(width):
+        for y in range(margin):
+            if _is_nonwhite(x, y):
+                top += 1
+        for y in range(height - margin, height):
+            if _is_nonwhite(x, y):
+                bottom += 1
+
+    vertical_band = max(1, margin * height)
+    horizontal_band = max(1, margin * width)
+    return {
+        "left": round(left / vertical_band, 6),
+        "right": round(right / vertical_band, 6),
+        "top": round(top / horizontal_band, 6),
+        "bottom": round(bottom / horizontal_band, 6),
+    }
+
+
 def _line_art_metrics(crop: Image.Image) -> dict[str, float | int]:
     mask = crop.convert("L").point(lambda px: 255 if px < 210 else 0)
     pixels = mask.load()

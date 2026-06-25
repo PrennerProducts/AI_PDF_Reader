@@ -1,9 +1,31 @@
 # PRD 0002 — Positionsbilder: optimalen Bildbereich je Bild erkennen (Bemaßung nicht abschneiden)
 
-> **Status:** Erste Stufe umgesetzt — rechte Crop-Grenze folgt der Spalte
+> **Status:** Stufe 1 umgesetzt — rechte Crop-Grenze folgt der Spalte
 > „Bezeichnung" (`_description_column_left_pt` in `api/extractor.py`), an #585
-> verifiziert (`2200`-Höhe nicht mehr abgeschnitten). Offen: inhaltsbasierte
-> Bounding-Box + Clipping-Wächter + anbieterübergreifende Verifikation.
+> verifiziert (`2200`-Höhe nicht mehr abgeschnitten).
+>
+> **Stufe 2 (2026-06-25): Clipping-Wächter umgesetzt + Verifikation.**
+> `_edge_content_ratios(crop, margin_px)` in `api/extractor.py` misst den
+> Non-White-Anteil je Kantenband der **Roh-Crop-Box** (vor Trim/Pad — die
+> finale Box ist immer weiß-gerandet). Tests: `tests/test_extractor_clipping_watchdog.py`.
+>
+> **Befund:** In den vorhandenen Sample-Belegen ist **kein Positionsbild
+> geclippt.** SCHUCHTER (rechte Grenze = Bezeichnung-Spalte) hat am rechten Rand
+> nur ~0.05 Inhalt → Zeichnung + rechte Maße sind enthalten (Stufe-1-Fix
+> bestätigt; visuell an einem gerenderten Beleg gegengeprüft). Ein erzwungener
+> Rückfall auf die feste 220pt-Grenze hebt den Wert nur auf ~0.057 — der
+> ursprünglich gemeldete Worst-Case (#585) ist **nicht** im Sample-Set, daher
+> bleibt der Test ein Regressions-Wächter, keine Reproduktion. Andere Anbieter
+> erzeugen entweder keine Positions-Line-Art-Boxen (alu_one/koch/muigg/newo/
+> rieder/schlotterer → 0) oder ziehen mangels „Bezeichnung"-Spalte Text in die
+> Roh-Box (entholzer, 220pt-Fallback) — dieser Text wird aber downstream von
+> `_technical_line_art_bbox` entfernt, die finalen entholzer-Bilder sind saubere
+> schmale Zeichnungen.
+>
+> **Noch offen:** inhaltsbasierte Bounding-Box für den **No-Column-Fall**
+> (entholzer) und Validierung der eigentlichen #585-Klasse — beides braucht ein
+> echtes Clipping-Beispiel im Sample-Set (z. B. das #585-PDF aufnehmen) + visuelle
+> UI-Abnahme, bevor die geteilte Crop-Geometrie geändert wird.
 
 Verwandt: CONTEXT.md, `api/extractor.py` (Crop-Logik), PRD
 `docs/prds/0001-position-text-sanitization.md` (anderer SCHUCHTER-Befund von Dragan).
