@@ -226,8 +226,14 @@ def _strip_trailing_drawing_numbers(text: str) -> str:
     ``1`` in ``DK-Rechts 1``). Multi-digit single numbers are spec values and
     are kept, so ``bis 110``, ``Aufdopplung 200`` and a B/H height
     (``B/H: 1500x 1000``) survive.
+
+    A dimension pair can also bleed in glued together without a space (e.g.
+    ``2300``+``2300`` -> ``23002300``); such a trailing run of 6+ bare digits is
+    a drawing artifact too and is cut, while real spec/measurement values (<=4
+    digits, incl. B/H heights like ``2245``) are kept.
     """
     cleaned = re.sub(r"(?:\s+\d+(?:[.,]\d+)?){2,}\s*[.\-]*\s*$", "", text)
+    cleaned = re.sub(r"\s+\d{6,}\s*[.\-]*\s*$", "", cleaned)
     cleaned = re.sub(r"\s+\d\s*[.\-]*\s*$", "", cleaned)
     if cleaned == text:
         return text.strip()
