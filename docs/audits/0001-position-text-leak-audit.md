@@ -1,5 +1,24 @@
 # Task A — Read-only Leak Audit (VenDoc description_short / description_long)
 
+## Follow-up re-examination (2026-06-25)
+
+**alu_one (rank 1) was re-examined manually and its flags are FALSE POSITIVES — do NOT clean it.**
+Unlike SCHUCHTER, alu_one has no drawing/price-column bleed:
+- The flagged `… EUR …` lines are **legitimate prose** (surcharge clauses:
+  `Farbmindermengenzuschlag von 33,12 EUR pro RAL-Farbe berechnet.`,
+  `… Kleinmengenzuschlag von 55,00 EUR berechnet.`) — only 2 lines, both real text. Stripping them
+  would corrupt the description.
+- The 49 leading-number/pipe lines (`20 StückU201 | Isolierglas 0,7`, `102 | ESG 4 wärmebesch`,
+  `215 | VSG P5A wärmeb. ohne Statik`) are the **glass build-up specification table** — real spec data,
+  just pipe-formatted.
+- alu_one builds `description_long` from the raw, uncleaned block by design
+  (`template_alu_one.extract_line_items`, `"\n".join(full_block_lines)`), so the verbose technical text is
+  intentional, not bleed.
+
+Decision (Lukas, 2026-06-25): **leave alu_one untouched** — no confirmed Dragan complaint and no genuine
+artifact; cleaning would destroy legit prose + spec data. The heuristic ranking below over-states alu_one;
+treat the per-supplier ranks as *candidates to inspect*, not confirmed leaks.
+
 ## Summary
 
 Parsed **16 PDFs across 8 suppliers** (alu_one 3, entholzer 2, koch 2, muigg 2, newo 1, rieder 1,
