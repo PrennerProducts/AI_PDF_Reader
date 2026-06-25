@@ -19,6 +19,21 @@ Decision (Lukas, 2026-06-25): **leave alu_one untouched** — no confirmed Draga
 artifact; cleaning would destroy legit prose + spec data. The heuristic ranking below over-states alu_one;
 treat the per-supplier ranks as *candidates to inspect*, not confirmed leaks.
 
+**entholzer (rank 2) re-examined — REAL leak, FIXED.** The drawing column bleeds dimension numbers in
+front of description lines (`1750 Alu - Schale …`, `875 875 FLG 74 mm`, `1085 äußere Dichtungen …`).
+Corpus split is clean: bled dimensions are always ≥3-digit integers; legitimate leading numbers are 1-2
+digit counts (`2 flügeliges Fenster`, `3 Dichtungsebenen`, `2 x Entwässerung`, `1 Stk. …`). Fixed via
+`_strip_leading_drawing_dimensions` in `template_entholzer`. Residual: a mid-line bleed `St 1095
+Flügelfarbe` (starts with a letter token) is not caught.
+
+**rieder (rank 3) re-examined — FALSE POSITIVES, do NOT clean.** No drawing/price-column bleed. The only
+≥3-digit leading line is `100,2 kg / Elementumfang` (a legitimate weight, not a dimension); every other
+flagged line is a legit `1 Stk. …` quantity or a `B/H: …,0` decimal that tripped the trailing-single
+heuristic. The content is well-structured `Key: value` data; cleaning would risk corrupting it.
+
+Net lesson: of the audit's top-3 ranked suppliers, only **entholzer** was a real leak; **alu_one** and
+**rieder** were heuristic false positives. Always verify a genuine bleed before cleaning.
+
 ## Summary
 
 Parsed **16 PDFs across 8 suppliers** (alu_one 3, entholzer 2, koch 2, muigg 2, newo 1, rieder 1,

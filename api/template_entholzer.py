@@ -17,6 +17,18 @@ PRICE_PAIR_RE = re.compile(
 )
 EMPTY_PRICE_HEADER_RE = re.compile(r"\s*\bEP\s*:\s*GP\s*:\s*$", flags=re.IGNORECASE)
 
+# Drawing dimensions bleed in from the sketch column in front of real
+# description lines (e.g. "1750 Alu - Schale …", "875 875 FLG 74 mm"). These
+# leading dimensions are >=3-digit integers; legitimate leading numbers are 1-2
+# digit counts/quantities ("2 flügeliges Fenster", "3 Dichtungsebenen",
+# "2 x Entwässerung", "1 Stk. …") and are kept.
+_LEADING_DRAWING_DIM_RE = re.compile(r"^(?:\d{3,}\s+)+")
+
+
+def _strip_leading_drawing_dimensions(line: str) -> str:
+    """Strip a leading run of >=3-digit integer tokens (drawing dimensions)."""
+    return _LEADING_DRAWING_DIM_RE.sub("", line)
+
 
 def detect(normalized_lower: str) -> bool:
     return "entholzer" in normalized_lower or "angebot n" in normalized_lower
@@ -65,6 +77,9 @@ def _clean_description_lines(block_lines: list[str]) -> list[str]:
         if not normalized:
             continue
         if normalized.lower() == "(symbolfoto)":
+            continue
+        normalized = _strip_leading_drawing_dimensions(normalized)
+        if not normalized:
             continue
         normalized = EMPTY_PRICE_HEADER_RE.sub("", normalized).strip()
         price_remainder = PRICE_PAIR_RE.sub("", normalized)
