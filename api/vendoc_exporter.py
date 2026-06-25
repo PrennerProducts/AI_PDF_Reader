@@ -1199,6 +1199,31 @@ def _prepend_room_label(description_long: str, lv_pos: Any, *, supplier_name: An
     return f"{label}\n{text}" if text else label
 
 
+def _is_alu_one_supplier(supplier_name: Any) -> bool:
+    return (_to_str(supplier_name) or "").strip().lower().replace(" ", "-").startswith("alu-one")
+
+
+def _strip_duplicate_short_line(description_long: str, description_short: Any, *, supplier_name: Any) -> str:
+    """Drop the first long-text line when it merely repeats the short text.
+
+    alu_one builds ``description_long`` from the raw position block, whose first
+    line is the element header that is also extracted as ``description_short``
+    (e.g. ``Türelement 2650 mm x 2700 mm``), so the short text appears twice in
+    the export. Scoped to alu_one; the short text stays available in its own
+    field, and the rest of the block is preserved.
+    """
+    text = description_long or ""
+    if not _is_alu_one_supplier(supplier_name):
+        return text
+    short = (_to_str(description_short) or "").strip()
+    if not short:
+        return text
+    lines = text.split("\n")
+    if lines and lines[0].strip() == short:
+        return "\n".join(lines[1:])
+    return text
+
+
 def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime | None = None) -> dict[str, Any]:
     exported_at = exported_at or _utc_now()
     created_at = _datetime_value(exported_at)
@@ -1287,6 +1312,11 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         description_long = _prepend_room_label(
             description_long,
             raw_item.get("lv_pos"),
+            supplier_name=document.get("supplier_name"),
+        )
+        description_long = _strip_duplicate_short_line(
+            description_long,
+            description_short,
             supplier_name=document.get("supplier_name"),
         )
         image_bytes = image_payload.pop("image_bytes", None)
