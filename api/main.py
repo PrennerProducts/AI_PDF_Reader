@@ -55,6 +55,7 @@ from db import (
     revoke_app_session,
     update_document_approval_state,
     update_document_alternative_position_mode,
+    update_document_offer_reference,
     update_document_parse_result,
     update_document_pricing_adjustments,
     update_document_status,
@@ -166,6 +167,10 @@ class DocumentAlternativePositionModeRequest(BaseModel):
 
 class DocumentPricingAdjustmentsRequest(BaseModel):
     apply_pricing_adjustments: bool = True
+
+
+class DocumentOfferReferenceRequest(BaseModel):
+    offer_reference: str | None = Field(default=None, max_length=120)
 
 
 class LineItemAlternativeAppendRequest(BaseModel):
@@ -3462,6 +3467,39 @@ def set_document_alternative_position_mode(
         "ok": True,
         "document_id": document_id,
         "alternative_position_mode": updated.get("alternative_position_mode"),
+        "updated_at": updated.get("updated_at"),
+    }
+
+
+@app.put("/documents/{document_id}/offer-reference")
+def set_document_offer_reference(
+    document_id: int,
+    payload: DocumentOfferReferenceRequest,
+    request: Request,
+):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    updated = update_document_offer_reference(
+        document_id, offer_reference=payload.offer_reference
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    # Der Angebotsbezug steuert die AB->Angebot-Verknuepfung; daher neu berechnen.
+    refreshed = refresh_document_links(document_id)
+    if refreshed:
+        updated = refreshed
+    _audit(
+        request,
+        "offer_reference_changed",
+        document_id=document_id,
+        details={"offer_reference": updated.get("offer_reference")},
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "offer_reference": updated.get("offer_reference"),
+        "linked_offer_document_id": updated.get("linked_offer_document_id"),
         "updated_at": updated.get("updated_at"),
     }
 

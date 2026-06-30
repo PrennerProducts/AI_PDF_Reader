@@ -127,6 +127,57 @@ def test_vendoc_payload_maps_header_positions_and_primary_image(tmp_path: Path) 
     assert position["main_line_item_id"] == "57.05.21.A"
 
 
+def test_vendoc_payload_exports_linked_offer_id_as_offer_reference_for_order_confirmation(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["document_type"] = "auftragsbestaetigung"
+    result["document"]["offer_reference"] = "A260172"
+    result["document"]["linked_offer_document_id"] = 49
+
+    payload = build_vendoc_payload(result)
+
+    # Dragan matches the AB via our internal offer document id (the linked Angebot's
+    # source_document_id), so the export carries that id in offer_reference.
+    assert payload["header"]["offer_reference"] == "49"
+
+
+def test_vendoc_payload_exports_order_confirmation_document_type_as_auftrag(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["document_type"] = "auftragsbestaetigung"
+
+    payload = build_vendoc_payload(result)
+
+    # Dragan wants only "auftrag" in his document_type field for an AB.
+    assert payload["header"]["document_type"] == "auftrag"
+
+
+def test_vendoc_payload_keeps_angebot_document_type_unchanged(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    # Default sample is an Angebot.
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["header"]["document_type"] == "angebot"
+
+
+def test_vendoc_payload_keeps_parsed_offer_reference_when_no_linked_offer(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    result["document"]["document_type"] = "auftragsbestaetigung"
+    result["document"]["offer_reference"] = "A260172"
+    # No linked_offer_document_id: an AB without a resolved Angebot keeps its parsed reference.
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["header"]["offer_reference"] == "A260172"
+
+
 def test_vendoc_payload_reports_missing_primary_image_file(tmp_path: Path) -> None:
     payload = build_vendoc_payload(_sample_result(tmp_path / "missing.png"))
 

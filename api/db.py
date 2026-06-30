@@ -530,6 +530,28 @@ def update_document_pricing_adjustments(document_id: int, *, apply_pricing_adjus
     return dict(row) if row else None
 
 
+def update_document_offer_reference(
+    document_id: int, *, offer_reference: str | None
+) -> dict[str, Any] | None:
+    cleaned = (offer_reference or "").strip() or None
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET
+                offer_reference = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                offer_reference,
+                updated_at;
+            """,
+            (cleaned, document_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def update_document_status(
     document_id: int,
     *,

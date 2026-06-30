@@ -1193,6 +1193,25 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
     images = result_data.get("images") if isinstance(result_data.get("images"), list) else []
     document_id = document.get("id")
     ext_document_id = external_document_id(document_id)
+    # Dragan matcht die AB ueber unsere interne Angebots-ID (die source_document_id
+    # des Angebots, die er pro Angebot importiert). Daher exportieren wir bei einer
+    # AB mit erkanntem Angebot dessen interne ID als offer_reference; sonst bleibt
+    # der geparste Angebotsbezug (Angebotsnummer) erhalten.
+    linked_offer_id = document.get("linked_offer_document_id")
+    offer_reference_value = (
+        _to_str(linked_offer_id)
+        if linked_offer_id not in (None, "")
+        else _to_str(document.get("offer_reference"))
+    )
+    # Dragan moechte in seinem document_type-Feld bei einer Auftragsbestaetigung
+    # nur "auftrag" stehen haben. Reine Export-Abbildung; intern bleibt der Typ
+    # "auftragsbestaetigung" (Parser/Validierung/Verknuepfung haengen daran).
+    document_type_raw = _to_str(document.get("document_type"))
+    document_type_value = (
+        "auftrag"
+        if (document_type_raw or "").strip().lower() == "auftragsbestaetigung"
+        else document_type_raw
+    )
 
     warnings: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
@@ -1212,9 +1231,9 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         "source_document_id": _to_str(document_id),
         "supplier_name": _to_str(document.get("supplier_name")),
         "supplier_id": _supplier_id_for_document(document),
-        "document_type": _to_str(document.get("document_type")),
+        "document_type": document_type_value,
         "document_number": _to_str(document.get("document_number")),
-        "offer_reference": _to_str(document.get("offer_reference")),
+        "offer_reference": offer_reference_value,
         "document_date": _date_value(document.get("document_date")),
         "project_ref": _to_str(document.get("project_ref")),
         "currency_code": _to_str(document.get("currency")),
