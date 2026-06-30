@@ -414,13 +414,15 @@ def _build_required_field_summary(document: dict[str, Any]) -> tuple[dict[str, b
         "currency": _has_text(document.get("currency")),
         "gross_total": koch_offer_net_only or _to_decimal(document.get("gross_total")) is not None,
     }
-    if document_type == "auftragsbestaetigung":
-        required_fields["offer_reference"] = _has_text(document.get("offer_reference"))
     recommended_fields = {
         "project_ref": _has_text(document.get("project_ref")),
         "net_total": _to_decimal(document.get("net_total")) is not None,
         "vat_total": koch_offer_net_only or _to_decimal(document.get("vat_total")) is not None,
     }
+    # Eine Auftragsbestaetigung kann es ausnahmsweise ohne Angebotsbezug geben.
+    # Daher empfohlen (Warnung), nicht Pflicht (blockierender Fehler).
+    if document_type == "auftragsbestaetigung":
+        recommended_fields["offer_reference"] = _has_text(document.get("offer_reference"))
     return required_fields, recommended_fields
 
 

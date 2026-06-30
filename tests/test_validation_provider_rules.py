@@ -530,7 +530,7 @@ def test_complex_pricing_providers_use_heuristic_component_check() -> None:
     assert validation["line_item_summary"]["warning_count"] == 0
 
 
-def test_ab_requires_offer_reference() -> None:
+def test_ab_warns_on_missing_offer_reference_without_blocking() -> None:
     validation = build_document_validation(
         document={
             "supplier_name": "Rieder",
@@ -561,8 +561,11 @@ def test_ab_requires_offer_reference() -> None:
         images=[],
     )
 
-    assert validation["status"] == "reject"
-    assert any(issue.get("field") == "offer_reference" for issue in validation["document_issues"])
+    offer_issues = [issue for issue in validation["document_issues"] if issue.get("field") == "offer_reference"]
+    assert offer_issues, "Missing offer_reference should still surface an issue."
+    # A missing Angebotsbezug is only a warning now: an AB without an Angebot can occur.
+    assert all(issue.get("severity") == "warning" for issue in offer_issues)
+    assert validation["status"] != "reject"
 
 
 def test_manual_review_resolves_warning_but_keeps_item_marked() -> None:
@@ -697,7 +700,7 @@ def test_document_approval_summary_stays_pending_when_validation_blocks_release(
         document={
             "supplier_name": "Rieder",
             "document_type": "auftragsbestaetigung",
-            "document_number": "131584-2",
+            "document_number": None,  # Pflichtfeld fehlt -> blockierender Fehler
             "document_date": "2025-06-11",
             "project_ref": "Sevignani",
             "currency": "EUR",

@@ -192,6 +192,45 @@ UI-Verhalten:
 - der Kopfbereich zeigt, welcher Alternativmodus aktiv ist
 - eingebettete `Alternativ:`-Zeilen erscheinen als eigene Positionen erst in SQL-Vorschau, Dry-Run oder Live-Export
 
+### 8. Auftragsbestaetigung -> Angebot zuordnen
+
+Bereits umgesetzt:
+
+- Eine Auftragsbestaetigung wird in unserer App automatisch ihrem zugehoerigen
+  Angebot zugeordnet (Abgleich `offer_reference` der AB gegen `document_number`
+  des Angebots, je Lieferant). Vor dem Vergleich normalisieren wir den Wert (nur
+  Buchstaben/Ziffern, Grossschreibung), sodass Schreibvarianten und Leerzeichen
+  keine Rolle spielen.
+- `offer_reference` ist fuer Auftragsbestaetigungen kein Pflichtfeld mehr, nur
+  noch eine Warnung: Eine AB kann ausnahmsweise ohne zugehoeriges Angebot
+  vorkommen und blockiert die Freigabe dann nicht.
+- Der Angebotsbezug ist in der UI manuell editierbar; nach dem Speichern wird die
+  Verknuepfung automatisch neu berechnet.
+
+Abgestimmtes Verfahren (Dragan, 2026-06-30):
+
+- Wir schreiben pro Dokument unsere interne Dokument-ID in `source_document_id`.
+- Dragan importiert beim Angebot dessen `source_document_id` in ein Zusatzfeld.
+- Bei einer **Auftragsbestaetigung** uebergeben wir im Feld **`offer_reference`**
+  die `source_document_id` des **verknuepften Angebots** (also unsere interne
+  Angebots-ID, nicht die Angebotsnummer). Da diese ID bei uns eindeutig ist,
+  reicht das fuer die eindeutige Zuordnung.
+
+Abgleich auf Dragans Seite:
+
+```
+Auftragsbestaetigung.offer_reference = Angebot.source_document_id
+```
+
+Hinweise:
+
+- Keine Schema-Aenderung noetig; es wird das bestehende Feld `offer_reference`
+  genutzt.
+- Hat eine AB kein erkanntes Angebot, steht in `offer_reference` weiterhin der
+  geparste Angebotsbezug (Angebotsnummer) bzw. nichts. In unserer eigenen
+  Datenbank bleibt die Angebotsnummer erhalten (nur der VenDoc-Export traegt die
+  ID); der Angebotsbezug ist in der UI manuell editierbar.
+
 ## Welche Felder Dragan im Zielschema anlegen soll
 
 ### Empfohlen in `dbo.vendoc_import_positions`

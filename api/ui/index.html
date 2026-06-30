@@ -10818,6 +10818,53 @@
         0 10px 24px rgba(17, 17, 17, 0.050) !important;
     }
 
+    .summary-edit {
+      margin-top: 6px;
+    }
+    .summary-edit-btn {
+      font-size: 12px;
+      padding: 2px 8px;
+      border: 1px solid var(--sr-polish-line, #cbd5e1);
+      border-radius: 8px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+    }
+    .summary-edit-btn:hover {
+      background: rgba(17, 17, 17, 0.05);
+    }
+    .summary-edit-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .summary-edit-input {
+      flex: 1 1 140px;
+      min-width: 120px;
+      padding: 3px 8px;
+      border: 1px solid var(--sr-polish-line, #cbd5e1);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .summary-edit-save,
+    .summary-edit-cancel {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--sr-polish-line, #cbd5e1);
+      cursor: pointer;
+    }
+    .summary-edit-save {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+    .summary-edit-cancel {
+      background: transparent;
+      color: inherit;
+    }
+
     .app-v3 .review-panel > .panel-body {
       margin: 0 14px 14px !important;
       padding: 16px !important;
@@ -12397,9 +12444,90 @@
         if (source === "parser") card.classList.add("source-parser");
         valueEl.appendChild(sourceTagElement(source));
       }
+      if (options.editableField) {
+        valueEl.appendChild(createSummaryEditControl(options.editableField, value));
+      }
       card.appendChild(labelEl);
       card.appendChild(valueEl);
       return card;
+    }
+
+    function createSummaryEditControl(field, currentValue) {
+      const wrap = document.createElement("div");
+      wrap.className = "summary-edit";
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "summary-edit-btn";
+      editBtn.textContent = "Bearbeiten";
+      const form = document.createElement("div");
+      form.className = "summary-edit-form";
+      form.hidden = true;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "summary-edit-input";
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className = "summary-edit-save";
+      saveBtn.textContent = "Speichern";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "summary-edit-cancel";
+      cancelBtn.textContent = "Abbrechen";
+      form.appendChild(input);
+      form.appendChild(saveBtn);
+      form.appendChild(cancelBtn);
+      const openEditor = () => {
+        input.value = currentValue == null ? "" : String(currentValue);
+        form.hidden = false;
+        editBtn.hidden = true;
+        input.focus();
+      };
+      const closeEditor = () => {
+        form.hidden = true;
+        editBtn.hidden = false;
+      };
+      editBtn.addEventListener("click", openEditor);
+      cancelBtn.addEventListener("click", closeEditor);
+      saveBtn.addEventListener("click", async () => {
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        try {
+          if (field === "offer_reference") {
+            await saveDocumentOfferReference(input.value);
+          }
+        } finally {
+          saveBtn.disabled = false;
+          cancelBtn.disabled = false;
+        }
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); saveBtn.click(); }
+        else if (event.key === "Escape") { event.preventDefault(); closeEditor(); }
+      });
+      wrap.appendChild(editBtn);
+      wrap.appendChild(form);
+      return wrap;
+    }
+
+    async function saveDocumentOfferReference(rawValue) {
+      if (!state.documentId) return;
+      const value = String(rawValue || "").trim();
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/offer-reference`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offer_reference: value || null }),
+        });
+        if (state.result && state.result.document) {
+          state.result.document.offer_reference = response.offer_reference || null;
+          state.result.document.linked_offer_document_id = response.linked_offer_document_id || null;
+          syncCurrentDocumentIntoList(state.result.document);
+        }
+        await loadResult(state.documentId);
+        setStatus("Angebotsbezug gespeichert.", "ok");
+      } catch (error) {
+        setStatus(`Angebotsbezug konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
     }
 
     function setExtractTab(nextTab) {
@@ -13951,10 +14079,9 @@
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
         fieldRows.push(
           reviewRowHtml(
-            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · Pflicht`,
+            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · empfohlen`,
             reviewFieldValue(document, fieldName),
-            `${reviewFlagHtml(required[fieldName] ? "vorhanden" : "fehlt", required[fieldName] ? "ok" : "err")}${sourceKey ? sourceTagHtml(source) : ""}`,
-            { required: true }
+            `${reviewFlagHtml(recommended[fieldName] ? "vorhanden" : "offen", recommended[fieldName] ? "ok" : "review")}${sourceKey ? sourceTagHtml(source) : ""}`
           )
         );
       }
@@ -14589,7 +14716,7 @@
         ["Dokumenttyp", formatDocumentType(document.document_type), "document_type", true],
         ["Lieferant", document.supplier_name, "supplier_name", true],
         ...(String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
-          ? [["AB-Referenz", document.offer_reference, "offer_reference", true]]
+          ? [["AB-Referenz", document.offer_reference, "offer_reference", false]]
           : []),
         [documentNumberLabel, document.document_number, "document_number", true],
         ["Datum", formatDate(document.document_date), "document_date", true],
@@ -14611,7 +14738,9 @@
       ];
 
       for (const [label, value, sourceKey, required] of cards) {
-        ui.summary.appendChild(createSummaryCard(label, value, sourceKey, { required }));
+        const cardOptions = { required };
+        if (sourceKey === "offer_reference") cardOptions.editableField = "offer_reference";
+        ui.summary.appendChild(createSummaryCard(label, value, sourceKey, cardOptions));
       }
       if (document.document_notes) {
         ui.summary.appendChild(createSummaryCard("Vortext / Allgemeine Ausführung", document.document_notes, null, { wide: true }));
