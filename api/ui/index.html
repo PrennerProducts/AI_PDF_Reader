@@ -12513,11 +12513,11 @@
         for (const item of items || []) {
           const option = document.createElement("option");
           option.value = String(item.id);
-          const parts = [];
-          parts.push(item.document_number ? String(item.document_number) : `Dok. ${item.id}`);
+          const parts = [`#${item.id}`];
+          if (item.document_number) parts.push(String(item.document_number));
           if (item.document_date) parts.push(formatDate(item.document_date));
           if (item.project_ref) parts.push(String(item.project_ref));
-          option.textContent = `${parts.join(" · ")} (#${item.id})`;
+          option.textContent = parts.join(" · ");
           select.appendChild(option);
         }
         select.value = linkedId;
