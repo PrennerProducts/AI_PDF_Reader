@@ -15,14 +15,28 @@ from template_headers import (
 
 AMOUNT_PATTERN = r"[0-9]{1,3}(?:[ .][0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2}"
 POSITION_PATTERN = r"\d{3}[A-Za-z]?(?:-\d+)?"
+# Preis: Waehrung vor dem Betrag (Angebot) ODER nach dem Betrag (Auftragsbestaetigung).
+PRICE_TOKEN_PATTERN = (
+    rf"(?:(?:EUR|\u20ac)\s*(?:{AMOUNT_PATTERN})|(?:{AMOUNT_PATTERN})\s*(?:EUR|\u20ac))"
+)
+_AMOUNT_RE = re.compile(AMOUNT_PATTERN)
+
+
+def _amount_from_price_token(token):
+    if not token:
+        return None
+    match = _AMOUNT_RE.search(token)
+    return match.group(0) if match else None
+
+
 PRICE_ONLY_LABEL_RE = re.compile(rf"^(?:EUR|\u20ac)?\s*{AMOUNT_PATTERN}\s*(?:EUR|\u20ac)?$", flags=re.IGNORECASE)
 ITEM_HEADER_RE = re.compile(
     rf"^\s*(?P<position>{POSITION_PATTERN})\s+"
     rf"(?P<qty>[0-9]+(?:[.,][0-9]+)?)\s+"
     rf"(?P<unit>Stk|Stück|LFM|lfm)\s+"
     rf"(?P<label>.+?)"
-    rf"(?:\s+(?:EUR|\u20ac)\s*(?P<unit_price>{AMOUNT_PATTERN}))?"
-    rf"(?:\s+(?:EUR|\u20ac)\s*(?P<line_total>{AMOUNT_PATTERN}))?\s*$",
+    rf"(?:\s+(?P<unit_price>{PRICE_TOKEN_PATTERN}))?"
+    rf"(?:\s+(?P<line_total>{PRICE_TOKEN_PATTERN}))?\s*$",
     flags=re.MULTILINE,
 )
 DIMENSION_RE = re.compile(r"\b([0-9]{3,4})\s*mm\s*x\s*([0-9]{3,4})\s*mm\b", flags=re.IGNORECASE)
@@ -306,8 +320,8 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         quantity_raw = match.group("qty")
         unit = match.group("unit")
         header_label = normalize_line(match.group("label"))
-        unit_price_raw = match.group("unit_price")
-        line_total_raw = match.group("line_total") or (unit_price_raw if _quantity_is_one(quantity_raw) else None)
+        unit_price_raw = _amount_from_price_token(match.group("unit_price"))
+        line_total_raw = _amount_from_price_token(match.group("line_total")) or (unit_price_raw if _quantity_is_one(quantity_raw) else None)
 
         block_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(normalized_text)
         body_lines = trim_block_lines(
