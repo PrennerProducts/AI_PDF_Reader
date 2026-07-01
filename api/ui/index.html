@@ -12517,7 +12517,7 @@
           if (item.document_number) parts.push(String(item.document_number));
           if (item.document_date) parts.push(formatDate(item.document_date));
           if (item.project_ref) parts.push(String(item.project_ref));
-          option.textContent = parts.join(" · ");
+          option.textContent = parts.join(" | ");
           select.appendChild(option);
         }
         select.value = linkedId;
