@@ -229,12 +229,15 @@ Auftragsbestaetigung.offer_reference = Angebot.source_document_id
 
 Hinweise:
 
-- Keine Schema-Aenderung noetig; es wird das bestehende Feld `offer_reference`
-  genutzt.
-- Hat eine AB kein erkanntes Angebot, steht in `offer_reference` weiterhin der
-  geparste Angebotsbezug (Angebotsnummer) bzw. nichts. In unserer eigenen
-  Datenbank bleibt die Angebotsnummer erhalten (nur der VenDoc-Export traegt die
-  ID); der Angebotsbezug ist in der UI manuell editierbar.
+- Keine Aenderung an Dragans Zielschema noetig; es wird das bestehende Feld
+  `offer_reference` genutzt (der uebergebene Wert ist unsere interne
+  Angebots-ID, nicht die Angebotsnummer).
+- Der uebergebene Wert ist eindeutig, weil er ueber das Auswahlfeld gesetzt
+  wird und die manuelle Zuordnung intern gegen automatisches Ueberschreiben
+  geschuetzt ist (auch wenn dieselbe Angebotsnummer beim Lieferanten mehrfach
+  vorkommt).
+- Hat eine AB **kein** zugeordnetes Angebot, ist `offer_reference` im Export
+  **leer** (kein irrefuehrender Rohwert).
 
 ## Welche Felder Dragan im Zielschema anlegen soll
 
