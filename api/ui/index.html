@@ -10847,6 +10847,11 @@
       border-radius: 8px;
       font-size: 13px;
     }
+    .summary-edit-select {
+      flex: 1 1 240px;
+      min-width: 200px;
+      background: #fff;
+    }
     .summary-edit-save,
     .summary-edit-cancel {
       font-size: 12px;
@@ -12444,27 +12449,27 @@
         if (source === "parser") card.classList.add("source-parser");
         valueEl.appendChild(sourceTagElement(source));
       }
-      if (options.editableField) {
-        valueEl.appendChild(createSummaryEditControl(options.editableField, value));
+      if (options.offerSelect) {
+        valueEl.appendChild(createSummaryOfferSelect(options.offerSelect));
       }
       card.appendChild(labelEl);
       card.appendChild(valueEl);
       return card;
     }
 
-    function createSummaryEditControl(field, currentValue) {
+    function createSummaryOfferSelect(config) {
+      const linkedId = config && config.linkedId != null ? String(config.linkedId) : "";
       const wrap = document.createElement("div");
       wrap.className = "summary-edit";
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.className = "summary-edit-btn";
-      editBtn.textContent = "Bearbeiten";
+      editBtn.textContent = "Angebot zuordnen";
       const form = document.createElement("div");
       form.className = "summary-edit-form";
       form.hidden = true;
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "summary-edit-input";
+      const select = document.createElement("select");
+      select.className = "summary-edit-input summary-edit-select";
       const saveBtn = document.createElement("button");
       saveBtn.type = "button";
       saveBtn.className = "summary-edit-save";
@@ -12473,14 +12478,50 @@
       cancelBtn.type = "button";
       cancelBtn.className = "summary-edit-cancel";
       cancelBtn.textContent = "Abbrechen";
-      form.appendChild(input);
+      form.appendChild(select);
       form.appendChild(saveBtn);
       form.appendChild(cancelBtn);
-      const openEditor = () => {
-        input.value = currentValue == null ? "" : String(currentValue);
-        form.hidden = false;
-        editBtn.hidden = true;
-        input.focus();
+
+      const fillSelect = (items) => {
+        select.innerHTML = "";
+        const none = document.createElement("option");
+        none.value = "";
+        none.textContent = "— kein Angebot —";
+        select.appendChild(none);
+        for (const item of items || []) {
+          const option = document.createElement("option");
+          option.value = String(item.id);
+          const parts = [];
+          parts.push(item.document_number ? String(item.document_number) : `Dok. ${item.id}`);
+          if (item.document_date) parts.push(formatDate(item.document_date));
+          if (item.project_ref) parts.push(String(item.project_ref));
+          option.textContent = `${parts.join(" · ")} (#${item.id})`;
+          select.appendChild(option);
+        }
+        select.value = linkedId;
+      };
+
+      const openEditor = async () => {
+        if (!state.documentId) return;
+        editBtn.disabled = true;
+        try {
+          const response = await apiJson(`/documents/${state.documentId}/offer-candidates`);
+          fillSelect(response.items || []);
+          if (!(response.items || []).length) {
+            const info = document.createElement("option");
+            info.value = "";
+            info.disabled = true;
+            info.textContent = "Keine Angebote dieses Lieferanten eingelesen";
+            select.appendChild(info);
+          }
+          form.hidden = false;
+          editBtn.hidden = true;
+          select.focus();
+        } catch (error) {
+          setStatus(`Angebote konnten nicht geladen werden: ${String(error.message).slice(0, 200)}`, "err");
+        } finally {
+          editBtn.disabled = false;
+        }
       };
       const closeEditor = () => {
         form.hidden = true;
@@ -12492,31 +12533,29 @@
         saveBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
-          if (field === "offer_reference") {
-            await saveDocumentOfferReference(input.value);
-          }
+          const raw = select.value;
+          const selectedId = raw ? Number(raw) : null;
+          await saveDocumentLinkedOffer(selectedId);
         } finally {
           saveBtn.disabled = false;
           cancelBtn.disabled = false;
         }
       });
-      input.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") { event.preventDefault(); saveBtn.click(); }
-        else if (event.key === "Escape") { event.preventDefault(); closeEditor(); }
+      select.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") { event.preventDefault(); closeEditor(); }
       });
       wrap.appendChild(editBtn);
       wrap.appendChild(form);
       return wrap;
     }
 
-    async function saveDocumentOfferReference(rawValue) {
+    async function saveDocumentLinkedOffer(selectedId) {
       if (!state.documentId) return;
-      const value = String(rawValue || "").trim();
       try {
-        const response = await apiJson(`/documents/${state.documentId}/offer-reference`, {
+        const response = await apiJson(`/documents/${state.documentId}/linked-offer`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offer_reference: value || null }),
+          body: JSON.stringify({ linked_offer_document_id: selectedId }),
         });
         if (state.result && state.result.document) {
           state.result.document.offer_reference = response.offer_reference || null;
@@ -12524,9 +12563,14 @@
           syncCurrentDocumentIntoList(state.result.document);
         }
         await loadResult(state.documentId);
-        setStatus("Angebotsbezug gespeichert.", "ok");
+        setStatus(
+          response.linked_offer_document_id
+            ? "Angebot zugeordnet."
+            : "Angebotszuordnung entfernt.",
+          "ok",
+        );
       } catch (error) {
-        setStatus(`Angebotsbezug konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+        setStatus(`Angebot konnte nicht zugeordnet werden: ${String(error.message).slice(0, 220)}`, "err");
       }
     }
 
@@ -14739,7 +14783,9 @@
 
       for (const [label, value, sourceKey, required] of cards) {
         const cardOptions = { required };
-        if (sourceKey === "offer_reference") cardOptions.editableField = "offer_reference";
+        if (sourceKey === "offer_reference") {
+          cardOptions.offerSelect = { linkedId: document.linked_offer_document_id || null };
+        }
         ui.summary.appendChild(createSummaryCard(label, value, sourceKey, cardOptions));
       }
       if (document.document_notes) {
