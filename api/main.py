@@ -3090,7 +3090,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
 
 @app.get("/documents")
-def documents(limit: int = Query(default=20, ge=1, le=200)):
+def documents(limit: int = Query(default=20, ge=1, le=5000)):
     items = list_documents(limit=limit)
     return {"items": items, "count": len(items), "limit": limit}
 
