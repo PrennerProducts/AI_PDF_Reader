@@ -306,6 +306,17 @@
       margin-bottom: 6px;
       flex-wrap: wrap;
     }
+    .doc-load-more {
+      font-size: 12px;
+      padding: 2px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--sr-polish-line, #cbd5e1);
+      background: #fff;
+      color: inherit;
+      cursor: pointer;
+    }
+    .doc-load-more:hover { background: #f1f5f9; }
+    .doc-load-more:disabled { opacity: .5; cursor: default; }
 
     .controls select:focus,
     .controls input[type="file"]:focus {
@@ -11232,6 +11243,7 @@
         <div class="control-card control-card-wide">
           <div class="doc-select-head">
             <label class="control-label" for="docSelect">Dokument</label>
+            <button id="docLoadMore" type="button" class="doc-load-more" hidden>Mehr laden</button>
           </div>
           <select id="docSelect" aria-label="Dokument auswählen"></select>
         </div>
@@ -11755,6 +11767,7 @@
       topbar: document.querySelector(".topbar"),
       adminMenu: document.querySelector(".v3-admin-menu"),
       docSelect: document.getElementById("docSelect"),
+      docLoadMore: document.getElementById("docLoadMore"),
       documentApprovalBadge: document.getElementById("documentApprovalBadge"),
       documentApprovalState: document.getElementById("documentApprovalState"),
       uploadInput: document.getElementById("uploadInput"),
@@ -14718,10 +14731,23 @@
     }
 
     async function loadDocuments() {
+      if (!state.documentLimit) state.documentLimit = 200;
       setStatus("Lade Dokumente...");
-      const payload = await apiJson("/documents?limit=200");
+      const payload = await apiJson(`/documents?limit=${state.documentLimit}`);
       state.documents = payload.items || [];
       renderDocuments();
+      if (ui.docLoadMore) {
+        // Zeige "Mehr laden", wenn wir eine volle Seite bekommen haben (evtl. gibt es mehr).
+        ui.docLoadMore.hidden = (payload.count || 0) < state.documentLimit;
+        if (!ui.docLoadMore.dataset.bound) {
+          ui.docLoadMore.dataset.bound = "1";
+          ui.docLoadMore.addEventListener("click", async () => {
+            ui.docLoadMore.disabled = true;
+            state.documentLimit += 200;
+            try { await loadDocuments(); } finally { ui.docLoadMore.disabled = false; }
+          });
+        }
+      }
       if (state.documentId) {
         await selectDocument(Number(state.documentId));
       } else {
