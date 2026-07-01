@@ -165,13 +165,26 @@ def test_vendoc_payload_keeps_angebot_document_type_unchanged(tmp_path: Path) ->
     assert payload["header"]["document_type"] == "angebot"
 
 
-def test_vendoc_payload_keeps_parsed_offer_reference_when_no_linked_offer(tmp_path: Path) -> None:
+def test_vendoc_payload_leaves_offer_reference_empty_for_unlinked_order_confirmation(tmp_path: Path) -> None:
     image_path = tmp_path / "position.png"
     _write_png(image_path)
     result = _sample_result(image_path)
     result["document"]["document_type"] = "auftragsbestaetigung"
+    result["document"]["offer_reference"] = "26001808"
+    # No linked_offer_document_id: an AB without a resolved Angebot must NOT export the
+    # parsed raw reference (a moveIT number never matches Dragan's source_document_id).
+
+    payload = build_vendoc_payload(result)
+
+    assert payload["header"]["offer_reference"] is None
+
+
+def test_vendoc_payload_keeps_parsed_offer_reference_for_non_order_confirmation(tmp_path: Path) -> None:
+    image_path = tmp_path / "position.png"
+    _write_png(image_path)
+    result = _sample_result(image_path)
+    # Default sample is an Angebot; the empty-fallback only applies to ABs.
     result["document"]["offer_reference"] = "A260172"
-    # No linked_offer_document_id: an AB without a resolved Angebot keeps its parsed reference.
 
     payload = build_vendoc_payload(result)
 
