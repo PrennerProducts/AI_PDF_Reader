@@ -39,6 +39,8 @@ from db import (
     insert_document_image,
     insert_vendoc_export_job,
     list_documents,
+    list_offer_candidates,
+    set_document_linked_offer,
     list_vendoc_export_jobs,
     get_document_relations,
     refresh_document_links,
@@ -55,7 +57,6 @@ from db import (
     revoke_app_session,
     update_document_approval_state,
     update_document_alternative_position_mode,
-    update_document_offer_reference,
     update_document_parse_result,
     update_document_pricing_adjustments,
     update_document_status,
@@ -169,8 +170,8 @@ class DocumentPricingAdjustmentsRequest(BaseModel):
     apply_pricing_adjustments: bool = True
 
 
-class DocumentOfferReferenceRequest(BaseModel):
-    offer_reference: str | None = Field(default=None, max_length=120)
+class DocumentLinkedOfferRequest(BaseModel):
+    linked_offer_document_id: int | None = Field(default=None)
 
 
 class LineItemAlternativeAppendRequest(BaseModel):
@@ -3471,29 +3472,78 @@ def set_document_alternative_position_mode(
     }
 
 
-@app.put("/documents/{document_id}/offer-reference")
-def set_document_offer_reference(
+@app.get("/documents/{document_id}/offer-candidates")
+def get_document_offer_candidates(document_id: int):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    candidates = list_offer_candidates(
+        supplier_name=document.get("supplier_name"),
+        exclude_document_id=document_id,
+    )
+    items = [
+        {
+            "id": candidate.get("id"),
+            "document_number": candidate.get("document_number"),
+            "document_date": candidate.get("document_date"),
+            "project_ref": candidate.get("project_ref"),
+            "status": candidate.get("status"),
+        }
+        for candidate in candidates
+    ]
+    return _json_safe(
+        {
+            "ok": True,
+            "supplier_name": document.get("supplier_name"),
+            "linked_offer_document_id": document.get("linked_offer_document_id"),
+            "items": items,
+            "count": len(items),
+        }
+    )
+
+
+@app.put("/documents/{document_id}/linked-offer")
+def set_document_linked_offer_endpoint(
     document_id: int,
-    payload: DocumentOfferReferenceRequest,
+    payload: DocumentLinkedOfferRequest,
     request: Request,
 ):
     document = get_document(document_id)
     if not document:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
-    updated = update_document_offer_reference(
-        document_id, offer_reference=payload.offer_reference
+
+    linked_id = payload.linked_offer_document_id
+    offer_reference: str | None = None
+    if linked_id is not None:
+        offer = get_document(linked_id)
+        if not offer:
+            raise HTTPException(status_code=400, detail=f"Angebot {linked_id} nicht gefunden.")
+        if str(offer.get("document_type") or "").strip().lower() != "angebot":
+            raise HTTPException(
+                status_code=400,
+                detail="Das ausgewaehlte Dokument ist kein Angebot.",
+            )
+        ab_supplier = (document.get("supplier_name") or "").strip().lower()
+        offer_supplier = (offer.get("supplier_name") or "").strip().lower()
+        if ab_supplier and offer_supplier and ab_supplier != offer_supplier:
+            raise HTTPException(
+                status_code=400,
+                detail="Das Angebot gehoert zu einem anderen Lieferanten.",
+            )
+        offer_reference = offer.get("document_number")
+
+    updated = set_document_linked_offer(
+        document_id,
+        linked_offer_document_id=linked_id,
+        offer_reference=offer_reference,
     )
     if not updated:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
-    # Der Angebotsbezug steuert die AB->Angebot-Verknuepfung; daher neu berechnen.
-    refreshed = refresh_document_links(document_id)
-    if refreshed:
-        updated = refreshed
     _audit(
         request,
-        "offer_reference_changed",
+        "linked_offer_changed",
         document_id=document_id,
-        details={"offer_reference": updated.get("offer_reference")},
+        details={"linked_offer_document_id": updated.get("linked_offer_document_id")},
     )
     return {
         "ok": True,

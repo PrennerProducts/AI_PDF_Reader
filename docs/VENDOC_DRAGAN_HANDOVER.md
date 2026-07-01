@@ -204,8 +204,13 @@ Bereits umgesetzt:
 - `offer_reference` ist fuer Auftragsbestaetigungen kein Pflichtfeld mehr, nur
   noch eine Warnung: Eine AB kann ausnahmsweise ohne zugehoeriges Angebot
   vorkommen und blockiert die Freigabe dann nicht.
-- Der Angebotsbezug ist in der UI manuell editierbar; nach dem Speichern wird die
-  Verknuepfung automatisch neu berechnet.
+- Der Angebotsbezug wird in der UI ueber ein **Auswahlfeld** gesetzt (kein
+  Freitext mehr, Stand 2026-07-01): die "AB-Referenz"-Karte hat einen Button
+  "Angebot zuordnen", der nur **bereits eingelesene Angebote desselben
+  Lieferanten** zur Auswahl anbietet (plus "— kein Angebot —"). Damit ist die
+  Zuordnung eindeutig, auch wenn dieselbe Angebotsnummer bei mehreren
+  Lieferanten vorkommt. Gespeichert wird die interne Angebots-ID; die
+  Verknuepfung wird sofort gesetzt.
 
 Abgestimmtes Verfahren (Dragan, 2026-06-30):
 

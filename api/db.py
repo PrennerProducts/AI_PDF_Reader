@@ -530,24 +530,57 @@ def update_document_pricing_adjustments(document_id: int, *, apply_pricing_adjus
     return dict(row) if row else None
 
 
-def update_document_offer_reference(
-    document_id: int, *, offer_reference: str | None
+def list_offer_candidates(
+    *, supplier_name: str | None, exclude_document_id: int
+) -> list[dict[str, Any]]:
+    """Angebote desselben Lieferanten als Auswahl fuer die AB->Angebot-Zuordnung."""
+    supplier_filter = (supplier_name or "").strip()
+    if not supplier_filter:
+        return []
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, document_number, document_date, project_ref, status
+            FROM documents
+            WHERE id <> %s
+              AND document_type = 'angebot'
+              AND supplier_name = %s
+            ORDER BY document_date DESC NULLS LAST, id DESC;
+            """,
+            (exclude_document_id, supplier_filter),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def set_document_linked_offer(
+    document_id: int,
+    *,
+    linked_offer_document_id: int | None,
+    offer_reference: str | None,
 ) -> dict[str, Any] | None:
-    cleaned = (offer_reference or "").strip() or None
+    """Setzt die AB->Angebot-Verknuepfung direkt (Dropdown-Auswahl).
+
+    Bei gesetzter Verknuepfung wird offer_reference auf die Angebotsnummer
+    gespiegelt, damit ein spaeteres refresh_document_links dieselbe Zuordnung
+    ableitet und die manuelle Auswahl nicht ueberschreibt.
+    """
+    cleaned_ref = (offer_reference or "").strip() or None
     with get_db() as conn:
         row = conn.execute(
             """
             UPDATE documents
             SET
-                offer_reference = %s,
+                linked_offer_document_id = %s,
+                offer_reference = COALESCE(%s, offer_reference),
                 updated_at = NOW()
             WHERE id = %s
             RETURNING
                 id,
                 offer_reference,
+                linked_offer_document_id,
                 updated_at;
             """,
-            (cleaned, document_id),
+            (linked_offer_document_id, cleaned_ref, document_id),
         ).fetchone()
     return dict(row) if row else None
 
