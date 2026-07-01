@@ -1193,25 +1193,25 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
     images = result_data.get("images") if isinstance(result_data.get("images"), list) else []
     document_id = document.get("id")
     ext_document_id = external_document_id(document_id)
-    # Dragan matcht die AB ueber unsere interne Angebots-ID (die source_document_id
-    # des Angebots, die er pro Angebot importiert). Daher exportieren wir bei einer
-    # AB mit erkanntem Angebot dessen interne ID als offer_reference; sonst bleibt
-    # der geparste Angebotsbezug (Angebotsnummer) erhalten.
-    linked_offer_id = document.get("linked_offer_document_id")
-    offer_reference_value = (
-        _to_str(linked_offer_id)
-        if linked_offer_id not in (None, "")
-        else _to_str(document.get("offer_reference"))
-    )
     # Dragan moechte in seinem document_type-Feld bei einer Auftragsbestaetigung
     # nur "auftrag" stehen haben. Reine Export-Abbildung; intern bleibt der Typ
     # "auftragsbestaetigung" (Parser/Validierung/Verknuepfung haengen daran).
     document_type_raw = _to_str(document.get("document_type"))
-    document_type_value = (
-        "auftrag"
-        if (document_type_raw or "").strip().lower() == "auftragsbestaetigung"
-        else document_type_raw
-    )
+    is_order_confirmation = (document_type_raw or "").strip().lower() == "auftragsbestaetigung"
+    document_type_value = "auftrag" if is_order_confirmation else document_type_raw
+
+    # Dragan matcht die AB ueber unsere interne Angebots-ID (die source_document_id
+    # des Angebots, die er pro Angebot importiert). Daher exportieren wir bei einer
+    # AB mit zugeordnetem Angebot dessen interne ID als offer_reference. Ohne
+    # zugeordnetes Angebot bleibt das Feld leer (der geparste Rohwert, z.B. eine
+    # moveIT-Nummer, wuerde bei Dragan ohnehin nie matchen).
+    linked_offer_id = document.get("linked_offer_document_id")
+    if linked_offer_id not in (None, ""):
+        offer_reference_value = _to_str(linked_offer_id)
+    elif is_order_confirmation:
+        offer_reference_value = None
+    else:
+        offer_reference_value = _to_str(document.get("offer_reference"))
 
     warnings: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []

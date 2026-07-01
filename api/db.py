@@ -560,9 +560,11 @@ def set_document_linked_offer(
 ) -> dict[str, Any] | None:
     """Setzt die AB->Angebot-Verknuepfung direkt (Dropdown-Auswahl).
 
-    Bei gesetzter Verknuepfung wird offer_reference auf die Angebotsnummer
-    gespiegelt, damit ein spaeteres refresh_document_links dieselbe Zuordnung
-    ableitet und die manuelle Auswahl nicht ueberschreibt.
+    Jede Auswahl (auch "kein Angebot") ist eine manuelle Entscheidung und
+    setzt offer_link_manual = TRUE, damit der automatische Textabgleich
+    (refresh_document_links) sie nicht mehr ueberschreibt. Bei gesetzter
+    Verknuepfung wird offer_reference zusaetzlich auf die Angebotsnummer
+    gespiegelt (nur fuer die Anzeige).
     """
     cleaned_ref = (offer_reference or "").strip() or None
     with get_db() as conn:
@@ -572,12 +574,14 @@ def set_document_linked_offer(
             SET
                 linked_offer_document_id = %s,
                 offer_reference = COALESCE(%s, offer_reference),
+                offer_link_manual = TRUE,
                 updated_at = NOW()
             WHERE id = %s
             RETURNING
                 id,
                 offer_reference,
                 linked_offer_document_id,
+                offer_link_manual,
                 updated_at;
             """,
             (linked_offer_document_id, cleaned_ref, document_id),
@@ -769,7 +773,8 @@ def refresh_document_links(document_id: int) -> dict[str, Any] | None:
     with get_db() as conn:
         document = conn.execute(
             """
-            SELECT id, supplier_name, document_type, offer_reference, document_number
+            SELECT id, supplier_name, document_type, offer_reference, document_number,
+                   offer_link_manual
             FROM documents
             WHERE id = %s;
             """,
@@ -782,21 +787,23 @@ def refresh_document_links(document_id: int) -> dict[str, Any] | None:
         supplier_name = (document.get("supplier_name") or "").strip() or None
 
         if document_type == "auftragsbestaetigung":
-            linked_offer_id = _find_linked_offer_document_id(
-                conn,
-                source_document_id=document_id,
-                supplier_name=supplier_name,
-                offer_reference=document.get("offer_reference"),
-            )
-            conn.execute(
-                """
-                UPDATE documents
-                SET linked_offer_document_id = %s,
-                    updated_at = NOW()
-                WHERE id = %s;
-                """,
-                (linked_offer_id, document_id),
-            )
+            # Manuell (per Dropdown) gesetzte Zuordnung nie automatisch ueberschreiben.
+            if not document.get("offer_link_manual"):
+                linked_offer_id = _find_linked_offer_document_id(
+                    conn,
+                    source_document_id=document_id,
+                    supplier_name=supplier_name,
+                    offer_reference=document.get("offer_reference"),
+                )
+                conn.execute(
+                    """
+                    UPDATE documents
+                    SET linked_offer_document_id = %s,
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (linked_offer_id, document_id),
+                )
         elif document_type == "angebot":
             offer_key = _document_reference_key(document.get("document_number"))
             conn.execute(
@@ -815,7 +822,8 @@ def refresh_document_links(document_id: int) -> dict[str, Any] | None:
                         FROM documents
                         WHERE document_type = 'auftragsbestaetigung'
                           AND supplier_name = %s
-                          AND offer_reference IS NOT NULL;
+                          AND offer_reference IS NOT NULL
+                          AND offer_link_manual = FALSE;
                         """,
                         (supplier_name,),
                     ).fetchall()
@@ -825,7 +833,8 @@ def refresh_document_links(document_id: int) -> dict[str, Any] | None:
                         SELECT id, offer_reference
                         FROM documents
                         WHERE document_type = 'auftragsbestaetigung'
-                          AND offer_reference IS NOT NULL;
+                          AND offer_reference IS NOT NULL
+                          AND offer_link_manual = FALSE;
                         """
                     ).fetchall()
 
