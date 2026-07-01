@@ -10830,11 +10830,12 @@
     }
 
     .summary-edit {
-      margin-top: 6px;
+      margin-top: 8px;
+      width: 100%;
     }
     .summary-edit-btn {
       font-size: 12px;
-      padding: 2px 8px;
+      padding: 4px 12px;
       border: 1px solid var(--sr-polish-line, #cbd5e1);
       border-radius: 8px;
       background: transparent;
@@ -10847,26 +10848,30 @@
     .summary-edit-form {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
       align-items: center;
+      width: 100%;
+      margin-top: 4px;
     }
     .summary-edit-input {
-      flex: 1 1 140px;
-      min-width: 120px;
-      padding: 3px 8px;
+      box-sizing: border-box;
+      padding: 6px 10px;
       border: 1px solid var(--sr-polish-line, #cbd5e1);
       border-radius: 8px;
       font-size: 13px;
     }
     .summary-edit-select {
-      flex: 1 1 240px;
-      min-width: 200px;
+      flex: 1 1 100%;
+      width: 100%;
+      min-width: 0;
       background: #fff;
+      cursor: pointer;
     }
     .summary-edit-save,
     .summary-edit-cancel {
+      flex: 0 0 auto;
       font-size: 12px;
-      padding: 3px 10px;
+      padding: 6px 16px;
       border-radius: 8px;
       border: 1px solid var(--sr-polish-line, #cbd5e1);
       cursor: pointer;
@@ -10876,10 +10881,14 @@
       color: #fff;
       border-color: #2563eb;
     }
+    .summary-edit-save:hover { background: #1d4ed8; }
     .summary-edit-cancel {
       background: transparent;
       color: inherit;
     }
+    .summary-edit-cancel:hover { background: rgba(17, 17, 17, 0.05); }
+    .summary-edit-save:disabled,
+    .summary-edit-cancel:disabled { opacity: .5; cursor: default; }
 
     .app-v3 .review-panel > .panel-body {
       margin: 0 14px 14px !important;
@@ -14786,7 +14795,11 @@
         ["Dokumenttyp", formatDocumentType(document.document_type), "document_type", true],
         ["Lieferant", document.supplier_name, "supplier_name", true],
         ...(String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
-          ? [["AB-Referenz", document.offer_reference, "offer_reference", false]]
+          ? [["AB-Referenz",
+              document.linked_offer_document_id
+                ? `Angebot #${document.linked_offer_document_id}${document.offer_reference ? " · " + document.offer_reference : ""}`
+                : "— kein Angebot zugeordnet —",
+              null, false]]
           : []),
         [documentNumberLabel, document.document_number, "document_number", true],
         ["Datum", formatDate(document.document_date), "document_date", true],
@@ -14809,7 +14822,7 @@
 
       for (const [label, value, sourceKey, required] of cards) {
         const cardOptions = { required };
-        if (sourceKey === "offer_reference") {
+        if (label === "AB-Referenz") {
           cardOptions.offerSelect = { linkedId: document.linked_offer_document_id || null };
         }
         ui.summary.appendChild(createSummaryCard(label, value, sourceKey, cardOptions));
