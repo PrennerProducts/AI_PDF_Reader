@@ -9206,34 +9206,69 @@
       border-radius: 999px;
     }
 
+    /* Admin-Menue: Zahnrad-Icon statt der drei Punkte (signalisiert Einstellungen/Admin). */
+    .app-v3 .v3-admin-menu summary::before {
+      content: "";
+      width: 19px;
+      height: 19px;
+      background-color: rgba(29, 29, 31, 0.66);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Ccircle%20cx=%2712%27%20cy=%2712%27%20r=%273.2%27/%3E%3Cpath%20d=%27M19.4%2015a1.65%201.65%200%200%200%20.33%201.82l.06.06a2%202%200%201%201-2.83%202.83l-.06-.06a1.65%201.65%200%200%200-1.82-.33%201.65%201.65%200%200%200-1%201.51V21a2%202%200%200%201-4%200v-.09A1.65%201.65%200%200%200%209%2019.4a1.65%201.65%200%200%200-1.82.33l-.06.06a2%202%200%201%201-2.83-2.83l.06-.06a1.65%201.65%200%200%200%20.33-1.82%201.65%201.65%200%200%200-1.51-1H3a2%202%200%200%201%200-4h.09A1.65%201.65%200%200%200%204.6%209a1.65%201.65%200%200%200-.33-1.82l-.06-.06a2%202%200%201%201%202.83-2.83l.06.06a1.65%201.65%200%200%200%201.82.33H9a1.65%201.65%200%200%200%201-1.51V3a2%202%200%200%201%204%200v.09a1.65%201.65%200%200%200%201%201.51%201.65%201.65%200%200%200%201.82-.33l.06-.06a2%202%200%201%201%202.83%202.83l-.06.06a1.65%201.65%200%200%200-.33%201.82V15z%27/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Ccircle%20cx=%2712%27%20cy=%2712%27%20r=%273.2%27/%3E%3Cpath%20d=%27M19.4%2015a1.65%201.65%200%200%200%20.33%201.82l.06.06a2%202%200%201%201-2.83%202.83l-.06-.06a1.65%201.65%200%200%200-1.82-.33%201.65%201.65%200%200%200-1%201.51V21a2%202%200%200%201-4%200v-.09A1.65%201.65%200%200%200%209%2019.4a1.65%201.65%200%200%200-1.82.33l-.06.06a2%202%200%201%201-2.83-2.83l.06-.06a1.65%201.65%200%200%200%20.33-1.82%201.65%201.65%200%200%200-1.51-1H3a2%202%200%200%201%200-4h.09A1.65%201.65%200%200%200%204.6%209a1.65%201.65%200%200%200-.33-1.82l-.06-.06a2%202%200%201%201%202.83-2.83l.06.06a1.65%201.65%200%200%200%201.82.33H9a1.65%201.65%200%200%200%201-1.51V3a2%202%200%200%201%204%200v.09a1.65%201.65%200%200%200%201%201.51%201.65%201.65%200%200%200%201.82-.33l.06-.06a2%202%200%201%201%202.83%202.83l-.06.06a1.65%201.65%200%200%200-.33%201.82V15z%27/%3E%3C/svg%3E") center / contain no-repeat;
+      transform: none;
+    }
+
+    .app-v3 .v3-admin-menu summary:hover::before {
+      background-color: #d51a0f;
+    }
+
     .app-v3 .v3-admin-menu[open] {
       position: fixed;
-      top: 116px;
-      right: 18px;
+      top: 50%;
+      left: 50%;
+      right: auto;
       bottom: auto;
+      transform: translate(-50%, -50%);
       z-index: 3000;
-      width: min(760px, calc(100vw - 36px));
-      max-height: min(72vh, 680px);
+      width: min(900px, calc(100vw - 40px));
+      max-height: min(86vh, 900px);
       overflow: auto;
-      padding: 52px 14px 14px;
+      padding: 56px 22px 22px;
       border-radius: 28px;
       border: 1px solid rgba(60, 60, 67, 0.12);
-      background: rgba(255, 255, 255, 0.98);
+      background: rgba(255, 255, 255, 0.99);
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.98),
-        0 32px 80px rgba(29, 29, 31, 0.20);
+        0 40px 120px rgba(29, 29, 31, 0.32);
       backdrop-filter: blur(24px) saturate(1.16);
+    }
+
+    /* Abgedunkelter Vollbild-Hintergrund hinter dem geoeffneten Admin-Panel (Modal-Gefuehl). */
+    .admin-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2900;
+      background: rgba(18, 18, 22, 0.42);
+      backdrop-filter: blur(2px);
+    }
+
+    .admin-backdrop[hidden] {
+      display: none;
     }
 
     .app-v3 .v3-admin-menu[open] summary {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 36px;
-      height: 36px;
+      top: 12px;
+      right: 12px;
+      width: 38px;
+      height: 38px;
       border: 1px solid rgba(60, 60, 67, 0.12);
       border-radius: 999px;
       background: #f5f5f7;
+    }
+
+    .app-v3 .v3-admin-menu[open] summary::before {
+      width: 20px;
+      height: 20px;
     }
 
     .app-v3 .v3-admin-menu .admin-menu-head {
@@ -11853,6 +11888,8 @@
     </form>
   </div>
 
+  <div class="admin-backdrop" id="adminBackdrop" hidden></div>
+
   <div class="image-hover-preview" id="imageHoverPreview" hidden>
     <img id="imageHoverPreviewImg" alt="Bildvorschau">
     <div class="image-hover-preview-meta" id="imageHoverPreviewMeta"></div>
@@ -11983,6 +12020,7 @@
       adminUserList: document.getElementById("adminUserList"),
       adminUserListMessage: document.getElementById("adminUserListMessage"),
       adminUserListRefreshBtn: document.getElementById("adminUserListRefreshBtn"),
+      adminBackdrop: document.getElementById("adminBackdrop"),
       pwChangeGate: document.getElementById("pwChangeGate"),
       pwChangeForm: document.getElementById("pwChangeForm"),
       pwChangeHint: document.getElementById("pwChangeHint"),
@@ -19192,6 +19230,20 @@
     }
     if (ui.adminCreateUserForm) {
       ui.adminCreateUserForm.addEventListener("submit", submitAdminCreateUser);
+    }
+    if (ui.adminMenu) {
+      // Beim Oeffnen/Schliessen des Admin-Panels den abgedunkelten Hintergrund mitschalten.
+      ui.adminMenu.addEventListener("toggle", () => {
+        if (!ui.adminBackdrop) return;
+        if (ui.adminMenu.open) ui.adminBackdrop.removeAttribute("hidden");
+        else ui.adminBackdrop.setAttribute("hidden", "");
+      });
+    }
+    if (ui.adminBackdrop) {
+      ui.adminBackdrop.addEventListener("click", () => {
+        if (ui.adminMenu) ui.adminMenu.removeAttribute("open");
+        ui.adminBackdrop.setAttribute("hidden", "");
+      });
     }
     if (ui.adminUserList) {
       ui.adminUserList.addEventListener("click", handleUserListClick);
