@@ -164,6 +164,8 @@ def get_app_user_by_username(username: str) -> dict[str, Any] | None:
                 display_name,
                 password_hash,
                 is_active,
+                is_admin,
+                must_change_password,
                 created_at,
                 updated_at
             FROM app_users
@@ -185,6 +187,8 @@ def create_app_user(
     username: str,
     password_hash: str,
     display_name: str | None = None,
+    is_admin: bool = False,
+    must_change_password: bool = False,
 ) -> dict[str, Any]:
     cleaned_username = str(username or "").strip()
     normalized = _normalize_username(cleaned_username)
@@ -197,15 +201,19 @@ def create_app_user(
                 username,
                 username_normalized,
                 display_name,
-                password_hash
+                password_hash,
+                is_admin,
+                must_change_password
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING
                 id,
                 username,
                 username_normalized,
                 display_name,
                 is_active,
+                is_admin,
+                must_change_password,
                 created_at,
                 updated_at;
             """,
@@ -214,9 +222,133 @@ def create_app_user(
                 normalized,
                 (display_name or "").strip() or cleaned_username,
                 password_hash,
+                bool(is_admin),
+                bool(must_change_password),
             ),
         ).fetchone()
     return dict(row)
+
+
+def list_app_users() -> list[dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                username,
+                display_name,
+                is_active,
+                is_admin,
+                must_change_password,
+                created_at,
+                updated_at
+            FROM app_users
+            ORDER BY created_at ASC, id ASC;
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_app_user_by_id(user_id: int) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                id,
+                username,
+                display_name,
+                password_hash,
+                is_active,
+                is_admin,
+                must_change_password,
+                created_at,
+                updated_at
+            FROM app_users
+            WHERE id = %s;
+            """,
+            (int(user_id),),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def set_app_user_password(
+    user_id: int,
+    *,
+    password_hash: str,
+    must_change_password: bool,
+) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE app_users
+            SET password_hash = %s,
+                must_change_password = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                username,
+                display_name,
+                is_active,
+                is_admin,
+                must_change_password;
+            """,
+            (password_hash, bool(must_change_password), int(user_id)),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def set_app_user_active(user_id: int, *, is_active: bool) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE app_users
+            SET is_active = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                username,
+                display_name,
+                is_active,
+                is_admin,
+                must_change_password;
+            """,
+            (bool(is_active), int(user_id)),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def set_app_user_admin(user_id: int, *, is_admin: bool) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE app_users
+            SET is_admin = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                username,
+                display_name,
+                is_active,
+                is_admin,
+                must_change_password;
+            """,
+            (bool(is_admin), int(user_id)),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def count_app_admins(*, active_only: bool = True) -> int:
+    clause = "WHERE is_admin = TRUE"
+    if active_only:
+        clause += " AND is_active = TRUE"
+    with get_db() as conn:
+        row = conn.execute(
+            f"SELECT COUNT(*) AS count FROM app_users {clause};"
+        ).fetchone()
+    return int(row["count"] if row else 0)
 
 
 def ensure_app_user(
@@ -280,7 +412,9 @@ def get_app_session_user(session_token_hash: str) -> dict[str, Any] | None:
                 u.id,
                 u.username,
                 u.display_name,
-                u.is_active
+                u.is_active,
+                u.is_admin,
+                u.must_change_password
             FROM app_sessions s
             JOIN app_users u ON u.id = s.user_id
             WHERE s.session_token_hash = %s

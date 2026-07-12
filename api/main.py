@@ -24,11 +24,17 @@ from pydantic import BaseModel, Field
 from db import (
     apply_migrations,
     count_app_users,
+    count_app_admins,
     create_app_session,
     create_app_user,
     ensure_app_user,
     get_app_session_user,
+    get_app_user_by_id,
     get_app_user_by_username,
+    list_app_users,
+    set_app_user_active,
+    set_app_user_admin,
+    set_app_user_password,
     get_document,
     get_document_image,
     get_vendoc_import_state,
@@ -206,6 +212,24 @@ class CreateUserRequest(BaseModel):
     username: str = Field(min_length=1, max_length=160)
     password: str = Field(min_length=4, max_length=500)
     display_name: str | None = Field(default=None, max_length=160)
+    is_admin: bool = False
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str = Field(min_length=4, max_length=500)
+
+
+class SetUserRoleRequest(BaseModel):
+    is_admin: bool
+
+
+class SetUserActiveRequest(BaseModel):
+    is_active: bool
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=500)
+    new_password: str = Field(min_length=4, max_length=500)
 
 
 def _safe_filename(filename: str) -> str:
@@ -269,6 +293,20 @@ def _public_user(user: dict[str, Any]) -> dict[str, Any]:
         "id": user.get("id"),
         "username": user.get("username"),
         "display_name": user.get("display_name") or user.get("username"),
+        "is_admin": bool(user.get("is_admin")),
+        "must_change_password": bool(user.get("must_change_password")),
+    }
+
+
+def _admin_user_view(user: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": user.get("id"),
+        "username": user.get("username"),
+        "display_name": user.get("display_name") or user.get("username"),
+        "is_active": bool(user.get("is_active", True)),
+        "is_admin": bool(user.get("is_admin")),
+        "must_change_password": bool(user.get("must_change_password")),
+        "created_at": user.get("created_at").isoformat() if user.get("created_at") else None,
     }
 
 
@@ -279,10 +317,19 @@ def _current_user_from_request(request: Request) -> dict[str, Any] | None:
 
 def _require_user(request: Request) -> dict[str, Any]:
     if not _auth_enabled():
-        return {"id": None, "username": "dev", "display_name": "Dev"}
+        return {"id": None, "username": "dev", "display_name": "Dev", "is_admin": True}
     user = _current_user_from_request(request)
     if not user:
         raise HTTPException(status_code=401, detail="Login erforderlich.")
+    return user
+
+
+def _require_admin(request: Request) -> dict[str, Any]:
+    user = _require_user(request)
+    if not _auth_enabled():
+        return user
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Nur Administratoren duerfen das.")
     return user
 
 
@@ -321,6 +368,7 @@ def _bootstrap_auth_user() -> None:
         username=username,
         password_hash=_hash_password(password),
         display_name=display_name,
+        is_admin=True,
     )
 
 
@@ -398,6 +446,7 @@ def auth_register(payload: CreateUserRequest, request: Request, response: Respon
             username=payload.username,
             password_hash=_hash_password(payload.password),
             display_name=_clean_optional_str(payload.display_name),
+            is_admin=True,
         )
     except Exception as exc:
         raise HTTPException(status_code=409, detail=f"Benutzer konnte nicht angelegt werden: {exc}") from exc
@@ -436,19 +485,98 @@ def auth_logout(request: Request, response: Response):
     return {"ok": True}
 
 
+@app.get("/auth/users")
+def auth_list_users(request: Request):
+    _require_admin(request)
+    users = [_admin_user_view(user) for user in list_app_users()]
+    return {"ok": True, "users": users}
+
+
 @app.post("/auth/users")
 def auth_create_user(payload: CreateUserRequest, request: Request):
-    _require_user(request)
+    _require_admin(request)
     try:
         created = create_app_user(
             username=payload.username,
             password_hash=_hash_password(payload.password),
             display_name=_clean_optional_str(payload.display_name),
+            is_admin=bool(payload.is_admin),
+            # Vom Admin angelegte Benutzer muessen ihr Passwort beim ersten Login aendern.
+            must_change_password=True,
         )
     except Exception as exc:
         raise HTTPException(status_code=409, detail=f"Benutzer konnte nicht angelegt werden: {exc}") from exc
-    _audit(request, "user_created", details={"username": created.get("username")})
-    return {"ok": True, "user": _public_user(created)}
+    _audit(request, "user_created", details={"username": created.get("username"), "is_admin": bool(payload.is_admin)})
+    return {"ok": True, "user": _admin_user_view(created)}
+
+
+@app.post("/auth/users/{user_id}/reset-password")
+def auth_reset_user_password(user_id: int, payload: ResetPasswordRequest, request: Request):
+    _require_admin(request)
+    target = get_app_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden.")
+    updated = set_app_user_password(
+        user_id,
+        password_hash=_hash_password(payload.new_password),
+        # Nach einem Admin-Reset muss der Benutzer das Passwort neu setzen.
+        must_change_password=True,
+    )
+    _audit(request, "user_password_reset", details={"username": target.get("username")})
+    return {"ok": True, "user": _admin_user_view(updated)}
+
+
+@app.post("/auth/users/{user_id}/role")
+def auth_set_user_role(user_id: int, payload: SetUserRoleRequest, request: Request):
+    admin = _require_admin(request)
+    target = get_app_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden.")
+    # Den letzten aktiven Admin nicht die eigenen Rechte entziehen lassen.
+    if not payload.is_admin and target.get("is_admin") and count_app_admins() <= 1:
+        raise HTTPException(status_code=400, detail="Es muss mindestens ein Administrator bleiben.")
+    updated = set_app_user_admin(user_id, is_admin=bool(payload.is_admin))
+    _audit(request, "user_role_changed", details={"username": target.get("username"), "is_admin": bool(payload.is_admin)})
+    return {"ok": True, "user": _admin_user_view(updated)}
+
+
+@app.post("/auth/users/{user_id}/active")
+def auth_set_user_active(user_id: int, payload: SetUserActiveRequest, request: Request):
+    admin = _require_admin(request)
+    target = get_app_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden.")
+    if not payload.is_active:
+        if int(target["id"]) == int(admin.get("id") or 0):
+            raise HTTPException(status_code=400, detail="Man kann sich nicht selbst deaktivieren.")
+        if target.get("is_admin") and count_app_admins() <= 1:
+            raise HTTPException(status_code=400, detail="Der letzte Administrator kann nicht deaktiviert werden.")
+    updated = set_app_user_active(user_id, is_active=bool(payload.is_active))
+    _audit(request, "user_active_changed", details={"username": target.get("username"), "is_active": bool(payload.is_active)})
+    return {"ok": True, "user": _admin_user_view(updated)}
+
+
+@app.post("/auth/change-password")
+def auth_change_password(payload: ChangePasswordRequest, request: Request):
+    if not _auth_enabled():
+        raise HTTPException(status_code=400, detail="Login ist nicht aktiv.")
+    session_user = _current_user_from_request(request)
+    if not session_user:
+        raise HTTPException(status_code=401, detail="Login erforderlich.")
+    user = get_app_user_by_id(int(session_user["id"]))
+    if not user:
+        raise HTTPException(status_code=401, detail="Login erforderlich.")
+    if not _verify_password(payload.current_password, str(user.get("password_hash") or "")):
+        raise HTTPException(status_code=403, detail="Aktuelles Passwort ist falsch.")
+    if _verify_password(payload.new_password, str(user.get("password_hash") or "")):
+        raise HTTPException(status_code=400, detail="Das neue Passwort muss sich vom alten unterscheiden.")
+    set_app_user_password(
+        int(user["id"]),
+        password_hash=_hash_password(payload.new_password),
+        must_change_password=False,
+    )
+    _audit(request, "user_password_changed", details={"username": user.get("username")})
+    return {"ok": True}
 
 
 def _parse_eu_decimal(value: str | None) -> Decimal | None:
