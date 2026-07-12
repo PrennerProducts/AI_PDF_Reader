@@ -3431,6 +3431,111 @@
       font-size: 13px;
     }
 
+    .admin-user-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #2d2828;
+    }
+
+    .admin-user-check input {
+      width: auto;
+      margin: 0;
+    }
+
+    .admin-user-hint {
+      margin: 0;
+      font-size: 11px;
+      color: rgba(45, 40, 40, 0.62);
+    }
+
+    .admin-user-list-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .admin-user-list {
+      display: grid;
+      gap: 6px;
+    }
+
+    .admin-user-empty {
+      font-size: 12px;
+      color: rgba(45, 40, 40, 0.6);
+    }
+
+    .admin-user-row {
+      display: grid;
+      gap: 6px;
+      padding: 8px 10px;
+      border: 1px solid rgba(35, 32, 32, 0.10);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .admin-user-row-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .admin-user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #2d2828;
+    }
+
+    .admin-user-badges {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .admin-user-badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(35, 32, 32, 0.08);
+      color: #2d2828;
+    }
+
+    .admin-user-badge.admin {
+      background: rgba(59, 130, 246, 0.16);
+      color: #1d4ed8;
+    }
+
+    .admin-user-badge.inactive {
+      background: rgba(120, 113, 108, 0.18);
+      color: #57534e;
+    }
+
+    .admin-user-badge.warn {
+      background: rgba(234, 179, 8, 0.20);
+      color: #a16207;
+    }
+
+    .admin-user-row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .admin-user-row-actions .btn {
+      font-size: 11px;
+      padding: 5px 9px;
+    }
+
+    .auth-hint {
+      margin: 0 0 4px;
+      font-size: 12px;
+      color: rgba(45, 40, 40, 0.75);
+      line-height: 1.4;
+    }
+
     @keyframes heroGlow {
       from {
         transform: translate3d(0, 0, 0) scale(1);
@@ -11301,15 +11406,28 @@
               <input id="adminCreateUsername" autocomplete="off" required>
             </label>
             <label class="auth-field" for="adminCreatePassword">
-              Passwort
+              Start-Passwort
               <input id="adminCreatePassword" type="password" autocomplete="new-password" required minlength="4">
             </label>
           </div>
+          <label class="admin-user-check" for="adminCreateIsAdmin">
+            <input id="adminCreateIsAdmin" type="checkbox">
+            Als Administrator anlegen
+          </label>
           <div class="auth-actions">
             <div class="auth-error" id="adminCreateUserMessage"></div>
             <button class="btn btn-primary" id="adminCreateUserBtn" type="submit">Anlegen</button>
           </div>
+          <p class="admin-user-hint">Der Benutzer muss das Start-Passwort beim ersten Login selbst ändern.</p>
         </form>
+        <div class="admin-user-panel" id="adminUserListPanel">
+          <div class="admin-user-list-head">
+            <h3>Benutzer verwalten</h3>
+            <button class="btn btn-ghost" id="adminUserListRefreshBtn" type="button">Aktualisieren</button>
+          </div>
+          <div class="admin-user-list" id="adminUserList"></div>
+          <div class="auth-error" id="adminUserListMessage"></div>
+        </div>
         <div class="debug-panel">
           <div class="debug-head">
             <div>Live Debug</div>
@@ -11707,6 +11825,34 @@
     </form>
   </div>
 
+  <div class="modal-backdrop" id="pwChangeGate" hidden>
+    <form class="modal auth-modal" id="pwChangeForm" role="dialog" aria-modal="true" aria-labelledby="pwChangeTitle">
+      <div class="modal-head">
+        <div class="modal-title" id="pwChangeTitle">Passwort ändern</div>
+      </div>
+      <div class="auth-modal-body">
+        <p class="auth-hint" id="pwChangeHint">Bitte lege für dein Konto ein neues Passwort fest.</p>
+        <label class="auth-field" for="pwCurrent">
+          Aktuelles Passwort
+          <input id="pwCurrent" type="password" autocomplete="current-password" required>
+        </label>
+        <label class="auth-field" for="pwNew">
+          Neues Passwort
+          <input id="pwNew" type="password" autocomplete="new-password" required minlength="4">
+        </label>
+        <label class="auth-field" for="pwNewRepeat">
+          Neues Passwort wiederholen
+          <input id="pwNewRepeat" type="password" autocomplete="new-password" required minlength="4">
+        </label>
+        <div class="auth-error" id="pwChangeError"></div>
+        <div class="auth-actions">
+          <button class="auth-secondary" id="pwChangeCancelBtn" type="button" hidden>Abbrechen</button>
+          <button class="btn btn-primary" id="pwChangeBtn" type="submit">Passwort speichern</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <div class="image-hover-preview" id="imageHoverPreview" hidden>
     <img id="imageHoverPreviewImg" alt="Bildvorschau">
     <div class="image-hover-preview-meta" id="imageHoverPreviewMeta"></div>
@@ -11830,8 +11976,22 @@
       adminCreateUserForm: document.getElementById("adminCreateUserForm"),
       adminCreateUsername: document.getElementById("adminCreateUsername"),
       adminCreatePassword: document.getElementById("adminCreatePassword"),
+      adminCreateIsAdmin: document.getElementById("adminCreateIsAdmin"),
       adminCreateUserMessage: document.getElementById("adminCreateUserMessage"),
       adminCreateUserBtn: document.getElementById("adminCreateUserBtn"),
+      adminUserListPanel: document.getElementById("adminUserListPanel"),
+      adminUserList: document.getElementById("adminUserList"),
+      adminUserListMessage: document.getElementById("adminUserListMessage"),
+      adminUserListRefreshBtn: document.getElementById("adminUserListRefreshBtn"),
+      pwChangeGate: document.getElementById("pwChangeGate"),
+      pwChangeForm: document.getElementById("pwChangeForm"),
+      pwChangeHint: document.getElementById("pwChangeHint"),
+      pwCurrent: document.getElementById("pwCurrent"),
+      pwNew: document.getElementById("pwNew"),
+      pwNewRepeat: document.getElementById("pwNewRepeat"),
+      pwChangeError: document.getElementById("pwChangeError"),
+      pwChangeBtn: document.getElementById("pwChangeBtn"),
+      pwChangeCancelBtn: document.getElementById("pwChangeCancelBtn"),
       clearDebugBtn: document.getElementById("clearDebugBtn"),
       debugLog: document.getElementById("debugLog"),
       pdfStage: document.getElementById("pdfStage"),
@@ -14272,6 +14432,7 @@
 
     function syncAuthUser() {
       const user = state.currentUser || null;
+      const isAdmin = !!(user && user.is_admin);
       if (ui.currentUserLabel) {
         ui.currentUserLabel.textContent = user ? (user.username || user.display_name || "Angemeldet") : "Nicht angemeldet";
       }
@@ -14279,8 +14440,30 @@
         if (user) ui.authUserChip.removeAttribute("hidden");
         else ui.authUserChip.setAttribute("hidden", "");
       }
+      if (ui.adminMenu) {
+        // Admin-Menue (inkl. Benutzerverwaltung) nur fuer Administratoren zeigen.
+        if (isAdmin) {
+          ui.adminMenu.removeAttribute("hidden");
+        } else {
+          ui.adminMenu.setAttribute("hidden", "");
+          ui.adminMenu.removeAttribute("open");
+        }
+      }
       if (ui.documentApprovalReviewerUser) {
         ui.documentApprovalReviewerUser.textContent = user ? (user.username || user.display_name || "Angemeldet") : "Nicht angemeldet";
+      }
+    }
+
+    function applyAuthUserState() {
+      const user = state.currentUser || null;
+      syncAuthUser();
+      if (user && user.must_change_password) {
+        showPasswordChangeGate({ forced: true });
+      } else {
+        hidePasswordChangeGate();
+      }
+      if (user && user.is_admin) {
+        loadUserList();
       }
     }
 
@@ -14317,8 +14500,8 @@
         const payload = await apiJson("/auth/me", { method: "GET" }, { skipAuthRedirect: true });
         state.currentUser = payload && payload.user ? payload.user : null;
         state.authSetupRequired = false;
-        syncAuthUser();
         hideAuthGate();
+        applyAuthUserState();
         return true;
       } catch (error) {
         try {
@@ -14357,8 +14540,8 @@
         state.authSetupRequired = false;
         setAuthMode("login");
         if (ui.loginPassword) ui.loginPassword.value = "";
-        syncAuthUser();
         hideAuthGate();
+        applyAuthUserState();
         await loadDocuments();
       } catch (error) {
         if (ui.loginError) ui.loginError.textContent = String(error.message || "Login fehlgeschlagen.");
@@ -14390,21 +14573,176 @@
         if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = "Passwort braucht mindestens 4 Zeichen.";
         return;
       }
+      const isAdmin = ui.adminCreateIsAdmin ? !!ui.adminCreateIsAdmin.checked : false;
       if (ui.adminCreateUserBtn) ui.adminCreateUserBtn.disabled = true;
       if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = "";
       try {
         await apiJson("/auth/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ username, password, is_admin: isAdmin }),
         });
         if (ui.adminCreateUsername) ui.adminCreateUsername.value = "";
         if (ui.adminCreatePassword) ui.adminCreatePassword.value = "";
+        if (ui.adminCreateIsAdmin) ui.adminCreateIsAdmin.checked = false;
         if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = `Benutzer ${username} wurde angelegt.`;
+        loadUserList();
       } catch (error) {
         if (ui.adminCreateUserMessage) ui.adminCreateUserMessage.textContent = String(error.message || "Benutzer konnte nicht angelegt werden.");
       } finally {
         if (ui.adminCreateUserBtn) ui.adminCreateUserBtn.disabled = false;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderUserList(users) {
+      if (!ui.adminUserList) return;
+      const list = Array.isArray(users) ? users : [];
+      if (!list.length) {
+        ui.adminUserList.innerHTML = '<div class="admin-user-empty">Keine Benutzer.</div>';
+        return;
+      }
+      const selfId = state.currentUser ? state.currentUser.id : null;
+      ui.adminUserList.innerHTML = list.map((user) => {
+        const badges = [];
+        if (user.is_admin) badges.push('<span class="admin-user-badge admin">Admin</span>');
+        if (!user.is_active) badges.push('<span class="admin-user-badge inactive">Inaktiv</span>');
+        if (user.must_change_password) badges.push('<span class="admin-user-badge warn">Passwortwechsel</span>');
+        const isSelf = selfId != null && Number(user.id) === Number(selfId);
+        const roleLabel = user.is_admin ? "Admin entziehen" : "Zu Admin machen";
+        const activeLabel = user.is_active ? "Deaktivieren" : "Aktivieren";
+        return `
+          <div class="admin-user-row" data-user-id="${user.id}">
+            <div class="admin-user-row-main">
+              <span class="admin-user-name">${escapeHtml(user.username)}</span>
+              <span class="admin-user-badges">${badges.join("")}</span>
+            </div>
+            <div class="admin-user-row-actions">
+              <button class="btn btn-ghost" data-user-action="reset" data-user-id="${user.id}" data-user-name="${escapeHtml(user.username)}">Passwort zurücksetzen</button>
+              <button class="btn btn-ghost" data-user-action="role" data-user-id="${user.id}" data-user-admin="${user.is_admin ? "1" : "0"}"${isSelf ? " disabled title=\"Eigene Rolle nicht änderbar\"" : ""}>${roleLabel}</button>
+              <button class="btn btn-ghost" data-user-action="active" data-user-id="${user.id}" data-user-active="${user.is_active ? "1" : "0"}"${isSelf ? " disabled title=\"Sich selbst nicht deaktivieren\"" : ""}>${activeLabel}</button>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    async function loadUserList() {
+      if (!ui.adminUserList) return;
+      if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = "";
+      try {
+        const payload = await apiJson("/auth/users", { method: "GET" }, { skipAuthRedirect: true });
+        renderUserList(payload && payload.users ? payload.users : []);
+      } catch (error) {
+        if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = String(error.message || "Benutzer konnten nicht geladen werden.");
+      }
+    }
+
+    async function handleUserListClick(event) {
+      const btn = event.target.closest("[data-user-action]");
+      if (!btn) return;
+      const action = btn.getAttribute("data-user-action");
+      const userId = btn.getAttribute("data-user-id");
+      const userName = btn.getAttribute("data-user-name") || `#${userId}`;
+      if (!userId) return;
+      if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = "";
+      try {
+        if (action === "reset") {
+          const pw = window.prompt(`Neues Start-Passwort für ${userName} (mind. 4 Zeichen):`);
+          if (pw == null) return;
+          if (String(pw).length < 4) {
+            if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = "Passwort braucht mindestens 4 Zeichen.";
+            return;
+          }
+          await apiJson(`/auth/users/${userId}/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ new_password: String(pw) }),
+          }, { skipAuthRedirect: true });
+          if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = `Passwort für ${userName} zurückgesetzt. Muss beim nächsten Login geändert werden.`;
+        } else if (action === "role") {
+          const makeAdmin = btn.getAttribute("data-user-admin") !== "1";
+          await apiJson(`/auth/users/${userId}/role`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_admin: makeAdmin }),
+          }, { skipAuthRedirect: true });
+        } else if (action === "active") {
+          const makeActive = btn.getAttribute("data-user-active") !== "1";
+          await apiJson(`/auth/users/${userId}/active`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: makeActive }),
+          }, { skipAuthRedirect: true });
+        }
+        loadUserList();
+      } catch (error) {
+        if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = String(error.message || "Aktion fehlgeschlagen.");
+      }
+    }
+
+    function showPasswordChangeGate(options = {}) {
+      const forced = !!options.forced;
+      if (ui.pwChangeHint) {
+        ui.pwChangeHint.textContent = forced
+          ? "Dein Passwort wurde von einem Administrator gesetzt. Bitte lege jetzt ein eigenes Passwort fest."
+          : "Lege ein neues Passwort für dein Konto fest.";
+      }
+      if (ui.pwChangeCancelBtn) {
+        if (forced) ui.pwChangeCancelBtn.setAttribute("hidden", "");
+        else ui.pwChangeCancelBtn.removeAttribute("hidden");
+      }
+      if (ui.pwChangeError) ui.pwChangeError.textContent = "";
+      if (ui.pwCurrent) ui.pwCurrent.value = "";
+      if (ui.pwNew) ui.pwNew.value = "";
+      if (ui.pwNewRepeat) ui.pwNewRepeat.value = "";
+      if (ui.pwChangeGate) ui.pwChangeGate.removeAttribute("hidden");
+      window.setTimeout(() => { if (ui.pwCurrent) ui.pwCurrent.focus(); }, 0);
+    }
+
+    function hidePasswordChangeGate() {
+      if (ui.pwChangeGate) ui.pwChangeGate.setAttribute("hidden", "");
+      if (ui.pwChangeError) ui.pwChangeError.textContent = "";
+    }
+
+    async function submitPasswordChange(event) {
+      event.preventDefault();
+      const current = ui.pwCurrent ? String(ui.pwCurrent.value || "") : "";
+      const next = ui.pwNew ? String(ui.pwNew.value || "") : "";
+      const repeat = ui.pwNewRepeat ? String(ui.pwNewRepeat.value || "") : "";
+      if (!current || !next) {
+        if (ui.pwChangeError) ui.pwChangeError.textContent = "Bitte alle Felder ausfüllen.";
+        return;
+      }
+      if (next.length < 4) {
+        if (ui.pwChangeError) ui.pwChangeError.textContent = "Neues Passwort braucht mindestens 4 Zeichen.";
+        return;
+      }
+      if (next !== repeat) {
+        if (ui.pwChangeError) ui.pwChangeError.textContent = "Die neuen Passwörter stimmen nicht überein.";
+        return;
+      }
+      if (ui.pwChangeBtn) ui.pwChangeBtn.disabled = true;
+      if (ui.pwChangeError) ui.pwChangeError.textContent = "";
+      try {
+        await apiJson("/auth/change-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_password: current, new_password: next }),
+        }, { skipAuthRedirect: true });
+        if (state.currentUser) state.currentUser.must_change_password = false;
+        hidePasswordChangeGate();
+        syncAuthUser();
+      } catch (error) {
+        if (ui.pwChangeError) ui.pwChangeError.textContent = String(error.message || "Passwort konnte nicht geändert werden.");
+      } finally {
+        if (ui.pwChangeBtn) ui.pwChangeBtn.disabled = false;
       }
     }
 
@@ -18854,6 +19192,18 @@
     }
     if (ui.adminCreateUserForm) {
       ui.adminCreateUserForm.addEventListener("submit", submitAdminCreateUser);
+    }
+    if (ui.adminUserList) {
+      ui.adminUserList.addEventListener("click", handleUserListClick);
+    }
+    if (ui.adminUserListRefreshBtn) {
+      ui.adminUserListRefreshBtn.addEventListener("click", loadUserList);
+    }
+    if (ui.pwChangeForm) {
+      ui.pwChangeForm.addEventListener("submit", submitPasswordChange);
+    }
+    if (ui.pwChangeCancelBtn) {
+      ui.pwChangeCancelBtn.addEventListener("click", hidePasswordChangeGate);
     }
 
     ui.jsonPreviewBtn.addEventListener("click", async () => {
