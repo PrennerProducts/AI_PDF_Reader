@@ -11877,6 +11877,30 @@
     </form>
   </div>
 
+  <div class="modal-backdrop" id="adminResetGate" hidden>
+    <form class="modal auth-modal" id="adminResetForm" role="dialog" aria-modal="true" aria-labelledby="adminResetTitle">
+      <div class="modal-head">
+        <div class="modal-title" id="adminResetTitle">Passwort zurücksetzen</div>
+      </div>
+      <div class="auth-modal-body">
+        <p class="auth-hint" id="adminResetHint">Neues Start-Passwort festlegen.</p>
+        <label class="auth-field" for="adminResetPw">
+          Neues Passwort
+          <input id="adminResetPw" type="password" autocomplete="new-password" required minlength="4">
+        </label>
+        <label class="auth-field" for="adminResetPwRepeat">
+          Passwort wiederholen
+          <input id="adminResetPwRepeat" type="password" autocomplete="new-password" required minlength="4">
+        </label>
+        <div class="auth-error" id="adminResetError"></div>
+        <div class="auth-actions">
+          <button class="auth-secondary" id="adminResetCancelBtn" type="button">Abbrechen</button>
+          <button class="btn btn-primary" id="adminResetBtn" type="submit">Zurücksetzen</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <div class="image-hover-preview" id="imageHoverPreview" hidden>
     <img id="imageHoverPreviewImg" alt="Bildvorschau">
     <div class="image-hover-preview-meta" id="imageHoverPreviewMeta"></div>
@@ -12016,6 +12040,14 @@
       pwChangeError: document.getElementById("pwChangeError"),
       pwChangeBtn: document.getElementById("pwChangeBtn"),
       pwChangeCancelBtn: document.getElementById("pwChangeCancelBtn"),
+      adminResetGate: document.getElementById("adminResetGate"),
+      adminResetForm: document.getElementById("adminResetForm"),
+      adminResetHint: document.getElementById("adminResetHint"),
+      adminResetPw: document.getElementById("adminResetPw"),
+      adminResetPwRepeat: document.getElementById("adminResetPwRepeat"),
+      adminResetError: document.getElementById("adminResetError"),
+      adminResetBtn: document.getElementById("adminResetBtn"),
+      adminResetCancelBtn: document.getElementById("adminResetCancelBtn"),
       clearDebugBtn: document.getElementById("clearDebugBtn"),
       debugLog: document.getElementById("debugLog"),
       pdfStage: document.getElementById("pdfStage"),
@@ -14678,18 +14710,8 @@
       if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = "";
       try {
         if (action === "reset") {
-          const pw = window.prompt(`Neues Start-Passwort für ${userName} (mind. 4 Zeichen):`);
-          if (pw == null) return;
-          if (String(pw).length < 4) {
-            if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = "Passwort braucht mindestens 4 Zeichen.";
-            return;
-          }
-          await apiJson(`/auth/users/${userId}/reset-password`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ new_password: String(pw) }),
-          }, { skipAuthRedirect: true });
-          if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = `Passwort für ${userName} zurückgesetzt. Muss beim nächsten Login geändert werden.`;
+          openAdminResetGate(userId, userName);
+          return;
         } else if (action === "role") {
           const makeAdmin = btn.getAttribute("data-user-admin") !== "1";
           await apiJson(`/auth/users/${userId}/role`, {
@@ -14708,6 +14730,59 @@
         loadUserList();
       } catch (error) {
         if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = String(error.message || "Aktion fehlgeschlagen.");
+      }
+    }
+
+    let adminResetTargetId = null;
+
+    function openAdminResetGate(userId, userName) {
+      adminResetTargetId = userId;
+      if (ui.adminResetHint) {
+        ui.adminResetHint.innerHTML =
+          `Neues Start-Passwort für <strong>${escapeHtml(userName)}</strong>. Der Benutzer muss es beim nächsten Login selbst ändern.`;
+      }
+      if (ui.adminResetError) ui.adminResetError.textContent = "";
+      if (ui.adminResetPw) ui.adminResetPw.value = "";
+      if (ui.adminResetPwRepeat) ui.adminResetPwRepeat.value = "";
+      if (ui.adminResetGate) ui.adminResetGate.removeAttribute("hidden");
+      window.setTimeout(() => { if (ui.adminResetPw) ui.adminResetPw.focus(); }, 0);
+    }
+
+    function hideAdminResetGate() {
+      adminResetTargetId = null;
+      if (ui.adminResetGate) ui.adminResetGate.setAttribute("hidden", "");
+      if (ui.adminResetError) ui.adminResetError.textContent = "";
+    }
+
+    async function submitAdminReset(event) {
+      event.preventDefault();
+      if (adminResetTargetId == null) { hideAdminResetGate(); return; }
+      const pw = ui.adminResetPw ? String(ui.adminResetPw.value || "") : "";
+      const repeat = ui.adminResetPwRepeat ? String(ui.adminResetPwRepeat.value || "") : "";
+      if (pw.length < 4) {
+        if (ui.adminResetError) ui.adminResetError.textContent = "Passwort braucht mindestens 4 Zeichen.";
+        return;
+      }
+      if (pw !== repeat) {
+        if (ui.adminResetError) ui.adminResetError.textContent = "Die Passwörter stimmen nicht überein.";
+        return;
+      }
+      const targetId = adminResetTargetId;
+      if (ui.adminResetBtn) ui.adminResetBtn.disabled = true;
+      if (ui.adminResetError) ui.adminResetError.textContent = "";
+      try {
+        await apiJson(`/auth/users/${targetId}/reset-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ new_password: pw }),
+        }, { skipAuthRedirect: true });
+        hideAdminResetGate();
+        if (ui.adminUserListMessage) ui.adminUserListMessage.textContent = "Passwort zurückgesetzt. Muss beim nächsten Login geändert werden.";
+        loadUserList();
+      } catch (error) {
+        if (ui.adminResetError) ui.adminResetError.textContent = String(error.message || "Zurücksetzen fehlgeschlagen.");
+      } finally {
+        if (ui.adminResetBtn) ui.adminResetBtn.disabled = false;
       }
     }
 
@@ -19228,6 +19303,12 @@
     }
     if (ui.pwChangeCancelBtn) {
       ui.pwChangeCancelBtn.addEventListener("click", hidePasswordChangeGate);
+    }
+    if (ui.adminResetForm) {
+      ui.adminResetForm.addEventListener("submit", submitAdminReset);
+    }
+    if (ui.adminResetCancelBtn) {
+      ui.adminResetCancelBtn.addEventListener("click", hideAdminResetGate);
     }
 
     ui.jsonPreviewBtn.addEventListener("click", async () => {
