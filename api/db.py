@@ -356,11 +356,19 @@ def ensure_app_user(
     username: str,
     password_hash: str,
     display_name: str | None = None,
+    is_admin: bool = False,
+    must_change_password: bool = False,
 ) -> dict[str, Any]:
     existing = get_app_user_by_username(username)
     if existing:
         return existing
-    return create_app_user(username=username, password_hash=password_hash, display_name=display_name)
+    return create_app_user(
+        username=username,
+        password_hash=password_hash,
+        display_name=display_name,
+        is_admin=is_admin,
+        must_change_password=must_change_password,
+    )
 
 
 def create_app_session(
