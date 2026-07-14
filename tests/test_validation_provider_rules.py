@@ -281,9 +281,56 @@ def test_enforced_image_validation_flags_empty_extraction_for_visual_items() -> 
 
     issue_codes = [issue.get("code") for issue in (line_items[0].get("validation_issues") or [])]
 
-    assert validation["status"] == "review"
+    # "Kein Bild zugeordnet" bleibt als sichtbare Warnung erhalten, sperrt aber die
+    # Freigabe nicht mehr: Status ist freigabefaehig (manual_checked), nicht "review".
+    assert validation["status"] == "manual_checked"
+    assert validation["approval"]["eligible"] is True
     assert validation["line_item_summary"]["warning_count"] == 1
     assert "missing_image_assignment" in issue_codes
+
+
+def test_koch_offer_without_images_is_still_approvable() -> None:
+    # Dragans Fall: ein KOCH-Angebot ohne Detailzeichnungen muss freigebbar sein.
+    # Die Dokument-Warnung "keine Detailzeichnungen" bleibt sichtbar, sperrt aber
+    # die Freigabe nicht (sie liegt auf Dokument-Ebene und war frueher nicht
+    # aufloesbar -> Freigabe war technisch unmoeglich).
+    line_items = [
+        {
+            "position_no": "1",
+            "description_short": "Innentuere Objekt",
+            "quantity": "1",
+            "unit_price": "100.00",
+            "line_total": "100.00",
+            "page_ref": 1,
+            "is_alternative": False,
+            "image_ids": [],
+        }
+    ]
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Koch Türen GmbH",
+            "document_type": "angebot",
+            "document_number": "K-1001",
+            "document_date": "2026-03-01",
+            "project_ref": "Test",
+            "currency": "EUR",
+            "net_total": "100.00",
+            "vat_total": "20.00",
+            "gross_total": "120.00",
+            "parse_confidence": "0.99",
+            "raw_text_path": None,
+        },
+        amount_lines=[],
+        line_items=line_items,
+        images=[],
+        enforce_image_validation=True,
+    )
+
+    document_codes = [issue.get("code") for issue in (validation.get("document_issues") or [])]
+
+    assert "koch_detail_drawings_missing" in document_codes
+    assert validation["status"] == "manual_checked"
+    assert validation["approval"]["eligible"] is True
 
 
 def test_unsafe_auto_match_decision_does_not_create_missing_image_warning() -> None:

@@ -8,6 +8,13 @@ from image_assignment import is_non_visual_line_item, metadata_review_state
 SUM_TOLERANCE = Decimal("0.02")
 CONFIDENCE_AUTO_ACCEPT = Decimal("0.85")
 CONFIDENCE_REVIEW = Decimal("0.60")
+# "Kein Bild vorhanden/zugeordnet" bleibt als sichtbarer Hinweis erhalten, sperrt
+# aber die Freigabe nicht mehr (Produktentscheidung 2026-07-14, alle Lieferanten):
+# ein Dokument kann bewusst ohne Bilder freigegeben werden. Falsch oder doppelt
+# zugeordnete Bilder bleiben blockierend, das sind echte Fehler.
+NON_BLOCKING_IMAGE_WARNING_CODES = frozenset(
+    {"missing_image_assignment", "koch_detail_drawings_missing"}
+)
 COMPLEX_PRICING_TERMS = (
     "rabatt",
     "zuschlag",
@@ -824,6 +831,7 @@ def build_document_validation(
     line_items_with_resolved_issues = 0
     line_items_manually_checked = 0
     resolved_warning_count = 0
+    image_hint_warning_count = 0
     for item in line_items:
         issues = item.get("validation_issues")
         if not isinstance(issues, list):
@@ -874,6 +882,14 @@ def build_document_validation(
         line_item_issue_count += len(open_issues)
         line_item_error_count += len([issue for issue in open_issues if issue.get("severity") == "error"])
         line_item_warning_count += len([issue for issue in open_issues if issue.get("severity") == "warning"])
+        image_hint_warning_count += len(
+            [
+                issue
+                for issue in open_issues
+                if issue.get("severity") == "warning"
+                and issue.get("code") in NON_BLOCKING_IMAGE_WARNING_CODES
+            ]
+        )
 
     for amount_line in amount_lines:
         amount = _to_decimal(amount_line.get("amount"))
@@ -964,14 +980,26 @@ def build_document_validation(
 
     document_error_count = len([issue for issue in document_issues if issue.get("severity") == "error"])
     document_warning_count = len([issue for issue in document_issues if issue.get("severity") == "warning"])
+    document_image_hint_warning_count = len(
+        [
+            issue
+            for issue in document_issues
+            if issue.get("severity") == "warning"
+            and issue.get("code") in NON_BLOCKING_IMAGE_WARNING_CODES
+        ]
+    )
     error_count = document_error_count + line_item_error_count
     warning_count = document_warning_count + line_item_warning_count
+    # "Kein Bild"-Hinweise bleiben in warning_count sichtbar, zaehlen aber nicht in
+    # die Freigabe-Sperre (siehe NON_BLOCKING_IMAGE_WARNING_CODES).
+    image_hint_warning_count += document_image_hint_warning_count
+    blocking_warning_count = warning_count - image_hint_warning_count
 
     if error_count > 0:
         status = "reject"
-    elif warning_count > 0:
+    elif blocking_warning_count > 0:
         status = "review"
-    elif resolved_warning_count > 0:
+    elif resolved_warning_count > 0 or image_hint_warning_count > 0:
         status = "manual_checked"
     else:
         status = "auto_accept"
