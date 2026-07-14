@@ -18000,8 +18000,11 @@
             return;
           }
           if (alternativeForcesMainNumberForDisplay(item)) {
+            // SCHLOTTERER alternatives are sequential offer positions: keep them
+            // inline in document order (not moved to the end), matching the
+            // backend export order.
             flushParentAlternatives();
-            appendAlternatives.push(item);
+            visible.push(item);
             return;
           }
           if (lineItemAlternativeAppendAtEnd(item)) {
@@ -18046,6 +18049,12 @@
         }
         if (item.__embedded_alternative) {
           parentEmbeddedAlternatives.push(item);
+          return;
+        }
+        if (alternativeForcesMainNumberForDisplay(item)) {
+          // SCHLOTTERER alternatives stay inline in document order in both modes.
+          flushParentEmbeddedAlternatives();
+          mains.push(item);
           return;
         }
         flushParentEmbeddedAlternatives();
