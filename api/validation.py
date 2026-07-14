@@ -276,6 +276,25 @@ def _rieder_delivery_total(line_items: list[dict[str, Any]]) -> Decimal:
     return total.quantize(SUM_TOLERANCE)
 
 
+def _rieder_line_item_printed_delivery_total(line_items: list[dict[str, Any]]) -> Decimal | None:
+    """Printed Frachtblock total as reconstructed by the Rieder parser.
+
+    The parser (``extract_delivery_charge_item``) sums the per-line freight
+    charges and stores the result in ``delivery_charge_printed_total``. This is
+    more reliable than re-deriving it from the flat ``amount_lines`` rows, which
+    cannot tell a per-group aggregate (e.g. a printed "€ 120,00" covering two
+    freight lines) apart from a separate, additional freight line.
+    """
+    for item in line_items:
+        metadata = _metadata_dict(item)
+        if metadata.get("pricing_source") != "rieder_delivery_block":
+            continue
+        printed = _to_decimal(metadata.get("delivery_charge_printed_total"))
+        if printed is not None:
+            return printed.quantize(SUM_TOLERANCE)
+    return None
+
+
 def _is_rieder_delivery_amount_line(row: dict[str, Any]) -> bool:
     label = _normalized_text(row.get("label_raw"))
     return (
@@ -367,7 +386,13 @@ def _rieder_sequence_summary(
         current = printed_subtotal if printed_subtotal is not None else expected_subtotal
 
     delivery_position_total = _rieder_delivery_total(line_items)
-    printed_delivery_total = _rieder_printed_delivery_total(amount_lines)
+    line_item_printed_delivery_total = _rieder_line_item_printed_delivery_total(line_items)
+    amount_line_printed_delivery_total = _rieder_printed_delivery_total(amount_lines)
+    printed_delivery_total = (
+        line_item_printed_delivery_total
+        if line_item_printed_delivery_total is not None
+        else amount_line_printed_delivery_total
+    )
     delivery_total = printed_delivery_total if printed_delivery_total is not None else delivery_position_total
     computed_net = _money(current + delivery_total)
     return {
@@ -376,6 +401,7 @@ def _rieder_sequence_summary(
         "delivery_total": delivery_total,
         "delivery_position_total": delivery_position_total,
         "printed_delivery_total": printed_delivery_total,
+        "amount_line_printed_delivery_total": amount_line_printed_delivery_total,
         "computed_net": computed_net,
         "net_total": net_total,
         "steps": steps,
