@@ -164,6 +164,46 @@ def test_rieder_validation_can_skip_sequential_discounts() -> None:
     }.isdisjoint({"rieder_pricing_sequence_mismatch", "net_component_mismatch"})
 
 
+def test_rieder_multiple_freight_groups_sum_into_net_and_stay_approvable() -> None:
+    # Pichlmaier: the Frachtblock has two printed groups — an aggregate
+    # "€ 120,00" (Frachtkostenbeitrag + Baustellenanlieferung) and a separate
+    # "€ 84,00" (Frachtkostenbeitrag fuer Hebeschiebetueren). The flat
+    # amount-line heuristic only saw the 120 aggregate, leaving an 84,00 delta
+    # that blocked approval. The parser's printed total (204,00) is authoritative.
+    text = _read_pdf_text(ROOT / "samples/pdfs/regression/offers/rieder/20252270 BV Pichlmaier Angebot.pdf")
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"])
+    rows = _build_line_item_rows(text, parsed["template"], amount_line_rows=amount_rows)
+
+    validation = build_document_validation(
+        document={
+            "supplier_name": "Rieder",
+            "document_type": "angebot",
+            "document_number": parsed["document_number"],
+            "document_date": "2025-09-24",
+            "project_ref": parsed["project_ref"],
+            "currency": "EUR",
+            "net_total": "52397.47",
+            "vat_total": "10479.49",
+            "gross_total": "62876.96",
+        },
+        amount_lines=amount_rows,
+        line_items=rows,
+        images=[],
+    )
+
+    sequence = validation["totals"]["rieder_pricing_sequence"]
+    assert sequence["printed_delivery_total"] == Decimal("204.00")
+    assert sequence["computed_net"] == Decimal("52397.47")
+    assert sequence["net_matches"] is True
+    assert validation["totals"]["component_check_mode"] == "rieder_sequence"
+    assert validation["totals"]["component_sum_matches_net"] is True
+    assert {
+        issue["code"] for issue in validation["document_issues"]
+    }.isdisjoint({"rieder_pricing_sequence_mismatch", "net_component_mismatch"})
+    assert validation["approval"]["eligible"] is True
+
+
 def test_rieder_long_text_strips_non_alternative_price_lines() -> None:
     pdf_paths = sorted((ROOT / "samples/pdfs/regression/offers/rieder").glob("*.pdf"))
     pdf_paths += sorted((ROOT / "samples/pdfs/candidates/offers/rieder").glob("*.pdf"))
