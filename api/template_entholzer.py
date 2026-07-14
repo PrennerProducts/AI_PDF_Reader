@@ -30,6 +30,32 @@ def _strip_leading_drawing_dimensions(line: str) -> str:
     return _LEADING_DRAWING_DIM_RE.sub("", line)
 
 
+def _page_bounds_for_offset(text: str, offset: int) -> tuple[int, int]:
+    page_start = text.rfind("\f", 0, max(0, offset)) + 1
+    page_end = text.find("\f", max(0, offset))
+    if page_end < 0:
+        page_end = len(text)
+    return page_start, page_end
+
+
+def _page_line_top_ratio(text: str, offset: int) -> float | None:
+    """Vertical position of ``offset`` within its page, 0.0 (top) .. 1.0 (bottom).
+
+    Derived from the line index inside the page block. Used to give the image
+    matcher a vertical window per position so that two positions sharing a page
+    (each with its own sketch) get their own image instead of relying on the
+    weak aspect-ratio tie-breaker, which can swap near-square sketches.
+    """
+    page_start, page_end = _page_bounds_for_offset(text, offset)
+    if page_end <= page_start:
+        return None
+    page_text = text[page_start:page_end]
+    relative_offset = max(0, min(offset, page_end) - page_start)
+    line_count = max(1, page_text.count("\n") + 1)
+    line_index = page_text[:relative_offset].count("\n")
+    return min(0.98, max(0.02, line_index / line_count))
+
+
 def detect(normalized_lower: str) -> bool:
     return "entholzer" in normalized_lower or "angebot n" in normalized_lower
 
@@ -95,12 +121,21 @@ def _clean_description_lines(block_lines: list[str]) -> list[str]:
 def extract_line_items(text: str) -> list[dict[str, Any]]:
     normalized_text = normalize_text(text)
     items: list[dict[str, Any]] = []
-    for match in re.finditer(r"(?ms)^Pos\.\:\s*(\d+)(.*?)(?=^Pos\.\:\s*\d+|\Z)", normalized_text):
+    matches = list(re.finditer(r"(?ms)^Pos\.\:\s*(\d+)(.*?)(?=^Pos\.\:\s*\d+|\Z)", normalized_text))
+    for idx, match in enumerate(matches):
         page_ref = page_ref_from_offset(normalized_text, match.start())
         position_no = match.group(1)
         block = match.group(2).strip()
         if not block:
             continue
+
+        item_top_ratio = _page_line_top_ratio(normalized_text, match.start())
+        next_position_page_ref = None
+        next_position_top_ratio = None
+        if idx + 1 < len(matches):
+            next_match = matches[idx + 1]
+            next_position_page_ref = page_ref_from_offset(normalized_text, next_match.start())
+            next_position_top_ratio = _page_line_top_ratio(normalized_text, next_match.start())
 
         block_lines = trim_block_lines(
             block.splitlines(),
@@ -159,6 +194,9 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
                 "page_ref": page_ref,
+                "item_top_ratio": item_top_ratio,
+                "next_position_page_ref": next_position_page_ref,
+                "next_position_top_ratio": next_position_top_ratio,
             }
         )
 
