@@ -1348,6 +1348,12 @@ def test_schlotterer_long_text_images_alternatives_and_pricing_are_clean(tmp_pat
     parsed = parse_document_text(text)
     items = extract_line_items(text, parsed["template"])
     item_by_pos = {item["position_no"]: item for item in items}
+    # Pos 10's header sits at the bottom of page 4; its description continues on
+    # page 5 after the page footer/header. That orphaned long text must still be
+    # attached to Pos 10 (Dragan: "Kein Langtext zur Position gespeichert").
+    assert item_by_pos["10"]["description_long"].startswith("Modell B ,Montageart:v1")
+    assert "Breite:1100mm Höhe:1450mm" in item_by_pos["10"]["description_long"]
+    assert (item_by_pos["10"]["width_raw"], item_by_pos["10"]["height_raw"]) == ("1100", "1450")
     assert [position for position, item in item_by_pos.items() if item["is_alternative"]] == ["15", "16", "17", "18", "19"]
     assert [item_by_pos[position].get("alternative_parent_position_no") for position in ["15", "16", "17", "18", "19"]] == [
         "1",
