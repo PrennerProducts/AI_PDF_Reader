@@ -389,6 +389,22 @@ def _extract_leading_pricing_components(page_text: str) -> list[dict[str, str]]:
     return _extract_pricing_components(["", *leading_lines])
 
 
+def _extract_leading_description_lines(page_text: str) -> list[str]:
+    """Cleaned description lines before the first position row on a page.
+
+    A position header at the very bottom of a page keeps its description on the
+    next page, after the page footer and repeated page header. Those noise lines
+    are dropped by _clean_description_lines, leaving the orphaned description.
+    """
+    lines = [normalize_line(raw) for raw in page_text.splitlines() if normalize_line(raw)]
+    leading_lines: list[str] = []
+    for idx, line in enumerate(lines):
+        if _is_row_start(lines, idx):
+            break
+        leading_lines.append(line)
+    return _clean_description_lines(["", *leading_lines])
+
+
 def extract_line_items(text: str) -> list[dict[str, Any]]:
     normalized_text = normalize_text(text)
     items: list[dict[str, Any]] = []
@@ -396,6 +412,18 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         leading_components = _extract_leading_pricing_components(page_text)
         if leading_components and items:
             items[-1].setdefault("schlotterer_pricing_components", []).extend(leading_components)
+        # A position whose header sits at the bottom of a page carries its
+        # description onto the next page; attach it to that item when it has no
+        # long text yet (Dragan: Pos 10 had "Kein Langtext").
+        if items and not (items[-1].get("description_long") or "").strip():
+            leading_description = _extract_leading_description_lines(page_text)
+            if leading_description:
+                description_text = "\n".join(leading_description)[:8000]
+                items[-1]["description_long"] = description_text
+                if not items[-1].get("width_raw") and not items[-1].get("height_raw"):
+                    width_raw, height_raw = _extract_dimensions(description_text)
+                    items[-1]["width_raw"] = width_raw
+                    items[-1]["height_raw"] = height_raw
         items.extend(_extract_page_items(page_text, page_idx))
     _assign_alternative_parent_positions(items)
     return items
