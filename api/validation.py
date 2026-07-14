@@ -633,7 +633,16 @@ def build_document_validation(
                     message="Positionsnummer fehlt.",
                 )
             )
-        if not _has_text(item.get("description_short")) and not is_informational_item:
+        # Only a genuinely description-less position is a problem. Some positions
+        # deliberately carry their text in the long field only (NEWO text notes,
+        # SCHUCHTER "Kopplungselement bestehend aus ..." aggregates), so a present
+        # long text -- or informational status -- means the short text is empty on
+        # purpose, not missing.
+        if (
+            not _has_text(item.get("description_short"))
+            and not is_informational_item
+            and not _has_text(item.get("description_long"))
+        ):
             issues.append(
                 _make_issue(
                     code="missing_description_short",

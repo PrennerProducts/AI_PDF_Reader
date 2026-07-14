@@ -28,6 +28,7 @@ from template_schuchter import (
 from extractor import extract_pdf_text
 from parser import parse_document_text
 from main import _build_amount_line_rows, _build_line_item_rows
+from validation import build_document_validation
 from vendoc_exporter import build_vendoc_payload
 
 LEADING_NUMBER_LEAK = re.compile(r"^\s*\d[\d.,:]*\s+\S")
@@ -176,6 +177,47 @@ def test_schuchter_room_label_prepended_to_long_text() -> None:
     assert long_texts[0].startswith("KG\n")
     assert long_texts[1].startswith("EG: T1\n")
     assert long_texts[1] == "EG: T1\n1-flg.Fenster, DK-Links\nB/H: 800x 1000"
+
+
+def test_schuchter_kopplungselement_label_only_in_long_text() -> None:
+    # A260344 Pos 1 is a priced "Kopplungselement bestehend aus: Pos.1a+1b+1c"
+    # aggregate. Its label must appear in the long text only; the Kurztext stays
+    # empty so it is not duplicated on the printed export. The position keeps its
+    # price and is not turned informational.
+    pdf = ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260344.pdf"
+    text = extract_pdf_text(pdf)
+    parsed = parse_document_text(text)
+    amount_rows = _build_amount_line_rows(text, parsed["totals"], template=parsed["template"])
+    rows = _build_line_item_rows(text, parsed["template"], source_path=pdf, amount_line_rows=amount_rows)
+    by_pos = {str(row.get("position_no")): row for row in rows}
+
+    koppel = by_pos["1"]
+    assert koppel["description_short"] == ""
+    assert (koppel["description_long"] or "").startswith("Kopplungselement bestehend aus:")
+    assert "Pos.1a+1b+1c" in koppel["description_long"]
+    assert koppel["line_total"] is not None and koppel["line_total"] > 0
+
+    validation = build_document_validation(
+        document={
+            "supplier_name": parsed["supplier_name"],
+            "document_type": parsed["document_type"],
+            "document_number": parsed["document_number"],
+            "document_date": "2026-03-25",
+            "project_ref": parsed.get("project_ref"),
+            "currency": "EUR",
+            "net_total": (parsed["totals"].get("net_total") or "").replace(".", "").replace(",", "."),
+            "vat_total": (parsed["totals"].get("vat_total") or "").replace(".", "").replace(",", "."),
+            "gross_total": (parsed["totals"].get("gross_total") or "").replace(".", "").replace(",", "."),
+            "parse_confidence": "0.99",
+        },
+        amount_lines=amount_rows,
+        line_items=rows,
+        images=[],
+    )
+    # Blanking the Kurztext must not raise a "Kurzbeschreibung fehlt" warning:
+    # the label lives in the long text, so no line-item warning is expected.
+    assert validation["status"] == "auto_accept"
+    assert validation["line_item_summary"]["warning_count"] == 0
 
 
 def test_schuchter_samples_have_no_leading_number_leaks() -> None:
