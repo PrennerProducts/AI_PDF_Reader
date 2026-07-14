@@ -750,7 +750,11 @@ def _looks_like_position_line_art(
     return False
 
 
-def _technical_line_art_bbox(crop: Image.Image) -> tuple[int, int, int, int] | None:
+def _technical_line_art_bbox(
+    crop: Image.Image,
+    *,
+    preserve_right_dimensions: bool = False,
+) -> tuple[int, int, int, int] | None:
     gray = crop.convert("L")
     pixels = gray.load()
     width, height = gray.size
@@ -870,6 +874,24 @@ def _technical_line_art_bbox(crop: Image.Image) -> tuple[int, int, int, int] | N
         ):
             bottom = max(bottom, cluster_y1 + 1)
 
+    if preserve_right_dimensions:
+        # The raw crop's right edge is the table's 'Bezeichnung' column, so every
+        # dark pixel left of it is drawing or dimension content -- never
+        # description text. The run-based `right` above only tracks long ruled
+        # strokes and drops the thin right-hand height dimensions (lines + number
+        # labels such as "685"/"720"), which then get cropped off. Extend `right`
+        # to the rightmost content within the drawing's vertical band so those
+        # dimensions stay in the image.
+        band_top = max(0, top)
+        band_bottom = min(height, bottom)
+        rightmost = right
+        for y in range(band_top, band_bottom):
+            for x in range(width - 1, rightmost - 1, -1):
+                if pixels[x, y] < 245:
+                    rightmost = x + 1
+                    break
+        right = max(right, rightmost)
+
     pad_left = max(16, int(width * 0.045))
     pad_right = max(28, min(44, int(width * 0.10)))
     pad_top = max(2, int(height * 0.01))
@@ -940,6 +962,13 @@ def _extract_vector_crop_rows(
             rendered = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
             candidate_boxes = []
             position_boxes: list[tuple[int, int, int, int]] = []
+            # When the table's 'Bezeichnung' column is detected, the position
+            # crops are bounded by it, so their right edge holds only drawing and
+            # dimension content -- the content refinement must then keep the
+            # rightmost dimensions instead of trimming them off (SCHUCHTER).
+            page_has_desc_column = (
+                _description_column_left_pt(page, float(getattr(page.rect, "width", 0.0) or 0.0)) is not None
+            )
             if not has_product_image_by_page.get(page_ref):
                 position_boxes = _position_line_art_boxes(page, rendered)
                 candidate_boxes.extend((bbox, "vector_position_line_art") for bbox in position_boxes)
@@ -965,7 +994,10 @@ def _extract_vector_crop_rows(
                 raw_crop = rendered.crop((left, top, right, bottom))
                 refine_bbox = None
                 if source == "vector_position_line_art":
-                    refine_bbox = _technical_line_art_bbox(raw_crop)
+                    refine_bbox = _technical_line_art_bbox(
+                        raw_crop,
+                        preserve_right_dimensions=page_has_desc_column,
+                    )
                     if refine_bbox is not None:
                         raw_crop = raw_crop.crop(refine_bbox)
 
