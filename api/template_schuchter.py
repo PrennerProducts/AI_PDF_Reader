@@ -315,6 +315,14 @@ def _extract_items_from_records(line_records: list[tuple[str, int]]) -> list[dic
         height_raw = dimensions.group(2) if dimensions else None
         lv_pos = normalize_line(header_match.group("label") or "")
         description_short = _extract_description_short(block_lines, fallback=lv_pos)
+        # Aggregate "Kopplungselement bestehend aus: ..." positions have no own
+        # product name, so the fallback repeats the label as the short text --
+        # and _prepend_room_label_to_long_text (main) also puts that label at the
+        # head of the long text. Keep it in the long text only so the Kurztext
+        # column is not duplicated on the printed export (same intent as the
+        # NEWO note rule). A real product short never contains "bestehend aus".
+        if "bestehend aus" in description_short.lower():
+            description_short = ""
         block_text_normalized = normalize_line(block_text).lower()
         image_required = _is_image_required(block_text_normalized, width_raw, height_raw)
         description_lines = _clean_description_lines(block_lines)
