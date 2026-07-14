@@ -41,6 +41,7 @@ def _validation_line_item(item: dict[str, object]) -> dict[str, object]:
         "position_no": item.get("position_no"),
         "lv_pos": item.get("lv_pos"),
         "description_short": item.get("description_short"),
+        "description_long": item.get("description_long"),
         "quantity": item.get("quantity_raw"),
         "unit": item.get("unit"),
         "unit_price": item.get("unit_price_raw"),

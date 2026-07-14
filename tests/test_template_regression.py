@@ -381,6 +381,14 @@ def test_newo_regression() -> None:
     assert "110 4,00 Stk" not in item_by_pos["110"]["description_long"]
     assert "Wolfgang Neumeyer" not in item_by_pos["110"]["description_long"]
     assert item_by_pos["140"]["image_required"] is False
+    # Text-only note positions keep their note in the long text ONLY; the short
+    # text must stay empty so the note is not duplicated into the Kurztext
+    # column on the printed export.
+    for note_pos in ("110", "120", "140"):
+        assert item_by_pos[note_pos]["description_short"] == ""
+        assert item_by_pos[note_pos]["description_long"].lower().startswith("diese position")
+    # A real referenced material position keeps its Kurztext.
+    assert item_by_pos["160"]["description_short"] == "Neopor Platte,"
     assert item_by_pos["160"]["referenced_lv_pos"] == "57.05.21.A"
     assert item_by_pos["160"]["image_required"] is False
     assert item_by_pos["170"]["image_required"] is True

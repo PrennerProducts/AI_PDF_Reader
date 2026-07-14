@@ -214,7 +214,11 @@ def _is_informational_item(provider_key: str, item: dict[str, Any]) -> bool:
     if provider_key == "entholzer":
         return lv_pos == "system" and unit_price is None and line_total is None
     if provider_key == "newo":
-        return description.startswith("diese position")
+        # Text-only note positions carry the note in the long text; the short
+        # text is intentionally left empty (see template_newo), so fall back to
+        # the long text to keep classifying them as informational.
+        long_description = _normalized_text(item.get("description_long"))
+        return description.startswith("diese position") or long_description.startswith("diese position")
     if provider_key == "rekord_vomp":
         return lv_pos == "umfang" or "summe-umfang" in description or "summe-rahmen" in description
     if provider_key == "schlotterer":
@@ -629,7 +633,7 @@ def build_document_validation(
                     message="Positionsnummer fehlt.",
                 )
             )
-        if not _has_text(item.get("description_short")):
+        if not _has_text(item.get("description_short")) and not is_informational_item:
             issues.append(
                 _make_issue(
                     code="missing_description_short",

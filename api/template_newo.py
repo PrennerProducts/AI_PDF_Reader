@@ -184,6 +184,15 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
         )
         description_long = _clean_description_long(block_lines, header_tail)
 
+        # NEWO inserts pure-text note positions (e.g. "Diese Position stellt
+        # keine AZ dar. i80-Lamelle = preisgleich wie Z90-Lamelle!"). They have
+        # no product header, so the fallback above fabricates a Kurztext from
+        # the note's first body line -- which duplicates that line into both the
+        # short and long text and looks odd on the printed export. Such notes
+        # belong in the long text only; keep the Kurztext empty.
+        if description_norm.startswith("diese position"):
+            description_short = ""
+
         items.append(
             {
                 "position_no": position_no,

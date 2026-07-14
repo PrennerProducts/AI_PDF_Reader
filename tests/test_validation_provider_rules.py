@@ -536,7 +536,10 @@ def test_newo_zero_value_note_positions_are_informational() -> None:
         amount_lines=[],
         line_items=[
             {"position_no": "100", "description_short": "NeWo Raffstore Lite, i80", "quantity": "1", "unit_price": "9959.30", "line_total": "9959.30", "page_ref": 1, "is_alternative": False},
-            {"position_no": "110", "description_short": "Diese Position stellt keine", "quantity": "1", "unit_price": "0.00", "line_total": "0.00", "page_ref": 2, "is_alternative": False},
+            # Text-only note: the Kurztext is intentionally empty and the note
+            # lives in the long text only (see template_newo). It must still be
+            # classified as informational, so no missing_description_short warning.
+            {"position_no": "110", "description_short": "", "description_long": "Diese Position stellt keine\nAZ dar. i80-Lamelle =\npreisgleich wie\nZ90-Lamelle!", "quantity": "1", "unit_price": "0.00", "line_total": "0.00", "page_ref": 2, "is_alternative": False},
         ],
         images=[],
     )
