@@ -1,8 +1,17 @@
 import re
+from pathlib import Path
 from typing import Any
+
+import fitz
 
 from template_common import extract_amount_tokens, normalize_line, normalize_text
 from template_headers import first_match
+
+_LAYOUT_POSITION_NUMBER_RE = re.compile(r"^\d{1,3}[A-Za-z]?$")
+_LAYOUT_QUANTITY_UNIT_RE = re.compile(
+    r"^\d+(?:[.,]\d+)?\s*(?:Stck|Stk\.?|Stück|PA|Pauschale|Psch)\b",
+    flags=re.IGNORECASE,
+)
 
 POS_MARKER_RE = re.compile(r"^Pos\.$")
 POS_LINE_RE = re.compile(
@@ -362,3 +371,57 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
 
 def count_positions(text: str) -> int:
     return len(extract_line_items(text))
+
+
+def extract_line_item_layout_hints(source_path: Path) -> list[dict[str, Any]]:
+    """Per-position vertical anchor (item_top_ratio) read from PDF geometry.
+
+    Several SCHUCHTER positions share a page, each with its own sketch. Counting
+    text lines is too coarse -- a sketch occupies vertical space but no text
+    lines, so a position's line-index anchor drifts below its own sketch and the
+    image matcher swaps two near-square sketches (Dragan: A260172 Pos 11/12).
+    Reading the position header's y-coordinate and normalising by page height
+    gives an accurate vertical window per position. Mirrors the alu_one hints;
+    merged in main._build_line_item_rows.
+    """
+    hints: list[dict[str, Any]] = []
+    document = fitz.open(str(source_path))
+    try:
+        for page_index in range(document.page_count):
+            page = document.load_page(page_index)
+            page_ref = page_index + 1
+            page_height = float(getattr(page.rect, "height", 0.0) or 0.0)
+            if page_height <= 0:
+                continue
+            lines: list[tuple[float, float, str]] = []
+            for block in page.get_text("dict").get("blocks", []):
+                for line in block.get("lines", []):
+                    text = "".join(span.get("text", "") for span in line.get("spans", [])).strip()
+                    if not text:
+                        continue
+                    lines.append((float(line["bbox"][1]), float(line["bbox"][0]), text))
+            seen: set[str] = set()
+            for y0, x0, text in lines:
+                # Position numbers sit in the leftmost column; pane labels ("1",
+                # "2") sit further right and, unlike a header, have no quantity on
+                # their row.
+                if x0 > 55 or not _LAYOUT_POSITION_NUMBER_RE.fullmatch(text):
+                    continue
+                if not any(
+                    abs(other_y - y0) <= 4 and _LAYOUT_QUANTITY_UNIT_RE.match(other_text)
+                    for other_y, _other_x, other_text in lines
+                ):
+                    continue
+                if text in seen:
+                    continue
+                seen.add(text)
+                hints.append(
+                    {
+                        "position_no": text,
+                        "page_ref": page_ref,
+                        "item_top_ratio": round(max(0.0, min(1.0, y0 / page_height)), 6),
+                    }
+                )
+    finally:
+        document.close()
+    return hints

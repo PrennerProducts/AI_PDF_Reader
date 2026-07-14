@@ -28,6 +28,7 @@ from template_schuchter import (
 from extractor import extract_pdf_text
 from parser import parse_document_text
 from main import _build_amount_line_rows, _build_line_item_rows
+from image_assignment import image_within_item_vertical_window, metadata_dict
 from validation import build_document_validation
 from vendoc_exporter import build_vendoc_payload
 
@@ -177,6 +178,33 @@ def test_schuchter_room_label_prepended_to_long_text() -> None:
     assert long_texts[0].startswith("KG\n")
     assert long_texts[1].startswith("EG: T1\n")
     assert long_texts[1] == "EG: T1\n1-flg.Fenster, DK-Links\nB/H: 800x 1000"
+
+
+def test_schuchter_same_page_positions_get_ordered_image_windows() -> None:
+    # A260172 page 5 holds Pos 10-13, each with its own sketch. Without accurate
+    # vertical anchors the matcher swapped the two near-square sketches of Pos 11
+    # and 12 (Dragan). PDF-coordinate layout hints give each position its own
+    # vertical window, so four sketches (top->bottom) map 1:1 to the positions.
+    pdf = ROOT / "samples/pdfs/candidates/offers/schuchter/schuchter__angebot__A260172.pdf"
+    text = extract_pdf_text(pdf)
+    rows = _build_line_item_rows(text, "schuchter", source_path=pdf)
+    by_pos = {str(row["position_no"]): row for row in rows}
+
+    page5 = ["10", "11", "12", "13"]
+    tops = [metadata_dict(by_pos[p]).get("item_top_ratio") for p in page5]
+    assert all(top is not None for top in tops)
+    assert tops == sorted(tops)  # anchors increase down the page
+
+    # Four sketches ordered top->bottom must map to the four positions 1:1.
+    centers = [0.20, 0.38, 0.55, 0.75]
+    images = [
+        {"id": 900 + i, "page_ref": 5, "width": 200, "height": 200,
+         "metadata_json": {"center_y_ratio": center}}
+        for i, center in enumerate(centers)
+    ]
+    for pos, expected in zip(page5, images):
+        candidates = [img["id"] for img in images if image_within_item_vertical_window(by_pos[pos], img)]
+        assert candidates == [expected["id"]], f"Pos {pos} -> {candidates}"
 
 
 def test_schuchter_kopplungselement_label_only_in_long_text() -> None:

@@ -85,6 +85,7 @@ from image_preview import browser_preview_for_image
 from parser import parse_document_text, supplier_name_for_template
 from structured_parser import extract_amount_lines, extract_line_items
 from template_alu_one import extract_line_item_layout_hints as extract_alu_one_line_item_layout_hints
+from template_schuchter import extract_line_item_layout_hints as extract_schuchter_line_item_layout_hints
 from template_rieder import extract_delivery_charge_item as extract_rieder_delivery_charge_item
 from template_koch_detail import parse_page_details as parse_koch_detail_page_details
 from vendoc_exporter import build_vendoc_payload
@@ -2199,9 +2200,13 @@ def _build_line_item_rows(
         delivery_item = extract_rieder_delivery_charge_item(extracted_text, items)
         if delivery_item:
             items.append(delivery_item)
-    if template == "alu_one" and source_path is not None and source_path.exists():
+    layout_hint_extractor = {
+        "alu_one": extract_alu_one_line_item_layout_hints,
+        "schuchter": extract_schuchter_line_item_layout_hints,
+    }.get(template)
+    if layout_hint_extractor is not None and source_path is not None and source_path.exists():
         try:
-            hints = extract_alu_one_line_item_layout_hints(source_path)
+            hints = layout_hint_extractor(source_path)
         except Exception:
             hints = []
         hint_index = 0
