@@ -820,12 +820,15 @@ def test_vendoc_payload_exports_schlotterer_alternatives_without_grouping() -> N
     assert first["unit_price"] == 999999.0
     assert first["purchase_price"] == 473.68
     assert payload["summary"]["alternative_position_count"] == 5
+    # SCHLOTTERER alternatives stay in document order (Dragan: "der Reihe nach"),
+    # so they keep their sequential main numbers 15-19 and the info/charge lines
+    # (Auftragsinfo, Verpackungsbeitrag) follow as 20-21 -- not the other way round.
     assert [(position["position_no"], position["purchase_price"]) for position in nested_alternatives] == [
-        ("17", 720.18),
-        ("18", 1180.67),
-        ("19", 1324.42),
-        ("20", 1189.3),
-        ("21", 835.24),
+        ("15", 720.18),
+        ("16", 1180.67),
+        ("17", 1324.42),
+        ("18", 1189.3),
+        ("19", 835.24),
     ]
     assert all(position["description_short"] == "Vorsatzrollladen" for position in nested_alternatives)
     assert all(position["unit_price"] == 999999.0 for position in nested_alternatives)
@@ -851,13 +854,15 @@ def test_vendoc_payload_exports_schlotterer_alternatives_without_grouping() -> N
             "images": [],
         }
     )
+    # Even in append mode SCHLOTTERER's forced-main alternatives stay inline in
+    # document order (they are sequential offer positions, not deferrable variants).
     appended_alternatives = [position for position in appended_payload["positions"] if position["is_alternative"]]
     assert [(position["position_no"], position["purchase_price"]) for position in appended_alternatives] == [
-        ("17", 720.18),
-        ("18", 1180.67),
-        ("19", 1324.42),
-        ("20", 1189.3),
-        ("21", 835.24),
+        ("15", 720.18),
+        ("16", 1180.67),
+        ("17", 1324.42),
+        ("18", 1189.3),
+        ("19", 835.24),
     ]
     assert all(":aggregate:" not in position["source_line_item_id"] for position in appended_alternatives)
 

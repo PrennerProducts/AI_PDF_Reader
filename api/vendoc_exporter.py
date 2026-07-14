@@ -944,13 +944,19 @@ def _prepare_line_items_for_export(
             continue
 
         existing_alternative_count += 1
+        if _alternative_forces_main_number(item):
+            # SCHLOTTERER alternatives are sequential positions in the offer, not
+            # sub-variants of a main position. Keep them inline in document order
+            # with a main number instead of moving them to the end behind the
+            # info/charge lines (Dragan: "das soll einfach der Reihe nach kommen").
+            parent_index += 1
+            item["position_no"] = str(parent_index)
+            prepared.append(item)
+            continue
         parent_key = parent_position_no or _to_str(item.get("position_no")) or str(max(1, parent_index))
         if _alternative_append_at_end(item, normalized_mode):
             append_alternatives.append(item)
         else:
-            if _alternative_forces_main_number(item):
-                append_alternatives.append(item)
-                continue
             explicit_parent_position_no = _alternative_parent_position_no(item)
             explicit_parent_key = (
                 parent_export_by_source_position.get(explicit_parent_position_no or "")
