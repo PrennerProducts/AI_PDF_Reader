@@ -39,6 +39,23 @@ STRUCTURE_MARKER_RE = re.compile(
     r"(?<!\n)(Alternative:|Arch\.-Pos\.:|Pos\.\s*[0-9]+(?:\.[0-9]+)?\s+[0-9]+(?:[.,][0-9]+)?\s+St[üu]ck|Summe der Positionen)",
     flags=re.IGNORECASE,
 )
+# Rekord-Langtexte: PyMuPDF verschraenkt die Skizze (links) mit der Textspalte.
+# Zwei sicher erkennbare Leaks werden bereinigt:
+#  A) Angeklebte Mengen-Einheit rechts, z.B. "…Dekor0 m", "Montagebohrung2 m".
+#     Signatur: eine Ziffer ist DIREKT an einen Buchstaben geklebt (kein
+#     Leerzeichen) und endet mit " m". Legitime Mengen ("Laufwagen 1 Stück")
+#     haben ein Leerzeichen vor der Zahl und werden nicht angefasst; die
+#     Glaszeile "…, m²" hat keine angeklebte Ziffer und bleibt.
+#  B) Fuehrende Skizzenmasse, z.B. "4400 Rahmenbreite: …", "1171,2 2068,8 …".
+#     Nur Zahlen mit >=3 Vorkomma-Stellen; "0.5 W/m2k …" bleibt geschuetzt.
+#  C) Nachgestellte Skizzenmasse, z.B. "…Sch. A 2550 2750". Signatur: ein Lauf
+#     von >=2 nackten 3-4-stelligen Zahlen (ohne Einheit) am Zeilenende. Ueber
+#     alle Positionen des Korpus trifft das ausschliesslich Bleed-Zeilen, nie
+#     legitime Werte. Ein EINZELNES nachgestelltes Zahlwort wird bewusst NICHT
+#     entfernt (zu risikoreich). Mittiges Bleed ("… 88 2500 2750 Serie:") bleibt.
+TRAILING_GLUED_UNIT_RE = re.compile(r"(?<=[A-Za-zÄÖÜäöüß])[0-9]+\s+m$")
+LEADING_DIMENSION_BLEED_RE = re.compile(r"^(?:[0-9]{3,}(?:[.,][0-9]+)?\s+)+")
+TRAILING_DIMENSION_PAIR_RE = re.compile(r"(?:\s+[0-9]{3,4}){2,}$")
 
 
 def detect(normalized_lower: str) -> bool:
@@ -243,7 +260,10 @@ def _clean_description_line(line: str) -> str | None:
         return None
 
     cleaned = _strip_leading_diagram_markers(normalized)
-    cleaned = TRAILING_PRICE_RE.sub("", cleaned).strip()
+    cleaned = LEADING_DIMENSION_BLEED_RE.sub("", cleaned)
+    cleaned = TRAILING_PRICE_RE.sub("", cleaned)
+    cleaned = TRAILING_GLUED_UNIT_RE.sub("", cleaned)
+    cleaned = TRAILING_DIMENSION_PAIR_RE.sub("", cleaned).strip()
     if not re.search(r"[A-Za-zÄÖÜäöüß]", cleaned):
         return None
     if not cleaned or QUANTITY_ONLY_RE.fullmatch(cleaned):
