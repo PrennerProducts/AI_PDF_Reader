@@ -220,7 +220,17 @@ def _is_informational_item(provider_key: str, item: dict[str, Any]) -> bool:
         long_description = _normalized_text(item.get("description_long"))
         return description.startswith("diese position") or long_description.startswith("diese position")
     if provider_key == "rekord_vomp":
-        return lv_pos == "umfang" or "summe-umfang" in description or "summe-rahmen" in description
+        # Summary positions carry the article code as the short text and the
+        # "SUMME-UMFANG"/"SUMME-RAHMEN" label in the long text (see
+        # template_rekord_vomp._summary_position_texts), so check both.
+        long_description = _normalized_text(item.get("description_long"))
+        return (
+            lv_pos == "umfang"
+            or "summe-umfang" in description
+            or "summe-rahmen" in description
+            or "summe-umfang" in long_description
+            or "summe-rahmen" in long_description
+        )
     if provider_key == "schlotterer":
         return description == "auftragsinfo"
     if provider_key == "schuchter":

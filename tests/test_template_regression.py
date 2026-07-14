@@ -731,6 +731,31 @@ def test_rekord_vomp_long_text_keeps_menge_and_strips_price_and_sketch_bleed() -
     assert any(line.startswith("0.5 W/m2k") for line in lines10)
 
 
+def test_rekord_vomp_summary_position_splits_code_and_keeps_reference() -> None:
+    # Dragan-Meldung: Pos 12 (Summe-Umfang) hatte Artikelcode im Kurztext und
+    # Kurz==Langtext; Referenz "(zu Pos.: ...)" fehlte und die Zahl aus
+    # "138,020 lfm" wurde als Bemassung abgeschnitten. Korrekt: Kurztext = Code,
+    # Langtext = Beschreibung + Referenz + Wert (Zahl erhalten).
+    pdf_path = ROOT / "samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX60326.pdf"
+    text = _read_pdf_text(pdf_path)
+    parsed = parse_document_text(text)
+    item_by_pos = {item["position_no"]: item for item in extract_line_items(text, parsed["template"])}
+
+    pos12 = item_by_pos["12"]
+    assert pos12["description_short"] == "SUMM-UMFA"
+    long_lines = [line for line in pos12["description_long"].splitlines() if line.strip()]
+    assert long_lines == [
+        "SUMME-UMFANG",
+        "(zu Pos.: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)",
+        "138,020 lfm",
+    ]
+
+    # Service position (Lieferung) splits the same way; normal positions keep
+    # their real product short text and rich long text.
+    assert item_by_pos["13"]["description_short"] == "XX-LIEF-BAUS-MKRA"
+    assert item_by_pos["11"]["description_short"] == "1tlg.Kunststoff Fenster"
+
+
 def test_sr_schauraum_compact_extractor_regression() -> None:
     text = """
 Lupre AI Solutions FlexCo
