@@ -639,9 +639,10 @@ def test_rekord_vomp_long_text_strips_position_headers_and_prices() -> None:
             assert "9.681,56" not in item_by_pos["8"]["description_long"]
 
 
-def test_rekord_vomp_long_text_strips_sketch_number_bleed() -> None:
-    # Dragan-Meldung: PyMuPDF zieht Zahlen aus der Skizze (links) in den Langtext.
-    # Drei Leak-Typen werden bereinigt, legitime Specs bleiben erhalten.
+def test_rekord_vomp_long_text_keeps_menge_and_strips_price_and_sketch_bleed() -> None:
+    # Dragan-Meldung: die 3-stellige Menge ("9,500 m") wurde vom kaputten
+    # TRAILING_PRICE_RE zu "0 m" zerstoert. Korrekt: Menge behalten, nur den
+    # Preis entfernen. Zusaetzlich Skizzen-Bleed (fuehrend/nachgestellt) weg.
     pdf_path = ROOT / "samples/pdfs/regression/offers/rekord_vomp/Angebot_VAX60326.pdf"
     text = _read_pdf_text(pdf_path)
     parsed = parse_document_text(text)
@@ -651,32 +652,34 @@ def test_rekord_vomp_long_text_strips_sketch_number_bleed() -> None:
     pos8 = item_by_pos["8"]["description_long"]
     lines8 = pos8.splitlines()
 
-    # A) angeklebte Mengen-Einheit rechts ("…Dekor0 m", "Montagebohrung0 m")
-    assert "Alu-Clip Rahmen/innen Dekor" in lines8
-    assert "Montagebohrung" in lines8
-    assert "Montagebohrung mit Dübelkammeradapter" in lines8
-    assert "Purenit175 bis 200mm 1seitig gefräßt" in lines8
-    assert not any(line.endswith(" m") for line in lines8)
-    # B) fuehrendes Skizzenmass ("4400 Rahmenbreite: …")
+    # Menge bleibt vollstaendig erhalten, Preis ist entfernt.
+    assert "Alu-Clip Rahmen/innen Dekor 9,500 m" in lines8
+    assert "Alu-Clip Flügel/innen Dekor 19,000 m" in lines8
+    assert "Montagebohrung 5,100 m" in lines8
+    assert "Montagebohrung mit Dübelkammeradapter 4,400 m" in lines8
+    assert "Purenit175 bis 200mm 1seitig gefräßt 4,400 m" in lines8
+    assert "0.5 W/m2k 3-fach Verglasung, 2xESG (Außen, Innen), 11,22 m²" in lines8
+    # Kein zerstoertes "…Dekor0 m" mehr, keine Preise (…,xx) am Zeilenende.
+    assert not any("Dekor0 m" in line for line in lines8)
+    assert not any(re.search(r"[0-9],[0-9]{2}$", line) for line in lines8)
+    # B) fuehrendes Skizzenmass, C) nachgestelltes Skizzenmass entfernt.
     assert "Rahmenbreite: 65, 50" in lines8
     assert "4400 Rahmenbreite: 65, 50" not in pos8
-    # C) nachgestelltes Skizzenmass ("…Sch. A 2550 2750")
     assert "Beschlag:FF HS, HS300 GS Sch. A" in lines8
     assert "2550 2750" not in pos8
-    # Legitime Inhalte bleiben unangetastet
+    # Legitime Specs bleiben.
     assert "RAM: 4400 mm x 2550 mm" in lines8
-    assert "0.5 W/m2k 3-fach Verglasung, 2xESG (Außen, Innen), m²" in lines8
     assert "Hebeschiebe zusätzliche Laufwagen 1 Stück" in lines8
 
     pos10 = item_by_pos["10"]["description_long"]
     lines10 = pos10.splitlines()
-    # fuehrendes Dezimal-Bleed ("1171,2 2068,8 …") entfernt, glued unit ("Dekor2 m") bereinigt
+    # exakt Dragans Beispiel: volle Menge dran.
+    assert "Alu-Clip Rahmen/innen Dekor 16,420 m" in lines10
+    assert "Alu-Clip Flügel/innen Dekor 7,312 m" in lines10
+    assert "Alu-Clip H-Schieber 88605 bündig 30.4mm/innen Dekor 2,500 m" in lines10
+    # fuehrendes Dezimal-Bleed ("1171,2 2068,8 …") entfernt, legit "0.5 …" bleibt.
     assert "Stocklichte Höhe: 2341.0 mm, Fixfeld" in lines10
     assert "1171,2 2068,8 Stocklichte Höhe: 2341.0 mm, Fixfeld" not in pos10
-    assert "Alu-Clip Flügel/innen Dekor" in lines10
-    assert "Alu-Clip H-Schieber 88605 bündig 30.4mm/innen Dekor" in lines10
-    assert not any(line.endswith(" m") for line in lines10)
-    # legit fuehrende Dezimalzahl "0.5 …" bleibt geschuetzt
     assert any(line.startswith("0.5 W/m2k") for line in lines10)
 
 
