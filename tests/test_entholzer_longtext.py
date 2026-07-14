@@ -19,9 +19,11 @@ from template_entholzer import _strip_leading_drawing_dimensions
 from extractor import extract_pdf_text
 from parser import parse_document_text
 from main import _build_amount_line_rows, _build_line_item_rows
+from image_assignment import image_within_item_vertical_window, metadata_dict
 from vendoc_exporter import build_vendoc_payload
 
 ENTHOLZER_DIR = ROOT / "samples/pdfs/candidates/offers/entholzer"
+ENTHOLZER_REGRESSION_DIR = ROOT / "samples/pdfs/regression/offers/entholzer"
 LEADING_DIMENSION = re.compile(r"^\s*\d{3,}\b")
 
 
@@ -45,6 +47,33 @@ def test_keeps_legitimate_leading_quantities() -> None:
         "B/H: 1750 x 1095",
     ):
         assert _strip_leading_drawing_dimensions(line) == line
+
+
+def test_two_positions_on_one_page_get_a_vertical_image_window() -> None:
+    # Bernsteiner page 4 holds Pos 6 (Festverglasung, upper sketch) and Pos 7
+    # (Hebeschiebetuer, lower sketch). Both sketches are near-square, so the
+    # aspect-ratio tie-breaker swapped them. Populating item_top_ratio /
+    # next_position_* gives each position its own vertical window, so the upper
+    # image (center_y ~0.28) belongs to Pos 6 and the lower image (~0.57) to
+    # Pos 7 -- and neither is a candidate for the other position.
+    pdf = ENTHOLZER_REGRESSION_DIR / "Angebot 12600422.00 Bernsteiner.pdf"
+    text = extract_pdf_text(pdf)
+    rows = _build_line_item_rows(text, "entholzer")
+    by_pos = {str(row.get("position_no")): row for row in rows}
+
+    pos6, pos7 = by_pos["6"], by_pos["7"]
+    assert metadata_dict(pos6).get("item_top_ratio") is not None
+    assert metadata_dict(pos6).get("item_top_ratio") < metadata_dict(pos7).get("item_top_ratio")
+
+    upper_image = {"id": 319, "page_ref": 4, "width": 202, "height": 251,
+                   "metadata_json": {"center_y_ratio": 0.28, "top_ratio": 0.21}}
+    lower_image = {"id": 320, "page_ref": 4, "width": 208, "height": 251,
+                   "metadata_json": {"center_y_ratio": 0.57, "top_ratio": 0.51}}
+
+    assert image_within_item_vertical_window(pos6, upper_image) is True
+    assert image_within_item_vertical_window(pos6, lower_image) is False
+    assert image_within_item_vertical_window(pos7, upper_image) is False
+    assert image_within_item_vertical_window(pos7, lower_image) is True
 
 
 def _entholzer_long_texts(pdf_name: str) -> list[str]:
