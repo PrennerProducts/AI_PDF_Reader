@@ -18075,10 +18075,16 @@
         }
 
         const parentKey = parentExportNo || String(Math.max(1, parentIndex));
-        if (
+        if (alternativeForcesMainNumberForDisplay(item)) {
+          // SCHLOTTERER alternatives are sequential offer positions, not
+          // sub-variants: number them inline in document order with a main
+          // number (mirrors backend _prepare_line_items_for_export).
+          parentIndex += 1;
+          orderIndex += 1;
+          preview.set(item, { position_no: String(parentIndex), is_alternative: true, append_at_end: false, order_index: orderIndex });
+        } else if (
           normalizedMode === "nested"
           && !lineItemAlternativeAppendAtEnd(item)
-          && !alternativeForcesMainNumberForDisplay(item)
         ) {
           const nextAltNo = Number(parentAltCounts.get(parentKey) || 0) + 1;
           parentAltCounts.set(parentKey, nextAltNo);
