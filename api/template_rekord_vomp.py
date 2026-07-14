@@ -284,6 +284,55 @@ def _clean_description_lines(block_lines: list[str]) -> list[str]:
     return cleaned
 
 
+# Summary/service positions (Arch.-Pos. Umfang/Lieferung) render as a two-column
+# "<CODE>   <description>" line: the article code sits left, the description
+# right, separated by a wide column gap.
+_SUMMARY_CODE_LINE_RE = re.compile(r"^\s*([A-Z0-9]{2,}(?:-[A-Z0-9]+)+)\s{3,}(\S.*?)\s*$")
+# Measurement value on its own line, e.g. "138,020 lfm" (the position total the
+# generic cleaning strips as a leading dimension). Kept verbatim for these
+# positions.
+_SUMMARY_MEASURE_RE = re.compile(r"^[0-9][0-9.,]*\s*(?:lfm|m²|m2|m)$", re.IGNORECASE)
+
+
+def _summary_position_texts(block_lines: list[str]) -> tuple[str, str] | None:
+    """Article-code Kurztext + Langtext for Rekord summary/service positions.
+
+    The generic cleaning glues the code into the short text, drops the
+    "(zu Pos.: ...)" reference and strips the number off the measurement value.
+    Here the code becomes the Kurztext and the description, the reference and the
+    value form the Langtext verbatim. Returns None when the block is not a
+    two-column code position.
+    """
+    code = None
+    description = None
+    code_index = None
+    for index, raw_line in enumerate(block_lines):
+        match = _SUMMARY_CODE_LINE_RE.match(raw_line)
+        if match:
+            code = match.group(1)
+            description = normalize_line(match.group(2))
+            code_index = index
+            break
+    if code is None:
+        return None
+
+    detail_lines: list[str] = []
+    for raw_line in block_lines[code_index + 1 :]:
+        line = normalize_line(raw_line)
+        if not line:
+            continue
+        if line.lower().startswith("(zu pos") and re.search(r"\d", line):
+            detail_lines.append(line)
+        elif _SUMMARY_MEASURE_RE.match(line):
+            detail_lines.append(line)
+
+    long_parts = [part for part in [description] if part]
+    if detail_lines:
+        long_parts.append("")  # blank line separates description from reference/value
+        long_parts.extend(detail_lines)
+    return code, "\n".join(long_parts)
+
+
 def extract_line_items(text: str) -> list[dict[str, Any]]:
     normalized_text = _prepare_compact_text(text)
     matches = list(POSITION_RE.finditer(normalized_text))
@@ -334,6 +383,14 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
         description_lines = _clean_description_lines(block_lines)
         description_short = _extract_description_short(description_lines, arch_pos)
         description_long = "\n".join(description_lines)[:8000]
+        if arch_pos and not is_alternative:
+            # Use the raw (un-normalised) lines: the two-column code/description
+            # split relies on the wide gap that trim_block_lines collapses.
+            summary_texts = _summary_position_texts(block_text.splitlines())
+            if summary_texts is not None:
+                summary_code, summary_long = summary_texts
+                description_short = summary_code
+                description_long = summary_long[:8000]
 
         items.append(
             {
