@@ -27,6 +27,8 @@ def _validation_document(parsed: dict[str, object]) -> dict[str, object]:
         "document_date": parsed.get("document_date"),
         "project_ref": parsed.get("project_ref"),
         "currency": parsed.get("currency") or "EUR",
+        # Kunde ist Pflichtfeld (wird vor Freigabe zugewiesen); im Corpus fix gesetzt.
+        "customer_name": "Testkunde",
         "net_total": totals.get("net_total"),
         "vat_total": totals.get("vat_total"),
         "gross_total": totals.get("gross_total"),

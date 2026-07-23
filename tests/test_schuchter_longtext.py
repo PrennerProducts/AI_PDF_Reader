@@ -233,6 +233,7 @@ def test_schuchter_kopplungselement_label_only_in_long_text() -> None:
             "document_date": "2026-03-25",
             "project_ref": parsed.get("project_ref"),
             "currency": "EUR",
+            "customer_name": "Testkunde",
             "net_total": (parsed["totals"].get("net_total") or "").replace(".", "").replace(",", "."),
             "vat_total": (parsed["totals"].get("vat_total") or "").replace(".", "").replace(",", "."),
             "gross_total": (parsed["totals"].get("gross_total") or "").replace(".", "").replace(",", "."),

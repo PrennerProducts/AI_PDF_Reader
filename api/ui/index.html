@@ -6656,6 +6656,144 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.94);
     }
 
+    .app-v3 .shell-controls .doc-combo {
+      position: relative;
+      width: 100%;
+    }
+
+    .app-v3 .shell-controls .doc-combo-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      min-height: 44px;
+      padding: 7px 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(60, 60, 67, 0.10);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 250, 252, 0.86)),
+        rgba(255, 255, 255, 0.82);
+      color: #1d1d1f;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 10px 24px rgba(29, 29, 31, 0.035);
+    }
+
+    .app-v3 .shell-controls .doc-combo-trigger:focus-visible,
+    .app-v3 .shell-controls .doc-combo.is-open .doc-combo-trigger {
+      outline: none;
+      border-color: rgba(230, 51, 41, 0.34);
+      box-shadow:
+        0 0 0 4px rgba(230, 51, 41, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.94);
+    }
+
+    .app-v3 .shell-controls .doc-combo-trigger[disabled] {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    .app-v3 .shell-controls .doc-combo-value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-v3 .shell-controls .doc-combo-caret {
+      flex: 0 0 auto;
+      color: rgba(29, 29, 31, 0.5);
+      font-size: 11px;
+      transition: transform 0.15s ease;
+    }
+
+    .app-v3 .shell-controls .doc-combo.is-open .doc-combo-caret {
+      transform: rotate(180deg);
+    }
+
+    .app-v3 .shell-controls .doc-combo-panel {
+      position: absolute;
+      z-index: 40;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      max-height: 340px;
+      padding: 8px;
+      border-radius: 16px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 18px 44px rgba(29, 29, 31, 0.18);
+    }
+
+    .app-v3 .shell-controls .doc-combo-panel[hidden] {
+      display: none;
+    }
+
+    .app-v3 .shell-controls .doc-combo-search {
+      flex: 0 0 auto;
+      width: 100%;
+      min-height: 36px;
+      margin-bottom: 6px;
+      padding: 6px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(60, 60, 67, 0.12);
+      background: rgba(250, 250, 252, 0.9);
+      color: #1d1d1f;
+      font-size: 12px;
+    }
+
+    .app-v3 .shell-controls .doc-combo-search:focus {
+      outline: none;
+      border-color: rgba(230, 51, 41, 0.34);
+      box-shadow: 0 0 0 3px rgba(230, 51, 41, 0.10);
+    }
+
+    .app-v3 .shell-controls .doc-combo-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .app-v3 .shell-controls .doc-combo-option {
+      flex: 0 0 auto;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.3;
+      color: #1d1d1f;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .app-v3 .shell-controls .doc-combo-option:hover,
+    .app-v3 .shell-controls .doc-combo-option.is-active {
+      background: rgba(230, 51, 41, 0.08);
+    }
+
+    .app-v3 .shell-controls .doc-combo-option.is-selected {
+      font-weight: 700;
+      background: rgba(230, 51, 41, 0.12);
+    }
+
+    .app-v3 .shell-controls .doc-combo-empty {
+      padding: 10px;
+      font-size: 12px;
+      color: rgba(29, 29, 31, 0.5);
+      text-align: center;
+    }
+
     .app-v3 .shell-actions {
       grid-area: actions;
       align-self: end;
@@ -7966,6 +8104,12 @@
       text-align: center;
     }
 
+    /* "x zugeordnet"-Chip neutral (kein rot/gruen). */
+    .app-v3 .item-image-summary .chip {
+      background: rgba(60, 60, 67, 0.08);
+      color: rgba(29, 29, 31, 0.62);
+    }
+
     .app-v3 .item-validation {
       min-width: 190px;
     }
@@ -8119,9 +8263,9 @@
     }
 
     .app-v3 .img-card.unassigned {
-      border-color: rgba(255, 204, 0, 0.28);
-      background: linear-gradient(180deg, #ffffff, #fffaf0);
-      box-shadow: 0 12px 28px rgba(138, 79, 0, 0.055);
+      border-color: rgba(255, 59, 48, 0.24);
+      background: linear-gradient(180deg, #ffffff, #fff5f4);
+      box-shadow: 0 12px 28px rgba(159, 23, 42, 0.070);
     }
 
     .app-v3 .img-preview-link {
@@ -8216,9 +8360,9 @@
     }
 
     .app-v3 .img-badge.warning {
-      color: #8a4f00;
-      background: #fff8e7;
-      border-color: rgba(255, 204, 0, 0.24);
+      color: #9f172a;
+      background: #fff5f4;
+      border-color: rgba(255, 59, 48, 0.22);
     }
 
     .app-v3 .review-workbench {
@@ -8541,6 +8685,59 @@
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 8px;
       align-items: center;
+    }
+
+    .app-v3 .review-approval-override {
+      margin: 4px 0 10px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 2px solid rgba(230, 51, 41, 0.55);
+      background: linear-gradient(180deg, rgba(230, 51, 41, 0.12), rgba(230, 51, 41, 0.06));
+      box-shadow: 0 10px 26px rgba(230, 51, 41, 0.14);
+    }
+
+    .app-v3 .review-approval-override[hidden] {
+      display: none;
+    }
+
+    .app-v3 .review-approval-override-head {
+      font-size: 15px;
+      font-weight: 820;
+      letter-spacing: 0.01em;
+      color: #b21f16;
+      text-transform: uppercase;
+    }
+
+    .app-v3 .review-approval-override-text {
+      margin: 6px 0 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #7c1a13;
+    }
+
+    .app-v3 .review-approval-override-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #5f140f;
+      cursor: pointer;
+    }
+
+    .app-v3 .review-approval-override-check input {
+      margin-top: 2px;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      accent-color: #e63329;
+      cursor: pointer;
+    }
+
+    .app-v3 #approveDocumentBtn.is-override {
+      background: #b21f16;
+      border-color: #b21f16;
+      box-shadow: 0 14px 30px rgba(178, 31, 22, 0.28);
     }
 
     .app-v3 #approveDocumentBtn {
@@ -10012,12 +10209,12 @@
     }
 
     .app-v3 .img-card.unassigned {
-      border-color: rgba(189, 122, 24, 0.34);
+      border-color: rgba(213, 26, 15, 0.34);
       background:
-        linear-gradient(180deg, rgba(255, 246, 220, 0.96), rgba(255, 252, 242, 0.98) 54%, #ffffff);
+        linear-gradient(180deg, rgba(255, 235, 229, 0.98), rgba(255, 247, 245, 0.98) 54%, #ffffff);
       box-shadow:
-        inset 0 4px 0 rgba(226, 154, 44, 0.62),
-        0 14px 30px rgba(138, 79, 0, 0.11);
+        inset 0 4px 0 rgba(213, 26, 15, 0.62),
+        0 14px 30px rgba(157, 45, 26, 0.12);
     }
 
     .app-v3 .img-card.conflict-assigned {
@@ -10037,10 +10234,10 @@
     }
 
     .app-v3 .img-card.unassigned:hover {
-      border-color: rgba(189, 122, 24, 0.46);
+      border-color: rgba(213, 26, 15, 0.46);
       box-shadow:
-        inset 0 4px 0 rgba(226, 154, 44, 0.74),
-        0 18px 38px rgba(138, 79, 0, 0.15);
+        inset 0 4px 0 rgba(213, 26, 15, 0.74),
+        0 18px 38px rgba(157, 45, 26, 0.16);
     }
 
     .app-v3 .img-card.conflict-assigned:hover {
@@ -10056,8 +10253,8 @@
     }
 
     .app-v3 .img-card.unassigned .img-preview-link {
-      border-color: rgba(189, 122, 24, 0.18);
-      background: linear-gradient(180deg, #fffdf7, #fff6df);
+      border-color: rgba(213, 26, 15, 0.18);
+      background: linear-gradient(180deg, #fffafa, #ffede8);
     }
 
     .app-v3 .img-card.conflict-assigned .img-preview-link {
@@ -10072,9 +10269,9 @@
     }
 
     .app-v3 .img-card.unassigned .img-badge.warning {
-      color: #80520f;
-      background: #fff0c9;
-      border-color: rgba(189, 122, 24, 0.28);
+      color: #9d2d1a;
+      background: #ffe3dc;
+      border-color: rgba(213, 26, 15, 0.28);
     }
 
     .app-v3 .img-card.conflict-assigned .img-badge.conflict {
@@ -11383,7 +11580,17 @@
             <label class="control-label" for="docSelect">Dokument</label>
             <button id="docLoadMore" type="button" class="doc-load-more" hidden>Mehr laden</button>
           </div>
-          <select id="docSelect" aria-label="Dokument auswählen"></select>
+          <div class="doc-combo" id="docCombo">
+            <button type="button" class="doc-combo-trigger" id="docComboTrigger" aria-haspopup="listbox" aria-expanded="false">
+              <span class="doc-combo-value" id="docComboValue">Dokument wählen…</span>
+              <span class="doc-combo-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="doc-combo-panel" id="docComboPanel" hidden>
+              <input id="docComboSearch" type="search" class="doc-combo-search" placeholder="Suchen (Nr., Datei, Lieferant, Status)…" aria-label="Dokumente durchsuchen" autocomplete="off">
+              <div class="doc-combo-list" id="docComboList" role="listbox" aria-label="Dokumente"></div>
+            </div>
+          </div>
+          <select id="docSelect" aria-label="Dokument auswählen" hidden></select>
         </div>
         <div class="control-card">
           <label class="control-label" for="uploadInput">PDF</label>
@@ -11553,13 +11760,13 @@
                 <div class="review-card vendoc-start-customer-card">
                   <div class="review-card-head">
                     <div>
-                      <h2>Kunde in SRTemp</h2>
-                      <div class="small">Kundenzuordnung vor Prüfung und Export festlegen.</div>
+                      <h2>Endkunde</h2>
+                      <div class="small">Endkundenzuordnung vor Prüfung und Export festlegen.</div>
                     </div>
                   </div>
                   <div class="vendoc-customer-controls">
                     <label for="vendocCustomerTrigger">
-                      <span>Kunde in SRTemp</span>
+                      <span>Kunde</span>
                     </label>
                     <div class="vendoc-customer-picker" id="vendocCustomerPicker">
                       <button class="vendoc-customer-trigger" id="vendocCustomerTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
@@ -11585,7 +11792,7 @@
                   </div>
                 </div>
                 <div class="approval-guide" id="approvalGuide"></div>
-                <details class="overview-details" open>
+                <details class="overview-details">
                   <summary>Dokumentdetails</summary>
                   <div class="summary" id="summary"></div>
                 </details>
@@ -11676,6 +11883,14 @@
                         <span>Notiz</span>
                         <textarea id="documentApprovalNoteInput" rows="3" maxlength="1000" placeholder="Optionale Freigabenotiz"></textarea>
                       </label>
+                      <div class="review-approval-override" id="approvalOverrideBlock" hidden>
+                        <div class="review-approval-override-head">⚠️ Freigabe blockiert</div>
+                        <p class="review-approval-override-text" id="approvalOverrideText">Dieses Dokument erfüllt aktuell nicht alle Freigabekriterien.</p>
+                        <label class="review-approval-override-check">
+                          <input type="checkbox" id="approvalOverrideCheck">
+                          <span>Blocker überschreiben und trotzdem freigeben. Mir ist bewusst, dass die Freigabekriterien nicht erfüllt sind.</span>
+                        </label>
+                      </div>
                       <div class="review-approval-actions">
                         <button class="btn btn-primary" id="approveDocumentBtn" type="button">Freigeben</button>
                         <button class="btn btn-ghost" id="resetDocumentApprovalBtn" type="button">Freigabe zurücksetzen</button>
@@ -11759,8 +11974,8 @@
                 <label class="pricing-adjustment-toggle">
                   <input id="pricingAdjustmentToggle" type="checkbox" checked disabled>
                   <span>
-                    <strong>Zuschläge und Rabatte anwenden</strong>
-                    <small>Steuert die Rieder-Preisfolge für Positionen, Alternativen, Prüfung und VenDoc-Export.</small>
+                    <strong>Kundenaufschlag anwenden</strong>
+                    <small>Steuert die Preisfolge (Zu-/Abschläge) für Positionen, Alternativen, Prüfung und VenDoc-Export.</small>
                   </span>
                 </label>
                 <div class="pricing-adjustment-meta" id="pricingAdjustmentMeta">Noch kein Dokument geladen.</div>
@@ -11970,6 +12185,12 @@
       topbar: document.querySelector(".topbar"),
       adminMenu: document.querySelector(".v3-admin-menu"),
       docSelect: document.getElementById("docSelect"),
+      docCombo: document.getElementById("docCombo"),
+      docComboTrigger: document.getElementById("docComboTrigger"),
+      docComboValue: document.getElementById("docComboValue"),
+      docComboPanel: document.getElementById("docComboPanel"),
+      docComboSearch: document.getElementById("docComboSearch"),
+      docComboList: document.getElementById("docComboList"),
       docLoadMore: document.getElementById("docLoadMore"),
       documentApprovalBadge: document.getElementById("documentApprovalBadge"),
       documentApprovalState: document.getElementById("documentApprovalState"),
@@ -12081,6 +12302,9 @@
       documentApprovalSummary: document.getElementById("documentApprovalSummary"),
       documentApprovalReviewerUser: document.getElementById("documentApprovalReviewerUser"),
       documentApprovalNoteInput: document.getElementById("documentApprovalNoteInput"),
+      approvalOverrideBlock: document.getElementById("approvalOverrideBlock"),
+      approvalOverrideText: document.getElementById("approvalOverrideText"),
+      approvalOverrideCheck: document.getElementById("approvalOverrideCheck"),
       approveDocumentBtn: document.getElementById("approveDocumentBtn"),
       resetDocumentApprovalBtn: document.getElementById("resetDocumentApprovalBtn"),
       reviewWorkbenchMain: document.getElementById("reviewWorkbenchMain"),
@@ -12136,6 +12360,7 @@
       document_number: "Dokumentnummer",
       document_date: "Datum",
       currency: "Währung",
+      customer: "Kunde",
       gross_total: "Brutto",
       project_ref: "Projekt",
       net_total: "Netto",
@@ -12891,6 +13116,7 @@
       const wheelTarget = event.target instanceof Element ? event.target : null;
       if (wheelTarget && wheelTarget.closest(".v3-admin-menu[open]")) return;
       if (wheelTarget && wheelTarget.closest(".debug-log")) return;
+      if (wheelTarget && wheelTarget.closest(".doc-combo-panel")) return;
       const deltaY = wheelDeltaToPixels(event);
       if (!deltaY) return;
       event.preventDefault();
@@ -13472,6 +13698,7 @@
       if (fieldName === "document_type") return formatDocumentType(document.document_type);
       if (fieldName === "offer_reference") return fmt(document.offer_reference);
       if (fieldName === "document_date") return formatDate(document.document_date);
+      if (fieldName === "customer") return fmt(document.customer_name);
       if (fieldName === "gross_total") return euro(document.gross_total);
       if (fieldName === "net_total") return euro(document.net_total);
       if (fieldName === "vat_total") return euro(document.vat_total);
@@ -13947,8 +14174,32 @@
       if (ui.documentApprovalNoteInput) {
         ui.documentApprovalNoteInput.value = noteText !== "-" ? noteText : "";
       }
+
+      // Blocker sind ueberschreibbar: bei nicht-freigabefaehigem, noch nicht
+      // freigegebenem Dokument den Warnblock + Checkbox zeigen; der Freigeben-Button
+      // wird erst durch die Checkbox aktiv (Override), sonst normal via eligible.
+      const needsOverride = !approvalMeta.approved && !approvalMeta.eligible;
+      if (ui.approvalOverrideBlock) {
+        ui.approvalOverrideBlock.hidden = !needsOverride;
+      }
+      if (ui.approvalOverrideCheck) {
+        ui.approvalOverrideCheck.checked = false;
+      }
+      if (ui.approvalOverrideText) {
+        ui.approvalOverrideText.textContent = `${approvalMeta.label}: ${approvalMeta.note}`;
+      }
       if (ui.approveDocumentBtn) {
-        ui.approveDocumentBtn.disabled = !approvalMeta.eligible || approvalMeta.approved;
+        ui.approveDocumentBtn.classList.toggle("is-override", needsOverride);
+        if (approvalMeta.approved) {
+          ui.approveDocumentBtn.disabled = true;
+        } else if (needsOverride) {
+          // Erst nach Bestaetigung der Checkbox freigeben.
+          ui.approveDocumentBtn.disabled = true;
+          ui.approveDocumentBtn.textContent = "Trotzdem freigeben";
+        } else {
+          ui.approveDocumentBtn.disabled = false;
+          ui.approveDocumentBtn.textContent = "Freigeben";
+        }
       }
       if (ui.resetDocumentApprovalBtn) {
         ui.resetDocumentApprovalBtn.disabled = !approvalMeta.approved;
@@ -14338,7 +14589,7 @@
       }
 
       const fieldRows = [];
-      for (const fieldName of ["supplier_name", "document_type", "document_number", "document_date", "currency", "gross_total"]) {
+      for (const fieldName of ["supplier_name", "document_type", "document_number", "document_date", "customer", "gross_total"]) {
         const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
         const policy = validationFieldPolicy(validation, fieldName);
@@ -14380,6 +14631,28 @@
             `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · ${isOptional ? "optional" : "empfohlen"}`,
             reviewFieldValue(document, fieldName),
             `${flagHtml}${sourceKey ? sourceTagHtml(source) : ""}`
+          )
+        );
+      }
+      // Zu-/Abschläge und Positionsbasis nur zeigen, wenn das Dokument überhaupt
+      // Zu-/Abschläge trägt (sonst irreführendes "offen" bei rabattfreien Dokumenten).
+      const docPositionSubtotal = totals.document_position_subtotal;
+      const docAdjustmentTotal = totals.document_pricing_adjustment_total;
+      const hasBasisValue = docPositionSubtotal !== undefined && docPositionSubtotal !== null;
+      const hasAdjustmentValue = docAdjustmentTotal !== undefined && docAdjustmentTotal !== null;
+      if (hasBasisValue || hasAdjustmentValue) {
+        fieldRows.push(
+          reviewRowHtml(
+            "Positionsbasis vor Rabatt · empfohlen",
+            hasBasisValue ? euro(docPositionSubtotal) : "-",
+            reviewFlagHtml(hasBasisValue ? "vorhanden" : "offen", hasBasisValue ? "ok" : "review")
+          )
+        );
+        fieldRows.push(
+          reviewRowHtml(
+            "Zu-/Abschläge · empfohlen",
+            hasAdjustmentValue ? auditSignedMoney(docAdjustmentTotal) : "-",
+            reviewFlagHtml(hasAdjustmentValue ? "vorhanden" : "offen", hasAdjustmentValue ? "ok" : "review")
           )
         );
       }
@@ -15141,6 +15414,7 @@
         ui.docSelect.appendChild(option);
         ui.docSelect.disabled = true;
         setDocumentApprovalPills(null);
+        syncDocCombo();
         return;
       }
 
@@ -15173,6 +15447,88 @@
             },
           },
         });
+      }
+      syncDocCombo();
+    }
+
+    // Spiegelt die (versteckten) <select>-Optionen als durchsuchbare Combobox.
+    function syncDocCombo() {
+      if (!ui.docComboTrigger) return;
+      updateDocComboLabel();
+      const hasDocs = !!(ui.docSelect && !ui.docSelect.disabled && ui.docSelect.value);
+      ui.docComboTrigger.disabled = !ui.docSelect || ui.docSelect.disabled;
+      if (!hasDocs && ui.docSelect && ui.docSelect.disabled) {
+        closeDocCombo();
+      }
+      renderDocComboList();
+    }
+
+    function updateDocComboLabel() {
+      if (!ui.docComboValue || !ui.docSelect) return;
+      const selected = ui.docSelect.options[ui.docSelect.selectedIndex];
+      ui.docComboValue.textContent = selected && selected.value
+        ? selected.textContent
+        : "Dokument wählen…";
+    }
+
+    function renderDocComboList() {
+      if (!ui.docComboList || !ui.docSelect) return;
+      const raw = ui.docComboSearch && ui.docComboSearch.value ? ui.docComboSearch.value : "";
+      const terms = raw.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const currentValue = ui.docSelect.value;
+      ui.docComboList.textContent = "";
+      let visibleCount = 0;
+      for (const option of ui.docSelect.options) {
+        if (!option.value) continue;
+        const haystack = option.textContent.toLowerCase();
+        if (!terms.every((term) => haystack.includes(term))) continue;
+        const row = document.createElement("div");
+        row.className = "doc-combo-option";
+        row.setAttribute("role", "option");
+        row.dataset.value = option.value;
+        row.textContent = option.textContent;
+        if (option.value === currentValue) {
+          row.classList.add("is-selected");
+          row.setAttribute("aria-selected", "true");
+        }
+        ui.docComboList.appendChild(row);
+        visibleCount += 1;
+      }
+      if (!visibleCount) {
+        const empty = document.createElement("div");
+        empty.className = "doc-combo-empty";
+        empty.textContent = raw.trim() ? "Keine Treffer" : "Keine Dokumente vorhanden";
+        ui.docComboList.appendChild(empty);
+      }
+    }
+
+    function openDocCombo() {
+      if (!ui.docCombo || !ui.docComboPanel || ui.docComboTrigger.disabled) return;
+      renderDocComboList();
+      ui.docComboPanel.hidden = false;
+      ui.docCombo.classList.add("is-open");
+      ui.docComboTrigger.setAttribute("aria-expanded", "true");
+      if (ui.docComboSearch) {
+        ui.docComboSearch.focus();
+        ui.docComboSearch.select();
+      }
+    }
+
+    function closeDocCombo() {
+      if (!ui.docCombo || !ui.docComboPanel) return;
+      ui.docComboPanel.hidden = true;
+      ui.docCombo.classList.remove("is-open");
+      if (ui.docComboTrigger) ui.docComboTrigger.setAttribute("aria-expanded", "false");
+    }
+
+    async function chooseDocComboValue(value) {
+      closeDocCombo();
+      const nextId = Number(value);
+      if (!Number.isFinite(nextId) || nextId <= 0) return;
+      if (ui.docSelect) ui.docSelect.value = String(value);
+      updateDocComboLabel();
+      if (nextId !== Number(state.documentId)) {
+        await selectDocument(nextId);
       }
     }
 
@@ -15875,6 +16231,10 @@
       if (!state.documentId) return;
       const targetButton = button instanceof HTMLElement ? button : null;
       const note = ui.documentApprovalNoteInput ? String(ui.documentApprovalNoteInput.value || "").trim() : "";
+      const overrideBlockers = !!(ui.approvalOverrideCheck
+        && ui.approvalOverrideBlock
+        && !ui.approvalOverrideBlock.hidden
+        && ui.approvalOverrideCheck.checked);
       if (targetButton) targetButton.disabled = true;
       setStatus(approved ? "Dokument wird freigegeben ..." : "Dokumentfreigabe wird zurückgesetzt ...");
       try {
@@ -15884,6 +16244,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               note: note || null,
+              override_blockers: overrideBlockers,
             }),
           });
         } else {
@@ -16232,10 +16593,6 @@
         const pageRange = pageEndRef && String(pageEndRef) !== String(item.page_ref)
           ? `${fmt(item.page_ref)}-${fmt(pageEndRef)}`
           : fmt(item.page_ref);
-        const sourceLabel = "Parser";
-        const imageRequiredLabel = itemMetadata.image_required === undefined
-          ? (lineItemNeedsImageForUi(item) ? "ja" : "nein")
-          : detailValue(itemMetadata.image_required);
         const alternativeAppendControl = alternativeAppendControlHtml(item, lineItemId, alternativeMode);
         const lineTotalOverrideControl = lineTotalOverrideControlHtml(item, lineItemId);
         const priceAggregationInline = priceAggregationInlineHtml(item, itemMetadata);
@@ -16255,34 +16612,21 @@
           ? `PDF Pos. ${sourcePositionNo}${lvPart} · Seite ${fmt(item.page_ref)}`
           : `Seite ${fmt(item.page_ref)}`;
         const extractedFieldHtml = detailMetaCellsHtml([
-          ["Datensatz-ID", item.id],
           ["PDF-Position", item.position_no],
-          ["Export-Position", exportPositionNo],
+          ["Position", exportPositionNo],
           ["LV / Arch.-Pos.", item.lv_pos],
-          ["Referenz-LV", itemMetadata.referenced_lv_pos],
           ["Alternativ", item.is_alternative],
           ["Am Ende anhängen", item.is_alternative ? !!exportMeta.append_at_end : null],
           ["Seite(n)", pageRange],
-          ["Seitenumbruch", itemMetadata.spans_page_break],
-          ["Quelle", sourceLabel],
-          ["Menge extrahiert", `${formatQuantity(item.quantity)} ${fmt(item.unit, "")}`.trim()],
-          ["Menge roh", itemMetadata.quantity_raw],
+          ["Menge", `${formatQuantity(item.quantity)} ${fmt(item.unit, "")}`.trim()],
           ["Einheit", item.unit],
           ["Breite", item.width_mm ? `${fmt(item.width_mm)} mm` : "-"],
-          ["Breite roh", itemMetadata.width_raw],
           ["Höhe", item.height_mm ? `${fmt(item.height_mm)} mm` : "-"],
-          ["Höhe roh", itemMetadata.height_raw],
-          ["Einzelpreis extrahiert", euro(item.unit_price)],
-          ["Unitpreis VenDoc", euro(exportPriceStack.unitPrice)],
-          ["Purchasepreis VenDoc", euro(exportPriceStack.purchasePrice)],
-          ["Einzelpreis roh", itemMetadata.unit_price_raw],
-          ["Gesamtpreis extrahiert", euro(item.line_total)],
-          ["Gesamtpreis roh", itemMetadata.line_total_raw],
-          ["Bildpflicht", imageRequiredLabel],
-          ["Bildgrund", imageAssignmentSourceLabel(item.image_assignment_reason)],
-          ["Bild-Match-Quelle", imageAssignmentSourceLabel(item.image_assignment_source)],
+          ["EK-EP", euro(item.unit_price)],
+          ["POS. Preis", euro(exportPriceStack.unitPrice)],
+          ["EK-GP", euro(item.line_total)],
           ["Manuelle Änderung", manualEditLabel || null],
-        ]) + extraMetadataCellsHtml(itemMetadata, usedMetadataKeys);
+        ]);
 
         const row = document.createElement("tr");
         row.className = `position-row${isExpanded ? " is-expanded" : ""}`;
@@ -16305,7 +16649,7 @@
           </td>
           <td>
             <div class="price-stack">
-              <strong>${escapeHtml(displayLineTotal === null ? "-" : `GP ${euro(displayLineTotal)}`)}</strong>
+              <strong>${escapeHtml(displayLineTotal === null ? "-" : `EK GP ${euro(displayLineTotal)}`)}</strong>
               ${exportPriceStack.html}
               ${priceAggregationInline}
               ${originalPriceNote}
@@ -16345,7 +16689,6 @@
                   <div class="detail-meta-grid">
                     ${detailMetaCellHtml("Seite", fmt(item.page_ref))}
                     ${detailMetaCellHtml("Bilder", mappedImageLabel(item))}
-                    ${detailMetaCellHtml("Bildquelle", imageAssignmentSourceLabel(item.image_assignment_source))}
                   </div>
                 </div>
                 ${alternativeAppendControl ? `
@@ -16365,8 +16708,6 @@
                   <h3>Extraktionskontext</h3>
                   <div class="detail-meta-grid">
                     ${detailMetaCellHtml("Status", validationMeta.label)}
-                    ${detailMetaCellHtml("Review", item.review_checked ? "manuell geprüft" : "offen / automatisch")}
-                    ${detailMetaCellHtml("Quelle", sourceLabel)}
                     ${manualEditLabel ? detailMetaCellHtml("Manuell geändert", manualEditLabel) : ""}
                   </div>
                 </div>
@@ -16377,7 +16718,7 @@
                   </div>
                 ` : ""}
                 <div class="position-detail-block wide">
-                  <h3>Extrahierter Positionstext</h3>
+                  <h3>Positionstext</h3>
                   <div class="position-image-section">
                     ${alternativeExportNote}
                     ${positionTextPanelHtml("Kurztext", lineItemShortText(item), "Kein Kurztext extrahiert.")}
@@ -16385,7 +16726,7 @@
                   </div>
                 </div>
                 <div class="position-detail-block wide">
-                  <h3>Alle extrahierten Felder</h3>
+                  <h3>Alle Felder</h3>
                   <div class="detail-meta-grid">
                     ${extractedFieldHtml}
                   </div>
@@ -16394,9 +16735,6 @@
                   <div class="position-detail-head">
                     <h3>Bildprüfung</h3>
                     ${imageActionButtons ? `<div class="position-image-actions">${imageActionButtons}</div>` : ""}
-                  </div>
-                  <div class="position-image-toolbar">
-                    ${imageAssignmentChipsHtml(state.documentId, item)}
                   </div>
                   <div class="position-image-section">
                     <div class="position-image-group">
@@ -16624,6 +16962,7 @@
       state.documentId = documentId;
       state.packagePreviewDocumentId = documentId;
       ui.docSelect.value = String(documentId);
+      updateDocComboLabel();
       state.pdf.page = 1;
       state.pdf.pageCount = null;
       state.pdf.zoom = "fit";
@@ -17623,11 +17962,11 @@
     function exportPriceStackHtml(item, metadata) {
       const info = exportPriceInfoForUi(item, metadata);
       const unitHtml = info.unitPrice === null
-        ? `<span>Unit EP -</span>`
-        : `<span title="VenDoc unit_price: Basis- bzw. Listenpreis">Unit EP ${escapeHtml(auditMoney(info.unitPrice))} €</span>`;
+        ? `<span>Pos. Preis -</span>`
+        : `<span title="VenDoc unit_price: Basis- bzw. Listenpreis">Pos. Preis ${escapeHtml(auditMoney(info.unitPrice))} €</span>`;
       const purchaseHtml = info.purchasePrice === null
         ? ""
-        : `<span class="price-purchase" title="VenDoc purchase_price: rabattierter Einkaufspreis">Purchase EP ${escapeHtml(auditMoney(info.purchasePrice))} €</span>`;
+        : `<span class="price-purchase" title="VenDoc purchase_price: rabattierter Einkaufspreis">EK EP ${escapeHtml(auditMoney(info.purchasePrice))} €</span>`;
       return { ...info, html: `${unitHtml}${purchaseHtml}` };
     }
 
@@ -18130,8 +18469,8 @@
 
     function pricingAdjustmentModeLabel(enabled) {
       return enabled
-        ? "Preise inkl. Zuschlag-/Rabatt-Sequenz"
-        : "Basispreise ohne Zuschläge/Rabatte";
+        ? "Im VenDoc hinterlegten Aufschlag auf Netto-EK-Preis anwenden."
+        : "Positions-Angebotspreis wird im VenDoc als VK Sonstiges übernommen.";
     }
 
     function pricingAdjustmentSummaryHtml(result, enabled) {
@@ -18154,21 +18493,11 @@
       const discount = totals.discount_sum;
       const surcharge = totals.surcharge_sum;
       const delta = totals.net_delta_from_components;
-      const modeNote = enabled
-        ? "Positionen verwenden rabattierte Werte"
-        : "Positionen verwenden Basiswerte";
       const positionLabel = enabled ? "Aktuelle Summe" : "Basis-Positionssumme";
       const deltaNote = enabled
         ? "Soll nahe 0,00 sein"
         : "erwartet, weil Zu-/Abschläge aus sind";
       return [
-        `
-          <div class="pricing-adjustment-summary-item is-mode">
-            <span>Modus</span>
-            <strong>${escapeHtml(enabled ? "Mit Zu-/Abschlägen" : "Basispreise")}</strong>
-            <small>${escapeHtml(modeNote)}</small>
-          </div>
-        `,
         documentBasis !== undefined && documentBasis !== null
           ? `
             <div class="pricing-adjustment-summary-item">
@@ -18194,7 +18523,7 @@
         `,
         `
           <div class="pricing-adjustment-summary-item">
-            <span>Delta zu Netto</span>
+            <span>Abweichung zu Netto</span>
             <strong>${escapeHtml(auditSignedMoney(delta))} €</strong>
             <small>${escapeHtml(deltaNote)}</small>
           </div>
@@ -18781,6 +19110,39 @@
       }
     }
 
+    // Diese Fehler sind NICHT ueberschreibbar (technische Vorbedingung / Infrastruktur).
+    const HARD_EXPORT_ERROR_CODES = new Set([
+      "document_not_processed",
+      "document_not_approved",
+      "mssql_disabled",
+      "mssql_config_incomplete",
+      "mssql_write_failed",
+    ]);
+
+    function exportErrorsAreOverridable(errors) {
+      if (!Array.isArray(errors) || !errors.length) return false;
+      return errors.every((error) => error && !HARD_EXPORT_ERROR_CODES.has(String(error.code || "")));
+    }
+
+    // Roh-Fetch, damit der strukturierte 409-Body (detail.errors) auswertbar bleibt.
+    async function requestVendocLiveExport(overrideBlockers) {
+      const packageBody = activePackageRequestBody();
+      const packageMode = !!packageBody;
+      const overrideQuery = overrideBlockers ? "&override_blockers=true" : "";
+      const url = packageMode
+        ? `/vendoc/export-package?dry_run=false${overrideQuery}`
+        : `/vendoc/export/${state.documentId}?dry_run=false${overrideQuery}`;
+      const options = packageMode
+        ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(packageBody) }
+        : { method: "POST" };
+      const response = await fetch(url, options);
+      const text = await response.text();
+      let body = null;
+      try { body = text ? JSON.parse(text) : null; } catch (_) { body = null; }
+      if (response.status === 401) showAuthGate("Login erforderlich.");
+      return { ok: response.ok, status: response.status, body, text };
+    }
+
     async function runVendocLiveExport() {
       if (!state.documentId) return;
       const packageBody = activePackageRequestBody();
@@ -18825,13 +19187,43 @@
       setVendocButtonsBusy(true);
       setStatus("VenDoc Live-Export wird ausgeführt...");
       try {
-        const payload = packageMode
-          ? await apiJson(`/vendoc/export-package?dry_run=false`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(packageBody),
-            })
-          : await apiJson(`/vendoc/export/${state.documentId}?dry_run=false`, { method: "POST" });
+        let result = await requestVendocLiveExport(false);
+
+        // Bei ueberschreibbaren Inhaltsfehlern (z. B. fehlender Preis): fette Warnung,
+        // dann auf Wunsch mit override_blockers erzwingen.
+        if (!result.ok && result.status === 409) {
+          const detail = result.body && result.body.detail;
+          const errors = detail && Array.isArray(detail.errors) ? detail.errors : [];
+          if (exportErrorsAreOverridable(errors)) {
+            const forced = await openConfirmModal({
+              title: "⚠️ Export trotz Fehlern erzwingen?",
+              paragraphs: [
+                packageMode
+                  ? `Das Multi-PDF-Paket hat blockierende Export-Fehler:`
+                  : `Dokument #${state.documentId} hat blockierende Export-Fehler:`,
+                ...errors.slice(0, 8).map((error) => `• ${String(error.message || error.code || "Fehler")}`),
+                "Beim Erzwingen werden unvollständige Daten (z. B. fehlender Preis) in die produktive VenDoc-DB geschrieben. Das lässt sich nicht automatisch rückgängig machen.",
+              ],
+              confirmLabel: "Trotzdem übergeben",
+              confirmKind: "danger",
+            });
+            if (!forced) {
+              setStatus("VenDoc Übergabe abgebrochen (Fehler nicht überschrieben).", "warn");
+              return;
+            }
+            result = await requestVendocLiveExport(true);
+          }
+        }
+
+        if (!result.ok) {
+          const detail = result.body && result.body.detail;
+          const message = (detail && typeof detail.message === "string" ? detail.message : null)
+            || parseApiError(result.text, `HTTP ${result.status}`);
+          setStatus(`VenDoc Übergabe fehlgeschlagen: ${String(message).slice(0, 260)}`, "err");
+          return;
+        }
+
+        const payload = result.body || {};
         setStatus(`VenDoc Übergabe fertig: ${fmt(payload.status)}.`, "ok");
         state.previewFormat = "json";
         state.previewContent = JSON.stringify(payload.write || payload, null, 2);
@@ -18891,6 +19283,54 @@
       if (Number.isFinite(nextId) && nextId > 0) {
         await selectDocument(nextId);
       }
+    });
+
+    if (ui.docComboTrigger) {
+      ui.docComboTrigger.addEventListener("click", () => {
+        if (ui.docCombo.classList.contains("is-open")) {
+          closeDocCombo();
+        } else {
+          openDocCombo();
+        }
+      });
+    }
+
+    if (ui.docComboSearch) {
+      ui.docComboSearch.addEventListener("input", () => {
+        renderDocComboList();
+      });
+      ui.docComboSearch.addEventListener("keydown", async (event) => {
+        if (event.key === "Escape") {
+          closeDocCombo();
+          ui.docComboTrigger.focus();
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const first = ui.docComboList.querySelector(".doc-combo-option");
+          if (first && first.dataset.value) {
+            await chooseDocComboValue(first.dataset.value);
+          }
+        }
+      });
+    }
+
+    if (ui.docComboList) {
+      ui.docComboList.addEventListener("click", async (event) => {
+        const target = event.target instanceof Element
+          ? event.target.closest(".doc-combo-option")
+          : null;
+        if (target && target.dataset.value) {
+          await chooseDocComboValue(target.dataset.value);
+        }
+      });
+    }
+
+    // Klick außerhalb schließt die Combobox.
+    document.addEventListener("click", (event) => {
+      if (!ui.docCombo || !ui.docCombo.classList.contains("is-open")) return;
+      if (event.target instanceof Node && ui.docCombo.contains(event.target)) return;
+      closeDocCombo();
     });
 
     ui.resetBtn.addEventListener("click", async () => {
@@ -18979,6 +19419,15 @@
     ui.approveDocumentBtn.addEventListener("click", () => {
       void setDocumentApproval(true, ui.approveDocumentBtn);
     });
+
+    if (ui.approvalOverrideCheck) {
+      ui.approvalOverrideCheck.addEventListener("change", () => {
+        // Override-Checkbox schaltet den Freigeben-Button frei (nur im Blocker-Fall sichtbar).
+        if (ui.approveDocumentBtn && !ui.approvalOverrideBlock.hidden) {
+          ui.approveDocumentBtn.disabled = !ui.approvalOverrideCheck.checked;
+        }
+      });
+    }
 
     ui.resetDocumentApprovalBtn.addEventListener("click", () => {
       void setDocumentApproval(false, ui.resetDocumentApprovalBtn);

@@ -458,7 +458,7 @@ def _build_required_field_summary(document: dict[str, Any]) -> tuple[dict[str, b
         "document_type": document_type in {"angebot", "auftragsbestaetigung"},
         "document_number": _has_text(document.get("document_number")),
         "document_date": document.get("document_date") is not None,
-        "currency": _has_text(document.get("currency")),
+        "customer": _has_text(document.get("customer_name")),
         "gross_total": koch_offer_net_only or _to_decimal(document.get("gross_total")) is not None,
     }
     recommended_fields = {

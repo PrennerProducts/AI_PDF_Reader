@@ -159,6 +159,10 @@ class ScreenCropImageRequest(BaseModel):
 
 class DocumentApprovalRequest(BaseModel):
     note: str | None = Field(default=None, max_length=1000, description="Optional approval note.")
+    override_blockers: bool = Field(
+        default=False,
+        description="Freigabe trotz blockierender Validierungsfehler erzwingen (mit Warnung).",
+    )
 
 
 class DocumentVendocCustomerRequest(BaseModel):
@@ -3113,27 +3117,46 @@ def approve_document(document_id: int, payload: DocumentApprovalRequest, request
     validation = result_data.get("validation") if isinstance(result_data.get("validation"), dict) else {}
     validation_status = str(validation.get("status") or "").strip().lower()
 
+    # "Muss fertig verarbeitet sein" bleibt harte technische Vorbedingung.
     if str(document.get("status") or "").strip().lower() != "processed":
         raise HTTPException(
             status_code=409,
             detail="Dokument kann erst nach abgeschlossener Verarbeitung freigegeben werden.",
         )
-    if validation_status not in {"auto_accept", "manual_checked"}:
+    # Validierungs-Blocker sind grundsaetzlich ueberschreibbar: mit override_blockers
+    # laesst sich trotz reject freigeben (mit Warnung + Protokoll).
+    blocked_by_validation = validation_status not in {"auto_accept", "manual_checked"}
+    if blocked_by_validation and not payload.override_blockers:
         raise HTTPException(
             status_code=409,
             detail=f"Dokument ist aktuell nicht freigabefähig (Status: {validation_status or 'unknown'}).",
         )
 
+    override_used = blocked_by_validation and payload.override_blockers
+    approval_note = _clean_optional_str(payload.note)
+    if override_used:
+        marker = f"⚠️ Freigabe trotz Blocker erzwungen (Status: {validation_status or 'unknown'})."
+        approval_note = f"{marker} {approval_note}" if approval_note else marker
+
     updated = update_document_approval_state(
         document_id,
         approval_status="approved",
         reviewed_by=str(user.get("username") or user.get("display_name") or "").strip(),
-        approval_note=_clean_optional_str(payload.note),
+        approval_note=approval_note,
     )
     if not updated:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
 
-    _audit(request, "document_approved", document_id=document_id, details={"note_present": bool(_clean_optional_str(payload.note))})
+    _audit(
+        request,
+        "document_approved",
+        document_id=document_id,
+        details={
+            "note_present": bool(_clean_optional_str(payload.note)),
+            "override_blockers": bool(override_used),
+            "validation_status": validation_status or "unknown",
+        },
+    )
     return {
         "ok": True,
         "document_id": document_id,
@@ -3933,6 +3956,7 @@ def vendoc_export_document(
     request: Request,
     dry_run: bool = Query(default=True),
     include_sql: bool = Query(default=False),
+    override_blockers: bool = Query(default=False),
 ):
     result_data = get_document_result(document_id)
     if not result_data:
@@ -3987,9 +4011,10 @@ def vendoc_export_document(
         )
 
     document = result_data.get("document") if isinstance(result_data.get("document"), dict) else {}
-    live_errors = list(errors)
+    # Technische Vorbedingungen bleiben hart (nicht ueberschreibbar).
+    precondition_errors: list[dict[str, Any]] = []
     if str(document.get("status") or "").strip().lower() != "processed":
-        live_errors.append(
+        precondition_errors.append(
             {
                 "code": "document_not_processed",
                 "scope": "document",
@@ -3997,19 +4022,28 @@ def vendoc_export_document(
             }
         )
     if str(document.get("approval_status") or "").strip().lower() != "approved":
-        live_errors.append(
+        precondition_errors.append(
             {
                 "code": "document_not_approved",
                 "scope": "document",
                 "message": "Live-Export ist nur fuer freigegebene Dokumente erlaubt.",
             }
         )
+    # Payload-Inhaltsfehler (z. B. fehlender Preis) sind via override_blockers erzwingbar.
+    content_errors = list(errors)
+    override_used = bool(content_errors) and override_blockers and not precondition_errors
 
-    if live_errors:
-        vendoc_payload["errors"] = live_errors
+    blocking_errors: list[dict[str, Any]] = []
+    if precondition_errors:
+        blocking_errors = precondition_errors + content_errors
+    elif content_errors and not override_blockers:
+        blocking_errors = content_errors
+
+    if blocking_errors:
+        vendoc_payload["errors"] = blocking_errors
         if isinstance(vendoc_payload.get("summary"), dict):
-            vendoc_payload["summary"]["error_count"] = len(live_errors)
-        error_text = _vendoc_error_text(live_errors)
+            vendoc_payload["summary"]["error_count"] = len(blocking_errors)
+        error_text = _vendoc_error_text(blocking_errors)
         job = _record_vendoc_export_job(
             document_id=document_id,
             result_data=result_data,
@@ -4022,14 +4056,25 @@ def vendoc_export_document(
             request,
             "vendoc_live_export_failed",
             document_id=document_id,
-            details={"error_count": len(live_errors), "message": error_text},
+            details={"error_count": len(blocking_errors), "message": error_text},
         )
         raise HTTPException(
             status_code=409,
             detail={
                 "message": "VenDoc Live-Export ist gesperrt.",
-                "errors": live_errors,
+                "errors": blocking_errors,
                 "job": _vendoc_job_response(job),
+            },
+        )
+
+    if override_used:
+        _audit(
+            request,
+            "vendoc_live_export_override",
+            document_id=document_id,
+            details={
+                "error_count": len(content_errors),
+                "message": _vendoc_error_text(content_errors),
             },
         )
 
