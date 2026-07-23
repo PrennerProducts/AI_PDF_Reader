@@ -11898,6 +11898,8 @@
                     </div>
                   </div>
                 </div>
+<!-- VenDoc-Export-Karte deaktiviert: "An VenDoc uebergeben" ist jetzt Teil des Freigeben-Buttons oben.
+     Dry-Run + SQL-Vorschau hier fuer spaeteres Debuggen aufbewahrt (Card wieder einkommentieren zum Reaktivieren).
                 <div class="review-card vendoc-export-card" id="vendocExportCard">
                   <div class="review-card-head">
                     <div>
@@ -11913,6 +11915,7 @@
                     <button class="btn btn-primary" id="vendocLiveExportBtn" type="button">An VenDoc übergeben</button>
                   </div>
                 </div>
+-->
                 <div class="review-card review-open-tasks-card" id="reviewOpenTasksCard">
                   <div class="review-card-head">
                     <div>
@@ -19176,8 +19179,8 @@
               title: "VenDoc-Import starten",
               paragraphs: [
                 packageMode
-                  ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach SRTemp übergeben?`
-                  : `Dokument #${state.documentId} wirklich nach SRTemp übergeben?`,
+                  ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach VenDoc übergeben?`
+                  : `Dokument #${state.documentId} wirklich nach VenDoc übergeben?`,
               ],
               confirmLabel: "Import starten",
               confirmKind: "primary",
@@ -19416,8 +19419,18 @@
       if (state.result) renderReviewWorkbench(state.result);
     });
 
-    ui.approveDocumentBtn.addEventListener("click", () => {
-      void setDocumentApproval(true, ui.approveDocumentBtn);
+    ui.approveDocumentBtn.addEventListener("click", async () => {
+      await setDocumentApproval(true, ui.approveDocumentBtn);
+      // Zusammengefuehrte Aktion: nach erfolgreicher Freigabe direkt an VenDoc uebergeben.
+      // Sicherheitsabfragen (bereits importiert / Payload-Fehler-Override) bleiben in runVendocLiveExport.
+      if (currentDocumentApprovalStatus() !== "approved") return;
+      if (ui.approveDocumentBtn) ui.approveDocumentBtn.disabled = true;
+      try {
+        await runVendocLiveExport();
+      } finally {
+        // Button-Zustand wieder korrekt aus der Freigabe ableiten (freigegeben -> gesperrt).
+        renderDocumentApproval(state.result);
+      }
     });
 
     if (ui.approvalOverrideCheck) {
@@ -19781,15 +19794,23 @@
     ui.csvPreviewBtn.addEventListener("click", async () => {
       await previewExport("csv");
     });
-    ui.vendocDryRunBtn.addEventListener("click", async () => {
-      await runVendocDryRun({ includeSql: false });
-    });
-    ui.vendocSqlPreviewBtn.addEventListener("click", async () => {
-      await runVendocDryRun({ includeSql: true });
-    });
-    ui.vendocLiveExportBtn.addEventListener("click", async () => {
-      await runVendocLiveExport();
-    });
+    // Dry-Run / SQL-Vorschau / Live-Export-Button sind auskommentiert (Card unten).
+    // Listener bleiben null-sicher, damit Reaktivierung fuers Debuggen leicht ist.
+    if (ui.vendocDryRunBtn) {
+      ui.vendocDryRunBtn.addEventListener("click", async () => {
+        await runVendocDryRun({ includeSql: false });
+      });
+    }
+    if (ui.vendocSqlPreviewBtn) {
+      ui.vendocSqlPreviewBtn.addEventListener("click", async () => {
+        await runVendocDryRun({ includeSql: true });
+      });
+    }
+    if (ui.vendocLiveExportBtn) {
+      ui.vendocLiveExportBtn.addEventListener("click", async () => {
+        await runVendocLiveExport();
+      });
+    }
     if (ui.vendocCustomerTrigger) {
       ui.vendocCustomerTrigger.addEventListener("click", () => {
         if (ui.vendocCustomerTrigger.disabled) return;
