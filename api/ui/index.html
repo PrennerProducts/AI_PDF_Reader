@@ -827,6 +827,34 @@
       background: #ffffff;
     }
 
+    /* Verdeckt das kurze "Seite 1"-Aufblinken des nativen PDF-Viewers beim Blaettern. */
+    .pdf-loading {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+    }
+
+    .pdf-loading[hidden] {
+      display: none;
+    }
+
+    .pdf-loading-spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid rgba(29, 29, 31, 0.14);
+      border-top-color: rgba(230, 51, 41, 0.7);
+      animation: pdf-loading-spin 0.7s linear infinite;
+    }
+
+    @keyframes pdf-loading-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .panel-body {
       padding: 14px;
       flex: 1 1 auto;
@@ -7229,6 +7257,136 @@
       pointer-events: none;
     }
 
+    /* Bildschirm-Screenshot: waehrend des Snippens den linken PDF-Bereich auf volle
+       Breite ziehen (rechtes Panel ausblenden), damit der Screenshot gross angezeigt
+       wird und das Rechteck-Ziehen nicht fummelig ist. */
+    .app-v3.pdf-snip-active .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app-v3.pdf-snip-active .review-panel {
+      display: none;
+    }
+
+    .app-v3.pdf-snip-active .pdf-crop-workspace {
+      align-items: center;
+    }
+
+    .app-v3.pdf-snip-active .pdf-crop-workspace img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+    }
+
+    /* Snip + Paste-Overlay (Screenshot mit OS-Tool, dann Strg+V). */
+    .snip-paste-overlay {
+      position: absolute;
+      inset: 14px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(246, 246, 248, 0.98);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 24px 64px rgba(29, 29, 31, 0.22);
+    }
+
+    .snip-paste-overlay[hidden] {
+      display: none;
+    }
+
+    .snip-paste-card {
+      width: 100%;
+      max-width: 460px;
+      padding: 20px;
+      border: 2px dashed rgba(60, 60, 67, 0.28);
+      border-radius: 16px;
+      background: #ffffff;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .snip-paste-card.is-dragover {
+      border-color: rgba(230, 51, 41, 0.6);
+      background: rgba(230, 51, 41, 0.05);
+    }
+
+    .snip-paste-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .snip-paste-head strong {
+      font-size: 15px;
+      font-weight: 820;
+      color: #1d1d1f;
+    }
+
+    .snip-paste-steps {
+      margin: 0 0 12px;
+      padding-left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #3a3a3c;
+    }
+
+    .snip-paste-steps kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(60, 60, 67, 0.2);
+      background: #f5f5f7;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .snip-paste-sub {
+      color: rgba(29, 29, 31, 0.5);
+      font-weight: 500;
+    }
+
+    .snip-paste-hint {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(230, 51, 41, 0.08);
+      color: #b21f16;
+      font-size: 13px;
+      font-weight: 720;
+      text-align: center;
+    }
+
+    .snip-paste-hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(178, 31, 22, 0.28);
+      background: #ffffff;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .snip-paste-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .snip-paste-alt {
+      font-size: 12px;
+      color: rgba(29, 29, 31, 0.55);
+    }
+
     .app-v3 .pdf-crop-selection[hidden] {
       display: none !important;
     }
@@ -10433,6 +10591,11 @@
       min-height: 62px;
     }
 
+    .app-v3 #fieldChecklist .ab-assign-slot {
+      display: block;
+      margin-top: 8px;
+    }
+
     .app-v3 #totalsAudit .review-row {
       grid-template-columns: 1fr;
       align-content: space-between;
@@ -11706,6 +11869,9 @@
         </div>
         <div class="pdf-stage" id="pdfStage">
           <iframe id="pdfFrame" title="PDF Vorschau"></iframe>
+          <div class="pdf-loading" id="pdfLoading" hidden aria-hidden="true">
+            <div class="pdf-loading-spinner"></div>
+          </div>
           <div class="pdf-crop-overlay" id="pdfCropOverlay" hidden>
             <div class="pdf-crop-toolbar">
               <div>
@@ -11717,6 +11883,26 @@
             <div class="pdf-crop-workspace" id="pdfCropWorkspace">
               <img id="pdfCropPreviewImg" alt="PDF-Seite für manuelle Bildauswahl" draggable="false">
               <div class="pdf-crop-selection" id="pdfCropSelection" hidden></div>
+            </div>
+          </div>
+          <div class="snip-paste-overlay" id="snipPasteOverlay" hidden>
+            <div class="snip-paste-card" id="snipPasteDrop">
+              <div class="snip-paste-head">
+                <strong id="snipPasteTitle">Screenshot einfügen</strong>
+                <button class="pdf-crop-cancel" id="snipPasteCancelBtn" type="button">Abbrechen</button>
+              </div>
+              <ol class="snip-paste-steps">
+                <li>Das <strong>Snipping-Tool öffnet sich automatisch</strong>. <span class="snip-paste-sub">Falls nicht: <kbd>⊞ Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> drücken.</span></li>
+                <li>Mit <strong>gedrückter linker Maustaste ein Rechteck</strong> um den gewünschten Bereich ziehen und loslassen. Der Ausschnitt liegt jetzt in der Zwischenablage.</li>
+                <li>Wieder <strong>in dieses Fenster (diesen Tab) klicken</strong>.</li>
+                <li><strong><kbd>Strg</kbd>+<kbd>V</kbd> drücken</strong> — das Bild wird der Position zugeordnet.</li>
+              </ol>
+              <div class="snip-paste-hint">Nach dem Snippen hier <strong><kbd>Strg</kbd>+<kbd>V</kbd></strong> drücken — oder das Bild hierher ziehen.</div>
+              <div class="snip-paste-actions">
+                <span class="snip-paste-alt">Screenshot liegt als Datei vor?</span>
+                <button class="btn btn-secondary" id="snipPasteFileBtn" type="button">Bilddatei wählen…</button>
+                <input id="snipPasteFileInput" type="file" accept="image/*" hidden>
+              </div>
             </div>
           </div>
         </div>
@@ -12153,6 +12339,7 @@
       vendocCustomerPickerOpen: false,
       vendocAlreadyImported: false,
       vendocLatestImportedAt: null,
+      pendingScreenshot: null,
       currentUser: null,
       authSetupRequired: false,
       authMode: "login",
@@ -12170,6 +12357,7 @@
         pageCount: null,
         zoom: "fit",
         reloadToken: 0,
+        frameLoadToken: 0,
       },
       pdfCrop: {
         active: false,
@@ -12276,10 +12464,17 @@
       debugLog: document.getElementById("debugLog"),
       pdfStage: document.getElementById("pdfStage"),
       pdfFrame: document.getElementById("pdfFrame"),
+      pdfLoading: document.getElementById("pdfLoading"),
       pdfCropOverlay: document.getElementById("pdfCropOverlay"),
       pdfCropWorkspace: document.getElementById("pdfCropWorkspace"),
       pdfCropPreviewImg: document.getElementById("pdfCropPreviewImg"),
       pdfCropSelection: document.getElementById("pdfCropSelection"),
+      snipPasteOverlay: document.getElementById("snipPasteOverlay"),
+      snipPasteDrop: document.getElementById("snipPasteDrop"),
+      snipPasteTitle: document.getElementById("snipPasteTitle"),
+      snipPasteCancelBtn: document.getElementById("snipPasteCancelBtn"),
+      snipPasteFileBtn: document.getElementById("snipPasteFileBtn"),
+      snipPasteFileInput: document.getElementById("snipPasteFileInput"),
       pdfCropTitle: document.getElementById("pdfCropTitle"),
       pdfCropHint: document.getElementById("pdfCropHint"),
       pdfCropCancelBtn: document.getElementById("pdfCropCancelBtn"),
@@ -12610,20 +12805,31 @@
       if (ui.pdfOpenBtn) ui.pdfOpenBtn.disabled = !pdfDocumentId;
     }
 
+    function hidePdfLoading(token) {
+      if (token !== undefined && token !== state.pdf.frameLoadToken) return;
+      if (ui.pdfLoading) ui.pdfLoading.hidden = true;
+    }
+
     function refreshPdfFrame({ forceReload = false } = {}) {
       syncPdfControls();
       const pdfDocumentId = currentPdfDocumentId();
       if (!pdfDocumentId || !ui.pdfFrame) return;
       if (forceReload) state.pdf.reloadToken += 1;
       const nextSrc = pdfDocumentUrl(pdfDocumentId);
-      if (forceReload) {
-        const reloadToken = state.pdf.reloadToken;
-        ui.pdfFrame.src = "about:blank";
-        window.setTimeout(() => {
-          if (currentPdfDocumentId() && state.pdf.reloadToken === reloadToken) ui.pdfFrame.src = nextSrc;
-        }, 0);
-        return;
-      }
+      // Kein Reload noetig, wenn sich die URL nicht aendert (verhindert unnoetiges Overlay).
+      if (nextSrc === (ui.pdfFrame.getAttribute("src") || "")) return;
+      // Overlay verdeckt das kurze "Seite 1"-Aufblinken des nativen Viewers waehrend des
+      // Reloads (der Viewer wertet #page nur beim Laden aus -> Seiten-Nav braucht Reload).
+      const token = ++state.pdf.frameLoadToken;
+      if (ui.pdfLoading) ui.pdfLoading.hidden = false;
+      // Sicherheits-Fallback, falls kein load-Event kommt.
+      window.setTimeout(() => hidePdfLoading(token), 4000);
+      const handler = () => {
+        ui.pdfFrame.removeEventListener("load", handler);
+        // kurz warten, bis der Viewer zur Zielseite gesprungen ist, dann Overlay entfernen
+        window.setTimeout(() => hidePdfLoading(token), 240);
+      };
+      ui.pdfFrame.addEventListener("load", handler);
       ui.pdfFrame.src = nextSrc;
     }
 
@@ -14001,7 +14207,7 @@
             reviewTaskActionHtml("Zur Position", "open-item", { item_key: itemKey, primary: true }),
             imageRelated ? reviewTaskActionHtml("Bilder", "open-audit", { item_key: itemKey }) : "",
             imageRelated && Number.isFinite(lineItemId)
-              ? reviewTaskActionHtml("Bildschirm", "screen-crop-image", { line_item_id: lineItemId, item_key: itemKey, icon: "screenshot" })
+              ? reviewTaskActionHtml("Bildschirm-Snip", "snip-paste-image", { line_item_id: lineItemId, item_key: itemKey, icon: "screenshot" })
               : "",
             imageRelated && Number.isFinite(lineItemId)
               ? reviewTaskActionHtml("Kein Bild", "clear-image", { line_item_id: lineItemId, warning: true })
@@ -14592,7 +14798,7 @@
       }
 
       const fieldRows = [];
-      for (const fieldName of ["supplier_name", "document_type", "document_number", "document_date", "customer", "gross_total"]) {
+      for (const fieldName of ["supplier_name", "document_type", "document_number", "document_date", "gross_total"]) {
         const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
         const policy = validationFieldPolicy(validation, fieldName);
@@ -14610,18 +14816,22 @@
         );
       }
       if (String(document.document_type || "").toLowerCase() === "auftragsbestaetigung") {
-        const fieldName = "offer_reference";
-        const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
-        const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
-        fieldRows.push(
-          reviewRowHtml(
-            `${REVIEW_FIELD_LABELS[fieldName] || fieldName} · empfohlen`,
-            reviewFieldValue(document, fieldName),
-            `${reviewFlagHtml(recommended[fieldName] ? "vorhanden" : "offen", recommended[fieldName] ? "ok" : "review")}${sourceKey ? sourceTagHtml(source) : ""}`
-          )
-        );
+        const linkedOffer = !!document.linked_offer_document_id;
+        const linkedValue = linkedOffer
+          ? `Angebot #${document.linked_offer_document_id}${document.offer_reference ? " · " + document.offer_reference : ""}`
+          : "— kein Angebot zugeordnet —";
+        fieldRows.push(`
+          <div class="review-row ab-ref-row">
+            <div class="review-row-main">
+              <div class="review-row-title">AB-Referenz · empfohlen</div>
+              <div class="review-row-sub">${escapeHtml(linkedValue)}</div>
+            </div>
+            <div class="review-row-meta">${reviewFlagHtml(linkedOffer ? "zugeordnet" : "offen", linkedOffer ? "ok" : "review")}</div>
+            <div class="ab-assign-slot" id="abAssignSlot"></div>
+          </div>
+        `);
       }
-      for (const fieldName of ["project_ref", "net_total", "vat_total"]) {
+      for (const fieldName of ["customer", "project_ref", "net_total", "vat_total"]) {
         const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
         const policy = validationFieldPolicy(validation, fieldName);
@@ -14671,6 +14881,15 @@
         )
       );
       ui.fieldChecklist.innerHTML = fieldRows.join("");
+
+      // AB-Referenz: interaktiven "Angebot zuordnen"-Widget in die Checklist-Zeile einhaengen
+      // (nur bei Auftragsbestaetigung; ersetzt die fruehere Karte in den Dokumentdetails).
+      if (String(document.document_type || "").toLowerCase() === "auftragsbestaetigung") {
+        const abSlot = ui.fieldChecklist.querySelector("#abAssignSlot");
+        if (abSlot) {
+          abSlot.appendChild(createSummaryOfferSelect({ linkedId: document.linked_offer_document_id || null }));
+        }
+      }
 
       const grossFlag = validationBooleanFlag(totals.net_plus_vat_matches_gross);
       const componentCheckMode = String(totals.component_check_mode || "").trim().toLowerCase();
@@ -15427,7 +15646,10 @@
         option.value = String(doc.id);
         const supplier = doc.supplier_name || "ohne Lieferant";
         const approvalStatus = String(doc.approval_status || "pending").trim().toLowerCase();
-        const approvalLabel = approvalStatus === "approved" ? "freigegeben" : "offen";
+        const reviewer = String(doc.reviewed_by || "").trim();
+        const approvalLabel = approvalStatus === "approved"
+          ? (reviewer ? `freigegeben von ${reviewer}` : "freigegeben")
+          : "offen";
         option.textContent = `#${doc.id} | ${doc.original_filename} | ${supplier} | ${doc.status} | ${approvalLabel}`;
         ui.docSelect.appendChild(option);
       }
@@ -15590,13 +15812,6 @@
         ["Freigabe", String(document.approval_status || "").toLowerCase() === "approved" ? "Freigegeben" : "Offen", null, false],
         ["Dokumenttyp", formatDocumentType(document.document_type), "document_type", true],
         ["Lieferant", document.supplier_name, "supplier_name", true],
-        ...(String(document.document_type || "").toLowerCase() === "auftragsbestaetigung"
-          ? [["AB-Referenz",
-              document.linked_offer_document_id
-                ? `Angebot #${document.linked_offer_document_id}${document.offer_reference ? " · " + document.offer_reference : ""}`
-                : "— kein Angebot zugeordnet —",
-              null, false]]
-          : []),
         [documentNumberLabel, document.document_number, "document_number", true],
         ["Datum", formatDate(document.document_date), "document_date", true],
         ["Projekt", document.project_ref, "project_ref", false],
@@ -15617,11 +15832,7 @@
       ];
 
       for (const [label, value, sourceKey, required] of cards) {
-        const cardOptions = { required };
-        if (label === "AB-Referenz") {
-          cardOptions.offerSelect = { linkedId: document.linked_offer_document_id || null };
-        }
-        ui.summary.appendChild(createSummaryCard(label, value, sourceKey, cardOptions));
+        ui.summary.appendChild(createSummaryCard(label, value, sourceKey, { required }));
       }
       if (document.document_notes) {
         ui.summary.appendChild(createSummaryCard("Vortext / Allgemeine Ausführung", document.document_notes, null, { wide: true }));
@@ -15953,6 +16164,7 @@
       }
       resetPdfCropSelection();
       if (ui.pdfCropOverlay) ui.pdfCropOverlay.setAttribute("hidden", "");
+      if (ui.app) ui.app.classList.remove("pdf-snip-active");
       if (ui.pdfCropPreviewImg) ui.pdfCropPreviewImg.removeAttribute("src");
       if (!silent) setStatus("Manuelle Bildauswahl abgebrochen.", "warn");
     }
@@ -16117,6 +16329,7 @@
       if (ui.pdfCropTitle) ui.pdfCropTitle.textContent = `Bildbereich für Pos. ${fmt(item.position_no)} · Seite ${fmt(page)}`;
       if (ui.pdfCropHint) ui.pdfCropHint.textContent = "Rechteck auf der PDF-Seite ziehen, um den Ausschnitt als Positionsbild zu speichern.";
       ui.pdfCropPreviewImg.src = `/document/${state.documentId}/page/${page}/preview?scale=2&crop_preview=${Date.now()}`;
+      if (ui.app) ui.app.classList.remove("pdf-snip-active");
       ui.pdfCropOverlay.removeAttribute("hidden");
       setStatus("Ziehe im PDF ein Rechteck um das gewünschte Bild.");
       if (button instanceof HTMLElement) button.blur();
@@ -16188,6 +16401,7 @@
         if (ui.pdfCropTitle) ui.pdfCropTitle.textContent = `Bildschirmbereich für Pos. ${fmt(item.position_no)}`;
         if (ui.pdfCropHint) ui.pdfCropHint.textContent = "Rechteck im Bildschirmfoto ziehen, um den Ausschnitt als Positionsbild zu speichern.";
         ui.pdfCropPreviewImg.src = state.pdfCrop.previewObjectUrl;
+        if (ui.app) ui.app.classList.add("pdf-snip-active");
         ui.pdfCropOverlay.removeAttribute("hidden");
         setStatus("Ziehe im Screenshot ein Rechteck um das gewünschte Bild.");
       } catch (error) {
@@ -16200,6 +16414,99 @@
           stream.getTracks().forEach((track) => track.stop());
         }
       }
+    }
+
+    // ---- Native Snip + Paste (OS-Snipping-Tool -> Strg+V) -----------------------------
+    // Funktioniert auch ueber http (kein secure context noetig, anders als getDisplayMedia).
+    function armSnipPasteForLineItem(lineItemId, itemKey, button) {
+      if (!state.documentId || !ui.snipPasteOverlay) return;
+      const item = lineItemById(lineItemId);
+      if (!item) {
+        setStatus(`Position ${lineItemId} wurde nicht gefunden.`, "warn");
+        return;
+      }
+      if (state.pdfCrop && state.pdfCrop.active) cancelPdfCrop({ silent: true });
+      const page = clampPdfPage(item.page_ref || state.pdf.page || 1);
+      state.pendingScreenshot = {
+        lineItemId: Number(lineItemId),
+        itemKey: String(itemKey || ""),
+        page,
+      };
+      if (ui.snipPasteTitle) ui.snipPasteTitle.textContent = `Screenshot für Pos. ${fmt(item.position_no)} einfügen`;
+      ui.snipPasteOverlay.removeAttribute("hidden");
+      if (button instanceof HTMLElement) button.blur();
+      // Windows: natives Snip-Overlay direkt oeffnen (Win+Shift+S-Aequivalent).
+      if (/Windows/i.test(navigator.userAgent || "")) {
+        try { window.location.href = "ms-screenclip:"; } catch (_) { /* ignore */ }
+      }
+      setStatus("Bereich snippen (Win+Shift+S) — danach hier auf 'Screenshot einfügen' klicken (oder Strg+V).");
+    }
+
+    function cancelSnipPaste({ silent = false } = {}) {
+      state.pendingScreenshot = null;
+      if (ui.snipPasteOverlay) ui.snipPasteOverlay.setAttribute("hidden", "");
+      if (ui.snipPasteDrop) ui.snipPasteDrop.classList.remove("is-dragover");
+      if (ui.snipPasteFileInput) ui.snipPasteFileInput.value = "";
+      if (!silent) setStatus("Screenshot-Zuordnung abgebrochen.", "warn");
+    }
+
+    function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Bild konnte nicht gelesen werden."));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function assignPendingImageBlob(blob) {
+      const pending = state.pendingScreenshot;
+      if (!pending || !state.documentId || !blob) return;
+      if (!String(blob.type || "").startsWith("image/")) {
+        setStatus("Das eingefügte Element ist kein Bild.", "warn");
+        return;
+      }
+      const lineItemId = Number(pending.lineItemId);
+      const itemKey = pending.itemKey;
+      setStatus(`Bild wird für Position ${lineItemId} gespeichert ...`);
+      try {
+        const imageDataUrl = await blobToDataUrl(blob);
+        const payload = {
+          page_ref: clampPdfPage(pending.page || state.pdf.page || 1),
+          image_data_url: imageDataUrl,
+        };
+        const response = await apiJson(`/documents/${state.documentId}/line-items/${lineItemId}/screen-crop-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const expandedSnapshot = new Set(state.expandedItemKeys);
+        if (itemKey) expandedSnapshot.add(itemKey);
+        cancelSnipPaste({ silent: true });
+        await loadResult(state.documentId);
+        state.expandedItemKeys = expandedSnapshot;
+        if (state.result) renderLineItems(state.result.line_items || []);
+        setExtractTab("items");
+        setStatus(`Bild wurde als #${response.image_id} der Position ${lineItemId} zugeordnet.`, "ok");
+      } catch (error) {
+        setStatus(`Bild konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    function imageBlobFromClipboard(clipboardData) {
+      if (!clipboardData) return null;
+      const items = clipboardData.items || [];
+      for (const entry of items) {
+        if (entry.kind === "file" && String(entry.type || "").startsWith("image/")) {
+          const file = entry.getAsFile();
+          if (file) return file;
+        }
+      }
+      const files = clipboardData.files || [];
+      for (const file of files) {
+        if (String(file.type || "").startsWith("image/")) return file;
+      }
+      return null;
     }
 
     async function setLineItemReviewChecked(lineItemId, checked, button) {
@@ -16479,7 +16786,7 @@
             ? reviewTaskActionHtml("PDF-Ausschnitt", "crop-image", { line_item_id: lineItemId, item_key: itemKey, primary: true, icon: "screenshot" })
             : "",
           !isNonVisual && Number.isFinite(lineItemId)
-            ? reviewTaskActionHtml("Bildschirm", "screen-crop-image", { line_item_id: lineItemId, item_key: itemKey, icon: "screenshot" })
+            ? reviewTaskActionHtml("Bildschirm-Snip", "snip-paste-image", { line_item_id: lineItemId, item_key: itemKey, icon: "screenshot" })
             : "",
           !isNonVisual && Number.isFinite(lineItemId)
             ? reviewTaskActionHtml("Kein Bild setzen", "clear-image", { line_item_id: lineItemId, warning: true })
@@ -19160,6 +19467,11 @@
       state.vendocLatestImportedAt = importState && importState.latest_imported_at
         ? String(importState.latest_imported_at)
         : null;
+      // Hinweis (kein Blocker): fehlender Endkunde wird im Bestaetigungsmodal erwaehnt.
+      const currentDoc = state.result && state.result.document ? state.result.document : {};
+      const customerHint = String(currentDoc.customer_name || "").trim()
+        ? []
+        : ["⚠️ Kein Endkunde gesetzt — die Übergabe ist trotzdem möglich."];
       const ok = await openConfirmModal(
         alreadyImported
           ? {
@@ -19171,6 +19483,7 @@
                 "Ein erneuter Import überschreibt keinen bestehenden Beleg.",
                 "Es wird ein zusätzlicher Beleg im ERP erzeugt.",
                 "Bitte nur erneut importieren, wenn der zusätzliche Beleg bewusst erzeugt werden soll.",
+                ...customerHint,
               ],
               confirmLabel: "Trotzdem erneut importieren",
               confirmKind: "danger",
@@ -19181,6 +19494,7 @@
                 packageMode
                   ? `Multi-PDF-Paket mit Master #${packageBody.main_document_id} wirklich nach VenDoc übergeben?`
                   : `Dokument #${state.documentId} wirklich nach VenDoc übergeben?`,
+                ...customerHint,
               ],
               confirmLabel: "Import starten",
               confirmKind: "primary",
@@ -19226,15 +19540,14 @@
           return;
         }
 
-        const payload = result.body || {};
-        setStatus(`VenDoc Übergabe fertig: ${fmt(payload.status)}.`, "ok");
-        state.previewFormat = "json";
-        state.previewContent = JSON.stringify(payload.write || payload, null, 2);
-        ui.previewTitle.textContent = packageMode
-          ? `VenDoc Übergabe - Multi-PDF-Paket #${packageBody.main_document_id}`
-          : `VenDoc Übergabe - Dokument #${state.documentId}`;
-        ui.previewContent.textContent = state.previewContent;
-        openPreviewModal();
+        // Kein JSON-Vorschau-Popup mehr: eine kurze Toast-/Statusmeldung genuegt (Metadaten
+        // sind fuer den Nutzer uninteressant).
+        setStatus(
+          packageMode
+            ? "Multi-PDF-Paket wurde freigegeben und an VenDoc übergeben."
+            : `Dokument #${state.documentId} wurde freigegeben und an VenDoc übergeben.`,
+          "ok"
+        );
       } catch (error) {
         setStatus(`VenDoc Übergabe fehlgeschlagen: ${String(error.message).slice(0, 260)}`, "err");
       } finally {
@@ -19538,6 +19851,10 @@
         void startScreenCropForLineItem(lineItemId, itemKey, actionButton);
         return;
       }
+      if (action === "snip-paste-image" && Number.isFinite(lineItemId)) {
+        armSnipPasteForLineItem(lineItemId, itemKey, actionButton);
+        return;
+      }
       if (action === "mark-reviewed" && Number.isFinite(lineItemId)) {
         void setLineItemReviewChecked(lineItemId, true, actionButton);
         return;
@@ -19579,6 +19896,11 @@
         if (action === "screen-crop-image") {
           const itemKey = String(reviewAction.getAttribute("data-item_key") || "");
           void startScreenCropForLineItem(lineItemId, itemKey, reviewAction);
+          return;
+        }
+        if (action === "snip-paste-image") {
+          const itemKey = String(reviewAction.getAttribute("data-item_key") || "");
+          armSnipPasteForLineItem(lineItemId, itemKey, reviewAction);
           return;
         }
         if (action === "mark-reviewed") {
@@ -19712,6 +20034,40 @@
     ui.pdfOpenBtn.addEventListener("click", () => openCurrentPdf());
     if (ui.pdfCropCancelBtn) {
       ui.pdfCropCancelBtn.addEventListener("click", () => cancelPdfCrop());
+    }
+
+    // Snip + Paste: Zwischenablage/Drop/Datei aufnehmen, solange eine Position "bewaffnet" ist.
+    document.addEventListener("paste", (event) => {
+      if (!state.pendingScreenshot) return;
+      const blob = imageBlobFromClipboard(event.clipboardData);
+      if (!blob) return; // kein Bild -> normalen Paste (z. B. in Textfeld) zulassen
+      event.preventDefault();
+      void assignPendingImageBlob(blob);
+    });
+    if (ui.snipPasteCancelBtn) {
+      ui.snipPasteCancelBtn.addEventListener("click", () => cancelSnipPaste());
+    }
+    if (ui.snipPasteFileBtn && ui.snipPasteFileInput) {
+      ui.snipPasteFileBtn.addEventListener("click", () => ui.snipPasteFileInput.click());
+      ui.snipPasteFileInput.addEventListener("change", () => {
+        const file = ui.snipPasteFileInput.files && ui.snipPasteFileInput.files[0];
+        if (file) void assignPendingImageBlob(file);
+      });
+    }
+    if (ui.snipPasteDrop) {
+      ui.snipPasteDrop.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        ui.snipPasteDrop.classList.add("is-dragover");
+      });
+      ui.snipPasteDrop.addEventListener("dragleave", () => {
+        ui.snipPasteDrop.classList.remove("is-dragover");
+      });
+      ui.snipPasteDrop.addEventListener("drop", (event) => {
+        event.preventDefault();
+        ui.snipPasteDrop.classList.remove("is-dragover");
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file && String(file.type || "").startsWith("image/")) void assignPendingImageBlob(file);
+      });
     }
     if (ui.pdfCropWorkspace) {
       ui.pdfCropWorkspace.addEventListener("pointerdown", (event) => {

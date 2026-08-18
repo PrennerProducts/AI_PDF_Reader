@@ -15,6 +15,9 @@ CONFIDENCE_REVIEW = Decimal("0.60")
 NON_BLOCKING_IMAGE_WARNING_CODES = frozenset(
     {"missing_image_assignment", "koch_detail_drawings_missing"}
 )
+# Warnungen, die sichtbar bleiben, aber die Freigabe NICHT sperren.
+# Fehlender Endkunde ist nur ein Hinweis (kein Pflichtfeld).
+NON_BLOCKING_WARNING_CODES = NON_BLOCKING_IMAGE_WARNING_CODES | frozenset({"missing_customer"})
 COMPLEX_PRICING_TERMS = (
     "rabatt",
     "zuschlag",
@@ -458,10 +461,12 @@ def _build_required_field_summary(document: dict[str, Any]) -> tuple[dict[str, b
         "document_type": document_type in {"angebot", "auftragsbestaetigung"},
         "document_number": _has_text(document.get("document_number")),
         "document_date": document.get("document_date") is not None,
-        "customer": _has_text(document.get("customer_name")),
         "gross_total": koch_offer_net_only or _to_decimal(document.get("gross_total")) is not None,
     }
     recommended_fields = {
+        # Endkunde ist kein Pflichtfeld: fehlt er, ist es nur ein nicht-blockierender
+        # Hinweis (missing_customer in NON_BLOCKING_WARNING_CODES) -- manchmal gibt es keinen.
+        "customer": _has_text(document.get("customer_name")),
         "project_ref": _has_text(document.get("project_ref")),
         "net_total": _to_decimal(document.get("net_total")) is not None,
         "vat_total": koch_offer_net_only or _to_decimal(document.get("vat_total")) is not None,
@@ -1034,13 +1039,13 @@ def build_document_validation(
             issue
             for issue in document_issues
             if issue.get("severity") == "warning"
-            and issue.get("code") in NON_BLOCKING_IMAGE_WARNING_CODES
+            and issue.get("code") in NON_BLOCKING_WARNING_CODES
         ]
     )
     error_count = document_error_count + line_item_error_count
     warning_count = document_warning_count + line_item_warning_count
-    # "Kein Bild"-Hinweise bleiben in warning_count sichtbar, zaehlen aber nicht in
-    # die Freigabe-Sperre (siehe NON_BLOCKING_IMAGE_WARNING_CODES).
+    # "Kein Bild"- und "kein Endkunde"-Hinweise bleiben in warning_count sichtbar,
+    # zaehlen aber nicht in die Freigabe-Sperre (siehe NON_BLOCKING_WARNING_CODES).
     image_hint_warning_count += document_image_hint_warning_count
     blocking_warning_count = warning_count - image_hint_warning_count
 
