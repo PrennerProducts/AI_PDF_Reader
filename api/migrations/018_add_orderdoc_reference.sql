@@ -1,0 +1,3 @@
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS orderdoc_destination TEXT,
+    ADD COLUMN IF NOT EXISTS orderdoc_additional BOOLEAN NOT NULL DEFAULT FALSE;

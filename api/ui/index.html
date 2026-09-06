@@ -8975,6 +8975,29 @@
       overflow: visible;
     }
 
+    .app-v3 .vendoc-auftrag-controls {
+      margin-top: 12px;
+      z-index: 1;
+    }
+
+    .app-v3 .vendoc-auftrag-additional {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      color: rgba(29, 29, 31, 0.82);
+    }
+
+    .app-v3 .vendoc-auftrag-additional input:disabled {
+      cursor: not-allowed;
+    }
+
+    .app-v3 .vendoc-auftrag-additional:has(input:disabled) {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .app-v3 .vendoc-start-customer-card {
       position: relative;
       z-index: 120;
@@ -11976,6 +11999,36 @@
                     </div>
                     <div class="vendoc-customer-meta" id="vendocCustomerMeta">Noch keine Kundenliste geladen.</div>
                   </div>
+                  <div class="vendoc-customer-controls vendoc-auftrag-controls">
+                    <label for="vendocAuftragTrigger">
+                      <span>Bezugs-Auftrag</span>
+                    </label>
+                    <div class="vendoc-customer-picker" id="vendocAuftragPicker">
+                      <button class="vendoc-customer-trigger" id="vendocAuftragTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
+                        <span class="vendoc-customer-trigger-text" id="vendocAuftragTriggerText">Aufträge werden geladen ...</span>
+                        <span class="vendoc-customer-trigger-caret">▾</span>
+                      </button>
+                      <div class="vendoc-customer-panel" id="vendocAuftragPanel" hidden>
+                        <div class="vendoc-customer-search-row">
+                          <label for="vendocAuftragSearch">
+                            <span>Auftrag suchen</span>
+                            <input id="vendocAuftragSearch" type="search" placeholder="Auftragsnummer oder Bezeichnung eingeben" autocomplete="off" disabled>
+                          </label>
+                          <div class="vendoc-customer-search-tools">
+                            <span class="vendoc-customer-search-count" id="vendocAuftragSearchCount">0 Treffer</span>
+                            <button class="btn btn-ghost" id="vendocAuftragSearchClearBtn" type="button" disabled>Zurücksetzen</button>
+                          </div>
+                        </div>
+                        <div class="vendoc-customer-results" id="vendocAuftragResults" role="listbox" aria-label="Auftragsliste SRTemp"></div>
+                        <div class="vendoc-customer-empty" id="vendocAuftragEmpty">Aufträge werden geladen ...</div>
+                      </div>
+                    </div>
+                    <label class="vendoc-auftrag-additional" for="vendocAuftragAdditional">
+                      <input type="checkbox" id="vendocAuftragAdditional" disabled>
+                      <span>Alternativangebot zu diesem Auftrag</span>
+                    </label>
+                    <div class="vendoc-customer-meta" id="vendocAuftragMeta">Optional – leer lassen für neuen Hauptauftrag.</div>
+                  </div>
                 </div>
                 <div class="approval-guide" id="approvalGuide"></div>
                 <details class="overview-details">
@@ -12337,6 +12390,12 @@
       vendocCustomersError: "",
       vendocCustomerQuery: "",
       vendocCustomerPickerOpen: false,
+      vendocAuftraege: [],
+      vendocAuftraegeLoaded: false,
+      vendocAuftraegeViewName: "",
+      vendocAuftraegeError: "",
+      vendocAuftragQuery: "",
+      vendocAuftragPickerOpen: false,
       vendocAlreadyImported: false,
       vendocLatestImportedAt: null,
       pendingScreenshot: null,
@@ -12406,6 +12465,17 @@
       vendocCustomerResults: document.getElementById("vendocCustomerResults"),
       vendocCustomerEmpty: document.getElementById("vendocCustomerEmpty"),
       vendocCustomerMeta: document.getElementById("vendocCustomerMeta"),
+      vendocAuftragPicker: document.getElementById("vendocAuftragPicker"),
+      vendocAuftragTrigger: document.getElementById("vendocAuftragTrigger"),
+      vendocAuftragTriggerText: document.getElementById("vendocAuftragTriggerText"),
+      vendocAuftragPanel: document.getElementById("vendocAuftragPanel"),
+      vendocAuftragSearch: document.getElementById("vendocAuftragSearch"),
+      vendocAuftragSearchCount: document.getElementById("vendocAuftragSearchCount"),
+      vendocAuftragSearchClearBtn: document.getElementById("vendocAuftragSearchClearBtn"),
+      vendocAuftragResults: document.getElementById("vendocAuftragResults"),
+      vendocAuftragEmpty: document.getElementById("vendocAuftragEmpty"),
+      vendocAuftragAdditional: document.getElementById("vendocAuftragAdditional"),
+      vendocAuftragMeta: document.getElementById("vendocAuftragMeta"),
       alternativeModeSegment: document.getElementById("alternativeModeSegment"),
       alternativeModeSegmentItems: document.getElementById("alternativeModeSegmentItems"),
       alternativeModeMeta: document.getElementById("alternativeModeMeta"),
@@ -17228,6 +17298,8 @@
         syncFieldSources();
         renderVendocCustomerSelect();
         void loadVendocCustomers();
+        renderVendocAuftragSelect();
+        void loadVendocAuftraege();
         const imageCount = (result.images || []).length;
         const itemCount = (result.line_items || []).length;
         const packagePrefix = usePackage ? `Multi-PDF-Paket #${documentId}` : `Dokument #${documentId}`;
@@ -17260,6 +17332,7 @@
         setDocumentApprovalPills(null);
         setVendocExportState("Nicht geprüft", "pending");
         renderVendocCustomerSelect();
+        renderVendocAuftragSelect();
         updateWorkflowNavigation();
         renderReview(null);
         renderDocumentIssues(null);
@@ -17626,6 +17699,202 @@
         ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen · ausgewählt: ${vendocCustomerOptionLabel(documentPayload)}`;
       } else {
         ui.vendocCustomerMeta.textContent = `${items.length} Kunden aus ${state.vendocCustomersViewName || "SRTemp"} geladen.`;
+      }
+    }
+
+    function vendocAuftragKey(item) {
+      if (!item || typeof item !== "object") return "";
+      return String(item.bezeichnung || "").trim();
+    }
+
+    function filteredVendocAuftraege(items, query) {
+      const normalized = String(query || "").trim().toLowerCase();
+      if (!normalized || normalized.length < 2) return [];
+      return items.filter((item) => vendocAuftragKey(item).toLowerCase().includes(normalized));
+    }
+
+    function defaultVendocAuftraege(items, selectedKey) {
+      const ordered = [...items].sort((a, b) =>
+        vendocAuftragKey(a).localeCompare(vendocAuftragKey(b), "de", { sensitivity: "base" })
+      );
+      const selectedItem = ordered.find((item) => vendocAuftragKey(item) === selectedKey) || null;
+      const rest = ordered.filter((item) => vendocAuftragKey(item) !== selectedKey).slice(0, 40);
+      return selectedItem ? [selectedItem, ...rest] : rest;
+    }
+
+    function setVendocAuftragPickerOpen(open) {
+      state.vendocAuftragPickerOpen = !!open;
+      if (ui.vendocAuftragPanel) ui.vendocAuftragPanel.hidden = !state.vendocAuftragPickerOpen;
+      if (ui.vendocAuftragTrigger) ui.vendocAuftragTrigger.setAttribute("aria-expanded", state.vendocAuftragPickerOpen ? "true" : "false");
+      if (state.vendocAuftragPickerOpen && ui.vendocAuftragSearch && !ui.vendocAuftragSearch.disabled) {
+        window.setTimeout(() => ui.vendocAuftragSearch.focus(), 0);
+      }
+    }
+
+    function renderVendocAuftragSelect() {
+      if (!ui.vendocAuftragMeta) return;
+      const documentPayload = state.result && state.result.document ? state.result.document : null;
+      const selectedKey = String(documentPayload && documentPayload.orderdoc_destination || "").trim();
+      const additional = !!(documentPayload && documentPayload.orderdoc_additional);
+      const items = Array.isArray(state.vendocAuftraege) ? state.vendocAuftraege : [];
+      const query = String(state.vendocAuftragQuery || "").trim();
+      const matches = filteredVendocAuftraege(items, query);
+      const renderItems = query && query.length >= 2 ? matches.slice(0, 100) : defaultVendocAuftraege(items, selectedKey);
+
+      if (ui.vendocAuftragResults) {
+        clearNode(ui.vendocAuftragResults);
+        const clearBtn = document.createElement("button");
+        clearBtn.type = "button";
+        clearBtn.className = `vendoc-customer-result${!selectedKey ? " is-selected" : ""}`;
+        const clearTitle = document.createElement("div");
+        clearTitle.className = "vendoc-customer-result-main";
+        clearTitle.textContent = "— Kein Bezugs-Auftrag (neuer Hauptauftrag) —";
+        clearBtn.appendChild(clearTitle);
+        clearBtn.addEventListener("click", async () => { await saveVendocAuftragSelection("", false); });
+        ui.vendocAuftragResults.appendChild(clearBtn);
+
+        for (const item of renderItems) {
+          const key = vendocAuftragKey(item);
+          if (!key) continue;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `vendoc-customer-result${key === selectedKey ? " is-selected" : ""}`;
+          const title = document.createElement("div");
+          title.className = "vendoc-customer-result-main";
+          title.textContent = key;
+          button.appendChild(title);
+          if (key === selectedKey) {
+            const meta = document.createElement("div");
+            meta.className = "vendoc-customer-result-meta";
+            const chip = document.createElement("span");
+            chip.className = "vendoc-customer-result-chip";
+            chip.textContent = "ausgewählt";
+            meta.appendChild(chip);
+            button.appendChild(meta);
+          }
+          button.addEventListener("click", async () => {
+            await saveVendocAuftragSelection(key, additional);
+          });
+          ui.vendocAuftragResults.appendChild(button);
+        }
+      }
+
+      if (ui.vendocAuftragSearch) {
+        ui.vendocAuftragSearch.value = state.vendocAuftragQuery || "";
+        ui.vendocAuftragSearch.disabled = !state.documentId || !items.length;
+      }
+      if (ui.vendocAuftragSearchClearBtn) {
+        ui.vendocAuftragSearchClearBtn.disabled = !state.documentId || !items.length || !state.vendocAuftragQuery;
+      }
+      if (ui.vendocAuftragSearchCount) {
+        if (!state.vendocAuftraegeLoaded) ui.vendocAuftragSearchCount.textContent = "lädt ...";
+        else if (!items.length) ui.vendocAuftragSearchCount.textContent = "0 Treffer";
+        else if (!query || query.length < 2) ui.vendocAuftragSearchCount.textContent = `${renderItems.length} sichtbar`;
+        else ui.vendocAuftragSearchCount.textContent = `${matches.length} Treffer`;
+      }
+      if (ui.vendocAuftragTrigger) {
+        ui.vendocAuftragTrigger.disabled = !state.documentId || !items.length;
+      }
+      if (ui.vendocAuftragTriggerText) {
+        if (!state.vendocAuftraegeLoaded) ui.vendocAuftragTriggerText.textContent = "Aufträge werden geladen ...";
+        else if (selectedKey) ui.vendocAuftragTriggerText.textContent = selectedKey;
+        else if (!items.length) ui.vendocAuftragTriggerText.textContent = "Keine Aufträge verfügbar";
+        else ui.vendocAuftragTriggerText.textContent = "Bezugs-Auftrag wählen (optional)";
+      }
+      if (ui.vendocAuftragEmpty) {
+        let emptyText = "";
+        if (!state.vendocAuftraegeLoaded) emptyText = "Aufträge werden geladen ...";
+        else if (!items.length) emptyText = "Keine Aufträge aus SRTemp geladen.";
+        else if (query && query.length >= 2 && !matches.length) emptyText = "Keine Treffer für die aktuelle Suche.";
+        ui.vendocAuftragEmpty.textContent = emptyText;
+        ui.vendocAuftragEmpty.hidden = !emptyText;
+      }
+      if (ui.vendocAuftragPanel && (!state.documentId || !items.length)) {
+        setVendocAuftragPickerOpen(false);
+      } else if (ui.vendocAuftragPanel) {
+        ui.vendocAuftragPanel.hidden = !state.vendocAuftragPickerOpen;
+      }
+      if (ui.vendocAuftragAdditional) {
+        ui.vendocAuftragAdditional.checked = additional;
+        ui.vendocAuftragAdditional.disabled = !state.documentId || !selectedKey;
+      }
+      if (state.vendocAuftraegeError) {
+        ui.vendocAuftragMeta.textContent = `Auftragsliste konnte nicht geladen werden: ${state.vendocAuftraegeError}`;
+      } else if (!state.vendocAuftraegeLoaded) {
+        ui.vendocAuftragMeta.textContent = "Auftragsliste aus SRTemp wird geladen ...";
+      } else if (selectedKey) {
+        ui.vendocAuftragMeta.textContent = additional
+          ? `Zugeordnet: ${selectedKey} · als Alternativangebot markiert.`
+          : `Zugeordnet: ${selectedKey}.`;
+      } else {
+        ui.vendocAuftragMeta.textContent = "Optional – leer lassen für neuen Hauptauftrag.";
+      }
+    }
+
+    async function loadVendocAuftraege(force = false) {
+      if (state.vendocAuftraegeLoaded && !force) {
+        renderVendocAuftragSelect();
+        return state.vendocAuftraege;
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+        let response;
+        try {
+          response = await fetch("/vendoc/auftraege", { signal: controller.signal });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+        const text = await response.text();
+        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+        const payload = text ? JSON.parse(text) : {};
+        state.vendocAuftraege = Array.isArray(payload.items) ? payload.items : [];
+        state.vendocAuftraegeViewName = String(payload.view_name || "");
+        state.vendocAuftraegeLoaded = true;
+        state.vendocAuftraegeError = "";
+      } catch (error) {
+        state.vendocAuftraege = [];
+        state.vendocAuftraegeLoaded = false;
+        state.vendocAuftraegeViewName = "";
+        state.vendocAuftraegeError = error && error.name === "AbortError"
+          ? "Zeitüberschreitung beim Laden aus SRTemp."
+          : String(error.message).slice(0, 220);
+      }
+      renderVendocAuftragSelect();
+      return state.vendocAuftraege;
+    }
+
+    async function saveVendocAuftragSelection(destination, additional) {
+      if (!state.documentId) return;
+      const dest = String(destination || "").trim();
+      const add = dest ? !!additional : false;
+      if (ui.vendocAuftragSearch) ui.vendocAuftragSearch.disabled = true;
+      if (ui.vendocAuftragSearchClearBtn) ui.vendocAuftragSearchClearBtn.disabled = true;
+      if (ui.vendocAuftragTrigger) ui.vendocAuftragTrigger.disabled = true;
+      if (ui.vendocAuftragAdditional) ui.vendocAuftragAdditional.disabled = true;
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/vendoc-auftrag`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderdoc_destination: dest || null, orderdoc_additional: add }),
+        });
+        if (state.result && state.result.document) {
+          state.result.document.orderdoc_destination = response.orderdoc_destination || null;
+          state.result.document.orderdoc_additional = !!response.orderdoc_additional;
+          syncCurrentDocumentIntoList(state.result.document);
+          renderSummary(state.result);
+        }
+        setVendocAuftragPickerOpen(false);
+        setStatus(
+          dest
+            ? (add ? `Bezugs-Auftrag gesetzt (Alternativangebot): ${dest}.` : `Bezugs-Auftrag gesetzt: ${dest}.`)
+            : "Bezugs-Auftrag zurückgesetzt (neuer Hauptauftrag).",
+          "ok"
+        );
+      } catch (error) {
+        setStatus(`Bezugs-Auftrag konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      } finally {
+        renderVendocAuftragSelect();
       }
     }
 
@@ -20188,6 +20457,38 @@
         }
       });
     }
+    if (ui.vendocAuftragTrigger) {
+      ui.vendocAuftragTrigger.addEventListener("click", () => {
+        if (ui.vendocAuftragTrigger.disabled) return;
+        setVendocAuftragPickerOpen(!state.vendocAuftragPickerOpen);
+      });
+    }
+    if (ui.vendocAuftragSearch) {
+      ui.vendocAuftragSearch.addEventListener("input", () => {
+        state.vendocAuftragQuery = String(ui.vendocAuftragSearch.value || "");
+        renderVendocAuftragSelect();
+      });
+    }
+    if (ui.vendocAuftragSearchClearBtn) {
+      ui.vendocAuftragSearchClearBtn.addEventListener("click", () => {
+        state.vendocAuftragQuery = "";
+        renderVendocAuftragSelect();
+        if (ui.vendocAuftragSearch && !ui.vendocAuftragSearch.disabled) {
+          ui.vendocAuftragSearch.focus();
+        }
+      });
+    }
+    if (ui.vendocAuftragAdditional) {
+      ui.vendocAuftragAdditional.addEventListener("change", () => {
+        const documentPayload = state.result && state.result.document ? state.result.document : null;
+        const dest = String(documentPayload && documentPayload.orderdoc_destination || "").trim();
+        if (!dest) {
+          ui.vendocAuftragAdditional.checked = false;
+          return;
+        }
+        void saveVendocAuftragSelection(dest, ui.vendocAuftragAdditional.checked);
+      });
+    }
     alternativeModeSegments().forEach((segment) => {
       segment.addEventListener("click", async (event) => {
         const button = event.target.closest("[data-alternative-mode]");
@@ -20204,6 +20505,11 @@
       if (!state.vendocCustomerPickerOpen) return;
       if (ui.vendocCustomerPicker && ui.vendocCustomerPicker.contains(event.target)) return;
       setVendocCustomerPickerOpen(false);
+    });
+    document.addEventListener("click", (event) => {
+      if (!state.vendocAuftragPickerOpen) return;
+      if (ui.vendocAuftragPicker && ui.vendocAuftragPicker.contains(event.target)) return;
+      setVendocAuftragPickerOpen(false);
     });
     ui.copyPreviewBtn.addEventListener("click", async () => {
       await copyPreviewContent();
@@ -20258,6 +20564,7 @@
     closePreviewModal();
     setExtractTab(state.activeExtractTab);
     renderVendocCustomerSelect();
+    renderVendocAuftragSelect();
     renderReview(null);
     renderReviewWorkbench(null);
     renderDocumentIssues(null);

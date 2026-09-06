@@ -12,6 +12,7 @@ HEADER_TABLE = "dbo.vendoc_import_headers"
 POSITION_TABLE = "dbo.vendoc_import_positions"
 ODBC_DRIVER = "ODBC Driver 18 for SQL Server"
 DEFAULT_CUSTOMER_VIEW = "dbo.Kundendaten"
+DEFAULT_ORDER_VIEW = "dbo.Auftrag"
 
 HEADER_COLUMNS = [
     "external_document_id",
@@ -32,6 +33,8 @@ HEADER_COLUMNS = [
     "subject",
     "tax_type",
     "customer_id",
+    "orderdoc_destination",
+    "orderdoc_additional",
 ]
 
 POSITION_COLUMNS = [
@@ -161,6 +164,10 @@ def customer_view_from_env() -> str:
     return _clean(os.getenv("VENDOC_MSSQL_CUSTOMER_VIEW")) or DEFAULT_CUSTOMER_VIEW
 
 
+def order_view_from_env() -> str:
+    return _clean(os.getenv("VENDOC_MSSQL_ORDER_VIEW")) or DEFAULT_ORDER_VIEW
+
+
 def driver_status() -> dict[str, Any]:
     try:
         import pyodbc  # type: ignore
@@ -279,6 +286,35 @@ def list_customer_options(config: VendocMssqlConfig, *, view_name: str | None = 
                     "display_name": display_name,
                 }
             )
+
+    return {
+        "view_name": resolved_view,
+        "items": items,
+        "count": len(items),
+    }
+
+
+def list_auftrag_options(config: VendocMssqlConfig, *, view_name: str | None = None) -> dict[str, Any]:
+    status = driver_status()
+    if not status["available"]:
+        raise RuntimeError(status["error"] or f"{ODBC_DRIVER} not installed")
+
+    resolved_view = _validated_sql_object_name(view_name or order_view_from_env())
+    query = f"""
+        SELECT Bezeichnung
+        FROM {resolved_view}
+        ORDER BY Bezeichnung;
+    """
+
+    items: list[dict[str, Any]] = []
+    with _connect(config) as conn:
+        cursor = conn.cursor()
+        rows = cursor.execute(query).fetchall()
+        for row in rows:
+            bezeichnung = _to_str(row[0])
+            if bezeichnung is None:
+                continue
+            items.append({"bezeichnung": bezeichnung})
 
     return {
         "view_name": resolved_view,

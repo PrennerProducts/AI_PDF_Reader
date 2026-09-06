@@ -1251,6 +1251,8 @@ def build_vendoc_payload(result_data: dict[str, Any], *, exported_at: datetime |
         "subject": _to_str(document.get("project_ref")),
         "tax_type": None,
         "customer_id": _to_str(document.get("vendoc_customer_number")),
+        "orderdoc_destination": _to_str(document.get("orderdoc_destination")),
+        "orderdoc_additional": bool(document.get("orderdoc_additional")),
     }
     errors.extend(
         _validate_required(

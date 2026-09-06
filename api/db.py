@@ -560,6 +560,8 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 vendoc_customer_number,
                 vendoc_customer_uid_number,
                 vendoc_customer_inactive,
+                orderdoc_destination,
+                orderdoc_additional,
                 document_type,
                 offer_reference,
                 linked_offer_document_id,
@@ -629,6 +631,35 @@ def update_document_vendoc_customer(
                 vendoc_customer_inactive,
                 document_id,
             ),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_document_vendoc_auftrag(
+    document_id: int,
+    *,
+    orderdoc_destination: str | None,
+    orderdoc_additional: bool,
+) -> dict[str, Any] | None:
+    destination = (orderdoc_destination or "").strip() or None
+    # Alternativangebot ist nur sinnvoll mit Bezugs-Auftrag; ohne Ziel immer False.
+    additional = bool(orderdoc_additional) if destination else False
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET
+                orderdoc_destination = %s,
+                orderdoc_additional = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING
+                id,
+                orderdoc_destination,
+                orderdoc_additional,
+                updated_at;
+            """,
+            (destination, additional, document_id),
         ).fetchone()
     return dict(row) if row else None
 

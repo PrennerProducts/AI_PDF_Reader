@@ -66,6 +66,7 @@ from db import (
     update_document_parse_result,
     update_document_pricing_adjustments,
     update_document_status,
+    update_document_vendoc_auftrag,
     update_document_vendoc_customer,
 )
 from extractor import extract_pdf_images, extract_pdf_text
@@ -95,7 +96,9 @@ from vendoc_mssql import (
     config_from_env,
     customer_view_from_env,
     driver_status,
+    list_auftrag_options,
     list_customer_options,
+    order_view_from_env,
     write_srtemp_payload,
 )
 
@@ -171,6 +174,11 @@ class DocumentVendocCustomerRequest(BaseModel):
     uid_number: str | None = Field(default=None, max_length=120)
     display_name: str | None = Field(default=None, max_length=255)
     inactive: bool | None = Field(default=None)
+
+
+class DocumentVendocAuftragRequest(BaseModel):
+    orderdoc_destination: str | None = Field(default=None, max_length=1000)
+    orderdoc_additional: bool = Field(default=False)
 
 
 class DocumentAlternativePositionModeRequest(BaseModel):
@@ -3556,6 +3564,17 @@ def vendoc_customers():
         raise HTTPException(status_code=502, detail=f"Kundenliste aus SRTemp konnte nicht geladen werden: {exc}") from exc
 
 
+@app.get("/vendoc/auftraege")
+def vendoc_auftraege():
+    config = config_from_env()
+    if not config:
+        raise HTTPException(status_code=503, detail="VenDoc MSSQL ist nicht konfiguriert.")
+    try:
+        return list_auftrag_options(config, view_name=order_view_from_env())
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Auftragsliste aus SRTemp konnte nicht geladen werden: {exc}") from exc
+
+
 @app.put("/documents/{document_id}/vendoc-customer")
 def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustomerRequest, request: Request):
     document = get_document(document_id)
@@ -3598,6 +3617,37 @@ def set_document_vendoc_customer(document_id: int, payload: DocumentVendocCustom
         "vendoc_customer_number": updated.get("vendoc_customer_number"),
         "vendoc_customer_uid_number": updated.get("vendoc_customer_uid_number"),
         "vendoc_customer_inactive": updated.get("vendoc_customer_inactive"),
+        "updated_at": updated.get("updated_at"),
+    }
+
+
+@app.put("/documents/{document_id}/vendoc-auftrag")
+def set_document_vendoc_auftrag(document_id: int, payload: DocumentVendocAuftragRequest, request: Request):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    updated = update_document_vendoc_auftrag(
+        document_id,
+        orderdoc_destination=_clean_optional_str(payload.orderdoc_destination),
+        orderdoc_additional=bool(payload.orderdoc_additional),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    _audit(
+        request,
+        "vendoc_auftrag_changed",
+        document_id=document_id,
+        details={
+            "orderdoc_destination": updated.get("orderdoc_destination"),
+            "orderdoc_additional": updated.get("orderdoc_additional"),
+        },
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "orderdoc_destination": updated.get("orderdoc_destination"),
+        "orderdoc_additional": updated.get("orderdoc_additional"),
         "updated_at": updated.get("updated_at"),
     }
 

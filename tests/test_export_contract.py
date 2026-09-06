@@ -69,6 +69,8 @@ EXPECTED_HEADER_COLUMNS = [
     "subject",
     "tax_type",
     "customer_id",
+    "orderdoc_destination",
+    "orderdoc_additional",
 ]
 
 EXPECTED_POSITION_COLUMNS = [
