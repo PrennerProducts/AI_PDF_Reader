@@ -12011,36 +12011,6 @@
                     </div>
                     <div class="vendoc-customer-meta" id="vendocCustomerMeta">Noch keine Kundenliste geladen.</div>
                   </div>
-                  <div class="vendoc-customer-controls vendoc-auftrag-controls">
-                    <label for="vendocAuftragTrigger">
-                      <span>Bezugs-Auftrag</span>
-                    </label>
-                    <div class="vendoc-customer-picker" id="vendocAuftragPicker">
-                      <button class="vendoc-customer-trigger" id="vendocAuftragTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
-                        <span class="vendoc-customer-trigger-text" id="vendocAuftragTriggerText">Aufträge werden geladen ...</span>
-                        <span class="vendoc-customer-trigger-caret">▾</span>
-                      </button>
-                      <div class="vendoc-customer-panel" id="vendocAuftragPanel" hidden>
-                        <div class="vendoc-customer-search-row">
-                          <label for="vendocAuftragSearch">
-                            <span>Auftrag suchen</span>
-                            <input id="vendocAuftragSearch" type="search" placeholder="Auftragsnummer oder Bezeichnung eingeben" autocomplete="off" disabled>
-                          </label>
-                          <div class="vendoc-customer-search-tools">
-                            <span class="vendoc-customer-search-count" id="vendocAuftragSearchCount">0 Treffer</span>
-                            <button class="btn btn-ghost" id="vendocAuftragSearchClearBtn" type="button" disabled>Zurücksetzen</button>
-                          </div>
-                        </div>
-                        <div class="vendoc-customer-results" id="vendocAuftragResults" role="listbox" aria-label="Auftragsliste SRTemp"></div>
-                        <div class="vendoc-customer-empty" id="vendocAuftragEmpty">Aufträge werden geladen ...</div>
-                      </div>
-                    </div>
-                    <label class="vendoc-auftrag-additional" for="vendocAuftragAdditional">
-                      <input type="checkbox" id="vendocAuftragAdditional" disabled>
-                      <span>Zusatzauftrag erzeugen</span>
-                    </label>
-                    <div class="vendoc-customer-meta" id="vendocAuftragMeta">Optional – leer lassen für neuen Hauptauftrag.</div>
-                  </div>
                 </div>
                 <div class="approval-guide" id="approvalGuide"></div>
                 <details class="overview-details">
@@ -12055,6 +12025,39 @@
                   <div class="review-card">
                     <h2>Pflicht- und Prüffelder</h2>
                     <div class="review-list" id="fieldChecklist"></div>
+                  </div>
+                  <div class="review-card">
+                    <h2>Bezugs-Auftrag</h2>
+                    <div class="vendoc-customer-controls vendoc-auftrag-controls">
+                      <label for="vendocAuftragTrigger">
+                        <span>Bezugs-Auftrag</span>
+                      </label>
+                      <div class="vendoc-customer-picker" id="vendocAuftragPicker">
+                        <button class="vendoc-customer-trigger" id="vendocAuftragTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
+                          <span class="vendoc-customer-trigger-text" id="vendocAuftragTriggerText">Aufträge werden geladen ...</span>
+                          <span class="vendoc-customer-trigger-caret">▾</span>
+                        </button>
+                        <div class="vendoc-customer-panel" id="vendocAuftragPanel" hidden>
+                          <div class="vendoc-customer-search-row">
+                            <label for="vendocAuftragSearch">
+                              <span>Auftrag suchen</span>
+                              <input id="vendocAuftragSearch" type="search" placeholder="Auftragsnummer oder Bezeichnung eingeben" autocomplete="off" disabled>
+                            </label>
+                            <div class="vendoc-customer-search-tools">
+                              <span class="vendoc-customer-search-count" id="vendocAuftragSearchCount">0 Treffer</span>
+                              <button class="btn btn-ghost" id="vendocAuftragSearchClearBtn" type="button" disabled>Zurücksetzen</button>
+                            </div>
+                          </div>
+                          <div class="vendoc-customer-results" id="vendocAuftragResults" role="listbox" aria-label="Auftragsliste SRTemp"></div>
+                          <div class="vendoc-customer-empty" id="vendocAuftragEmpty">Aufträge werden geladen ...</div>
+                        </div>
+                      </div>
+                      <label class="vendoc-auftrag-additional" for="vendocAuftragAdditional">
+                        <input type="checkbox" id="vendocAuftragAdditional" disabled>
+                        <span>Zusatzauftrag erzeugen</span>
+                      </label>
+                      <div class="vendoc-customer-meta" id="vendocAuftragMeta">Optional – leer lassen für neuen Hauptauftrag.</div>
+                    </div>
                   </div>
                   <div class="review-card">
                     <h2>Summenprüfung</h2>
