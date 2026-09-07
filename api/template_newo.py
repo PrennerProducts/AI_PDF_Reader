@@ -193,6 +193,14 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
         if description_norm.startswith("diese position"):
             description_short = ""
 
+        # Vertical position of the item within its page (0.0 top .. 1.0 bottom),
+        # from the header's line index. Gives the image matcher a per-position
+        # vertical window so the page logo (top of page 1) and a second
+        # position's sketch on the same page are not mis-assigned. Mirrors the
+        # entholzer/muigg approach.
+        line_count = max(1, len(lines))
+        item_top_ratio = min(0.98, max(0.02, start / line_count))
+
         items.append(
             {
                 "position_no": position_no,
@@ -209,6 +217,9 @@ def _extract_page_items(lines: list[str], page_ref: int | None = None) -> list[d
                 "unit_price_raw": unit_price_raw,
                 "line_total_raw": line_total_raw,
                 "page_ref": page_ref,
+                "item_top_ratio": item_top_ratio,
+                "next_position_page_ref": None,
+                "next_position_top_ratio": None,
             }
         )
 
@@ -221,4 +232,18 @@ def extract_line_items(text: str) -> list[dict[str, Any]]:
     for page_idx, page_text in enumerate(normalized_text.split("\f"), start=1):
         page_lines = [line for line in page_text.splitlines() if line.strip()]
         items.extend(_extract_page_items(page_lines, page_ref=page_idx))
+
+    # Link each image-bearing position to the next one so the image matcher can
+    # bound each vertical window from below (keeps two sketches on one page apart
+    # and excludes the header logo above the first position).
+    visual_items = [
+        item
+        for item in items
+        if item.get("image_required") and item.get("page_ref") is not None and item.get("item_top_ratio") is not None
+    ]
+    for idx, item in enumerate(visual_items[:-1]):
+        next_item = visual_items[idx + 1]
+        item["next_position_page_ref"] = next_item.get("page_ref")
+        item["next_position_top_ratio"] = next_item.get("item_top_ratio")
+
     return items
