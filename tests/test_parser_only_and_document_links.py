@@ -8,8 +8,30 @@ from fastapi import HTTPException
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 
-from db import _document_reference_key, _find_linked_offer_document_id
+from db import (
+    _document_reference_key,
+    _find_linked_offer_document_id,
+    _pick_predecessor_offer_id,
+)
 from main import _resolve_process_mode
+
+
+def test_pick_predecessor_offer_prefers_oldest_and_normalizes() -> None:
+    # Zeilen sind nach Alter AUFSTEIGEND sortiert (aeltestes zuerst) -> V1 gewinnt.
+    rows = [
+        {"id": 11, "document_number": "AN 2026-005"},   # V1 (aeltestes) -> Wurzel
+        {"id": 22, "document_number": "AN-2026-005"},   # V2 (gleiche Nummer, anders formatiert)
+        {"id": 33, "document_number": "AN-2026-999"},   # andere Nummer
+    ]
+    key = _document_reference_key("an2026005")
+    assert _pick_predecessor_offer_id(rows, key) == 11
+
+
+def test_pick_predecessor_offer_no_match_returns_none() -> None:
+    rows = [{"id": 5, "document_number": "AN-2026-111"}]
+    assert _pick_predecessor_offer_id(rows, _document_reference_key("AN-2026-222")) is None
+    assert _pick_predecessor_offer_id(rows, None) is None
+    assert _pick_predecessor_offer_id([], _document_reference_key("AN-2026-111")) is None
 
 
 def test_process_mode_accepts_parser_only() -> None:

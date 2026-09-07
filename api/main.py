@@ -46,7 +46,9 @@ from db import (
     insert_vendoc_export_job,
     list_documents,
     list_offer_candidates,
+    list_predecessor_offer_candidates,
     set_document_linked_offer,
+    set_document_predecessor_offer,
     list_vendoc_export_jobs,
     get_document_relations,
     refresh_document_links,
@@ -191,6 +193,10 @@ class DocumentPricingAdjustmentsRequest(BaseModel):
 
 class DocumentLinkedOfferRequest(BaseModel):
     linked_offer_document_id: int | None = Field(default=None)
+
+
+class DocumentPredecessorOfferRequest(BaseModel):
+    predecessor_document_id: int | None = Field(default=None)
 
 
 class LineItemAlternativeAppendRequest(BaseModel):
@@ -3304,6 +3310,20 @@ def reset_document(document_id: int, request: Request, delete_logs: bool = Query
 
 @app.get("/result/{document_id}")
 def result(document_id: int):
+    # Fall 1 (Angebot-Versionierung): solange keine manuelle Entscheidung getroffen
+    # wurde, beim Oeffnen erneut nach einem freigegebenen Vorgaenger-Angebot suchen
+    # (faengt Vorgaenger, die erst nach dem Import freigegeben wurden). Manuelle
+    # Zuordnungen (offer_link_manual) bleiben unberuehrt.
+    open_document = get_document(document_id)
+    if (
+        open_document
+        and str(open_document.get("document_type") or "").strip().lower() == "angebot"
+        and not open_document.get("offer_link_manual")
+    ):
+        try:
+            refresh_document_links(document_id)
+        except Exception:
+            pass
     result_data = get_document_result(document_id)
     if not result_data:
         raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
@@ -3756,6 +3776,80 @@ def set_document_linked_offer_endpoint(
         "document_id": document_id,
         "offer_reference": updated.get("offer_reference"),
         "linked_offer_document_id": updated.get("linked_offer_document_id"),
+        "updated_at": updated.get("updated_at"),
+    }
+
+
+@app.get("/documents/{document_id}/predecessor-offer-candidates")
+def get_document_predecessor_offer_candidates(document_id: int):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    candidates = list_predecessor_offer_candidates(exclude_document_id=document_id)
+    items = [
+        {
+            "id": candidate.get("id"),
+            "supplier_name": candidate.get("supplier_name"),
+            "document_number": candidate.get("document_number"),
+            "document_date": candidate.get("document_date"),
+            "project_ref": candidate.get("project_ref"),
+            "status": candidate.get("status"),
+            "approval_status": candidate.get("approval_status"),
+        }
+        for candidate in candidates
+    ]
+    return _json_safe(
+        {
+            "ok": True,
+            "linked_offer_document_id": document.get("linked_offer_document_id"),
+            "offer_link_manual": bool(document.get("offer_link_manual")),
+            "items": items,
+            "count": len(items),
+        }
+    )
+
+
+@app.put("/documents/{document_id}/predecessor-offer")
+def set_document_predecessor_offer_endpoint(
+    document_id: int,
+    payload: DocumentPredecessorOfferRequest,
+    request: Request,
+):
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    predecessor_id = payload.predecessor_document_id
+    if predecessor_id is not None:
+        if predecessor_id == document_id:
+            raise HTTPException(status_code=400, detail="Ein Angebot kann nicht sein eigener Vorgaenger sein.")
+        predecessor = get_document(predecessor_id)
+        if not predecessor:
+            raise HTTPException(status_code=400, detail=f"Angebot {predecessor_id} nicht gefunden.")
+        if str(predecessor.get("document_type") or "").strip().lower() != "angebot":
+            raise HTTPException(status_code=400, detail="Das ausgewaehlte Dokument ist kein Angebot.")
+        # Lieferantenuebergreifend bewusst erlaubt (Verantwortung beim Mitarbeiter).
+
+    updated = set_document_predecessor_offer(
+        document_id,
+        predecessor_document_id=predecessor_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    _audit(
+        request,
+        "predecessor_offer_changed",
+        document_id=document_id,
+        details={
+            "linked_offer_document_id": updated.get("linked_offer_document_id"),
+            "offer_link_manual": updated.get("offer_link_manual"),
+        },
+    )
+    return {
+        "ok": True,
+        "document_id": document_id,
+        "linked_offer_document_id": updated.get("linked_offer_document_id"),
+        "offer_link_manual": updated.get("offer_link_manual"),
         "updated_at": updated.get("updated_at"),
     }
 

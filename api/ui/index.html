@@ -10619,6 +10619,18 @@
       margin-top: 8px;
     }
 
+    .app-v3 #fieldChecklist .bezugsangebot-row {
+      border: 1px solid rgba(10, 90, 200, 0.35);
+      border-left: 3px solid #0a5ac8;
+      background: rgba(10, 90, 200, 0.06);
+      border-radius: 12px;
+      padding-left: 12px;
+    }
+
+    .app-v3 #fieldChecklist .bezugsangebot-row .review-row-title {
+      color: #0a5ac8;
+    }
+
     .app-v3 #totalsAudit .review-row {
       grid-template-columns: 1fr;
       align-content: space-between;
@@ -12025,7 +12037,7 @@
                     </div>
                     <label class="vendoc-auftrag-additional" for="vendocAuftragAdditional">
                       <input type="checkbox" id="vendocAuftragAdditional" disabled>
-                      <span>Alternativangebot zu diesem Auftrag</span>
+                      <span>Zusatzauftrag erzeugen</span>
                     </label>
                     <div class="vendoc-customer-meta" id="vendocAuftragMeta">Optional – leer lassen für neuen Hauptauftrag.</div>
                   </div>
@@ -12396,6 +12408,7 @@
       vendocAuftraegeError: "",
       vendocAuftragQuery: "",
       vendocAuftragPickerOpen: false,
+      predecessorPopupShownFor: new Set(),
       vendocAlreadyImported: false,
       vendocLatestImportedAt: null,
       pendingScreenshot: null,
@@ -13314,6 +13327,160 @@
       } catch (error) {
         setStatus(`Angebot konnte nicht zugeordnet werden: ${String(error.message).slice(0, 220)}`, "err");
       }
+    }
+
+    function createPredecessorOfferSelect(config) {
+      const linkedId = config && config.linkedId != null ? String(config.linkedId) : "";
+      const wrap = document.createElement("div");
+      wrap.className = "summary-edit";
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "summary-edit-btn";
+      editBtn.textContent = linkedId ? "Bezugsangebot ändern" : "Bezugsangebot zuordnen";
+      const form = document.createElement("div");
+      form.className = "summary-edit-form";
+      form.hidden = true;
+      const select = document.createElement("select");
+      select.className = "summary-edit-input summary-edit-select";
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className = "summary-edit-save";
+      saveBtn.textContent = "Speichern";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "summary-edit-cancel";
+      cancelBtn.textContent = "Abbrechen";
+      form.appendChild(select);
+      form.appendChild(saveBtn);
+      form.appendChild(cancelBtn);
+
+      const fillSelect = (items) => {
+        select.innerHTML = "";
+        const none = document.createElement("option");
+        none.value = "";
+        none.textContent = "— kein Bezugsangebot —";
+        select.appendChild(none);
+        for (const item of items || []) {
+          const option = document.createElement("option");
+          option.value = String(item.id);
+          const parts = [`#${item.id}`];
+          if (item.supplier_name) parts.push(String(item.supplier_name));
+          if (item.document_number) parts.push(String(item.document_number));
+          if (item.document_date) parts.push(formatDate(item.document_date));
+          option.textContent = parts.join(" | ");
+          select.appendChild(option);
+        }
+        select.value = linkedId;
+      };
+
+      const openEditor = async () => {
+        if (!state.documentId) return;
+        editBtn.disabled = true;
+        try {
+          const response = await apiJson(`/documents/${state.documentId}/predecessor-offer-candidates`);
+          fillSelect(response.items || []);
+          if (!(response.items || []).length) {
+            const info = document.createElement("option");
+            info.value = "";
+            info.disabled = true;
+            info.textContent = "Keine anderen Angebote eingelesen";
+            select.appendChild(info);
+          }
+          form.hidden = false;
+          editBtn.hidden = true;
+          select.focus();
+        } catch (error) {
+          setStatus(`Angebote konnten nicht geladen werden: ${String(error.message).slice(0, 200)}`, "err");
+        } finally {
+          editBtn.disabled = false;
+        }
+      };
+      const closeEditor = () => {
+        form.hidden = true;
+        editBtn.hidden = false;
+      };
+      editBtn.addEventListener("click", openEditor);
+      cancelBtn.addEventListener("click", closeEditor);
+      saveBtn.addEventListener("click", async () => {
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        try {
+          const raw = select.value;
+          const selectedId = raw ? Number(raw) : null;
+          await saveDocumentPredecessorOffer(selectedId);
+        } finally {
+          saveBtn.disabled = false;
+          cancelBtn.disabled = false;
+        }
+      });
+      select.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") { event.preventDefault(); closeEditor(); }
+      });
+      wrap.appendChild(editBtn);
+      wrap.appendChild(form);
+      return wrap;
+    }
+
+    async function saveDocumentPredecessorOffer(selectedId) {
+      if (!state.documentId) return;
+      try {
+        const response = await apiJson(`/documents/${state.documentId}/predecessor-offer`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ predecessor_document_id: selectedId }),
+        });
+        if (state.result && state.result.document) {
+          state.result.document.linked_offer_document_id = response.linked_offer_document_id || null;
+          state.result.document.offer_link_manual = !!response.offer_link_manual;
+          syncCurrentDocumentIntoList(state.result.document);
+        }
+        await loadResult(state.documentId);
+        setStatus(
+          response.linked_offer_document_id
+            ? "Bezugsangebot zugeordnet."
+            : "Bezugsangebot-Zuordnung entfernt.",
+          "ok",
+        );
+      } catch (error) {
+        setStatus(`Bezugsangebot konnte nicht gespeichert werden: ${String(error.message).slice(0, 220)}`, "err");
+      }
+    }
+
+    async function maybeShowPredecessorPopup(result) {
+      const doc = result && result.document ? result.document : null;
+      if (!doc) return;
+      if (String(doc.document_type || "").toLowerCase() !== "angebot") return;
+      const linkedId = doc.linked_offer_document_id;
+      if (!linkedId) return;
+      if (doc.offer_link_manual) return;                       // schon entschieden
+      if (state.predecessorPopupShownFor.has(Number(doc.id))) return;
+      state.predecessorPopupShownFor.add(Number(doc.id));
+
+      const rel = result.document_relations && result.document_relations.linked_offer_document;
+      const label = rel
+        ? `${rel.supplier_name || "?"} · ${rel.document_number || ("#" + linkedId)}${rel.document_date ? " · " + formatDate(rel.document_date) : ""}`
+        : `Angebot #${linkedId}`;
+
+      const prevCancel = ui.confirmModalCancelBtn ? ui.confirmModalCancelBtn.textContent : null;
+      if (ui.confirmModalCancelBtn) ui.confirmModalCancelBtn.textContent = "Verstanden";
+      let remove = false;
+      try {
+        remove = await openConfirmModal({
+          title: "Vorgängerbeleg gefunden",
+          paragraphs: [
+            "Achtung: Es wurde ein Vorgängerbeleg gefunden und automatisch zugeordnet:",
+            label,
+            "→ In VenDoc wird eine neue Version erstellt.",
+          ],
+          confirmLabel: "Zuordnung entfernen",
+          confirmKind: "danger",
+        });
+      } finally {
+        if (ui.confirmModalCancelBtn && prevCancel != null) ui.confirmModalCancelBtn.textContent = prevCancel;
+      }
+      // Beide Wege setzen offer_link_manual=TRUE (Popup erscheint nie wieder):
+      // "Verstanden" (Abbruch/ESC) behält die Zuordnung, "Zuordnung entfernen" löscht sie.
+      await saveDocumentPredecessorOffer(remove ? null : Number(linkedId));
     }
 
     function setExtractTab(nextTab) {
@@ -14901,6 +15068,26 @@
           </div>
         `);
       }
+      if (String(document.document_type || "").toLowerCase() === "angebot") {
+        const predRel = result.document_relations && result.document_relations.linked_offer_document;
+        const hasPred = !!document.linked_offer_document_id;
+        const predValue = hasPred
+          ? (predRel
+              ? `${predRel.supplier_name || "?"} · ${predRel.document_number || ("#" + document.linked_offer_document_id)}${predRel.document_date ? " · " + formatDate(predRel.document_date) : ""}`
+              : `Angebot #${document.linked_offer_document_id}`)
+          : "— kein Bezugsangebot —";
+        const autoHint = hasPred && !document.offer_link_manual ? " · automatisch erkannt" : "";
+        fieldRows.push(`
+          <div class="review-row bezugsangebot-row">
+            <div class="review-row-main">
+              <div class="review-row-title">Bezugsangebot (Vorversion)${autoHint}</div>
+              <div class="review-row-sub">${escapeHtml(predValue)}</div>
+            </div>
+            <div class="review-row-meta">${reviewFlagHtml(hasPred ? "zugeordnet" : "optional", hasPred ? "ok" : "neutral")}</div>
+            <div class="ab-assign-slot" id="bezugsAssignSlot"></div>
+          </div>
+        `);
+      }
       for (const fieldName of ["customer", "project_ref", "net_total", "vat_total"]) {
         const sourceKey = REVIEW_FIELD_SOURCE_KEYS[fieldName] || null;
         const source = sourceKey ? (state.fieldSources[sourceKey] || "unknown") : "unknown";
@@ -14958,6 +15145,13 @@
         const abSlot = ui.fieldChecklist.querySelector("#abAssignSlot");
         if (abSlot) {
           abSlot.appendChild(createSummaryOfferSelect({ linkedId: document.linked_offer_document_id || null }));
+        }
+      }
+      // Bezugsangebot (Angebot-Versionierung): Zuordnungs-Widget nur bei Angeboten einhängen.
+      if (String(document.document_type || "").toLowerCase() === "angebot") {
+        const bezugsSlot = ui.fieldChecklist.querySelector("#bezugsAssignSlot");
+        if (bezugsSlot) {
+          bezugsSlot.appendChild(createPredecessorOfferSelect({ linkedId: document.linked_offer_document_id || null }));
         }
       }
 
@@ -17300,6 +17494,7 @@
         void loadVendocCustomers();
         renderVendocAuftragSelect();
         void loadVendocAuftraege();
+        void maybeShowPredecessorPopup(result);
         const imageCount = (result.images || []).length;
         const itemCount = (result.line_items || []).length;
         const packagePrefix = usePackage ? `Multi-PDF-Paket #${documentId}` : `Dokument #${documentId}`;
@@ -17824,7 +18019,7 @@
         ui.vendocAuftragMeta.textContent = "Auftragsliste aus SRTemp wird geladen ...";
       } else if (selectedKey) {
         ui.vendocAuftragMeta.textContent = additional
-          ? `Zugeordnet: ${selectedKey} · als Alternativangebot markiert.`
+          ? `Zugeordnet: ${selectedKey} · Zusatzauftrag wird erzeugt.`
           : `Zugeordnet: ${selectedKey}.`;
       } else {
         ui.vendocAuftragMeta.textContent = "Optional – leer lassen für neuen Hauptauftrag.";
@@ -17887,7 +18082,7 @@
         setVendocAuftragPickerOpen(false);
         setStatus(
           dest
-            ? (add ? `Bezugs-Auftrag gesetzt (Alternativangebot): ${dest}.` : `Bezugs-Auftrag gesetzt: ${dest}.`)
+            ? (add ? `Bezugs-Auftrag gesetzt (Zusatzauftrag): ${dest}.` : `Bezugs-Auftrag gesetzt: ${dest}.`)
             : "Bezugs-Auftrag zurückgesetzt (neuer Hauptauftrag).",
           "ok"
         );

@@ -565,6 +565,7 @@ def get_document(document_id: int) -> dict[str, Any] | None:
                 document_type,
                 offer_reference,
                 linked_offer_document_id,
+                offer_link_manual,
                 document_number,
                 document_date,
                 project_ref,
@@ -725,6 +726,47 @@ def list_offer_candidates(
     return [dict(row) for row in rows]
 
 
+def list_predecessor_offer_candidates(*, exclude_document_id: int) -> list[dict[str, Any]]:
+    """Alle Angebote (ALLE Lieferanten) als Auswahl fuer die Angebot-Versionierung
+    (Bezugsangebot/Vorversion). Bewusst nicht auf den eigenen Lieferanten
+    beschraenkt -- die Zuordnung liegt in der Verantwortung des Mitarbeiters."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, supplier_name, document_number, document_date, project_ref,
+                   status, approval_status
+            FROM documents
+            WHERE id <> %s
+              AND document_type = 'angebot'
+            ORDER BY document_date DESC NULLS LAST, id DESC;
+            """,
+            (exclude_document_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def set_document_predecessor_offer(
+    document_id: int, *, predecessor_document_id: int | None
+) -> dict[str, Any] | None:
+    """Setzt die Angebot->Vorgaenger-Verknuepfung (Bezugsangebot) manuell ueber
+    linked_offer_document_id und markiert sie via offer_link_manual, damit die
+    Auto-Erkennung (refresh_document_links) sie nicht wieder ueberschreibt.
+    offer_reference bleibt unveraendert (Export nutzt linked_offer_document_id)."""
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            UPDATE documents
+            SET linked_offer_document_id = %s,
+                offer_link_manual = TRUE,
+                updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, linked_offer_document_id, offer_link_manual, updated_at;
+            """,
+            (predecessor_document_id, document_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def set_document_linked_offer(
     document_id: int,
     *,
@@ -882,6 +924,18 @@ def _document_reference_key(value: Any) -> str | None:
     return normalized or None
 
 
+def _pick_predecessor_offer_id(rows: list[dict[str, Any]], offer_key: str | None) -> int | None:
+    """Waehlt aus (nach Alter AUFSTEIGEND sortierten) Angebotszeilen das erste
+    (=aelteste) mit gleicher normalisierter Angebotsnummer -- der Wurzel-/erste
+    Beleg fuer die Angebot-Versionierung (Fall 1)."""
+    if offer_key is None:
+        return None
+    for row in rows:
+        if _document_reference_key(row.get("document_number")) == offer_key:
+            return int(row["id"])
+    return None
+
+
 def _compact_document_link(row: dict[str, Any] | None) -> dict[str, Any] | None:
     if not row:
         return None
@@ -979,14 +1033,41 @@ def refresh_document_links(document_id: int) -> dict[str, Any] | None:
                 )
         elif document_type == "angebot":
             offer_key = _document_reference_key(document.get("document_number"))
-            conn.execute(
-                """
-                UPDATE documents
-                SET linked_offer_document_id = NULL
-                WHERE id = %s;
-                """,
-                (document_id,),
-            )
+
+            # Fall 1 - Angebot-Versionierung: dieses Angebot automatisch mit
+            # seinem Vorgaenger verknuepfen (aeltestes freigegebenes Angebot
+            # gleicher, normalisierter Angebotsnummer, lieferantenuebergreifend).
+            # Manuell entschiedene Zuordnungen (offer_link_manual) bleiben
+            # unberuehrt, damit ein bewusstes Loeschen/Aendern nicht wieder
+            # ueberschrieben wird.
+            if not document.get("offer_link_manual"):
+                predecessor_id = None
+                if offer_key is not None:
+                    predecessor_rows = conn.execute(
+                        """
+                        SELECT id, document_number
+                        FROM documents
+                        WHERE id <> %s
+                          AND document_type = 'angebot'
+                          AND approval_status = 'approved'
+                        ORDER BY document_date ASC NULLS LAST, id ASC;
+                        """,
+                        (document_id,),
+                    ).fetchall()
+                    # aeltester Treffer zuerst (ORDER BY oben) -> der erste/Wurzel-Beleg
+                    predecessor_id = _pick_predecessor_offer_id(
+                        [dict(row) for row in predecessor_rows], offer_key
+                    )
+                conn.execute(
+                    """
+                    UPDATE documents
+                    SET linked_offer_document_id = %s,
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (predecessor_id, document_id),
+                )
+
             if offer_key is not None:
                 if supplier_name:
                     candidates = conn.execute(
